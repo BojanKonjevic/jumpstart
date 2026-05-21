@@ -55,6 +55,7 @@ def _render_vars(ctx: Context) -> dict[str, object]:
         pkg_name=ctx.pkg_name,
         template=ctx.template,
         secret_key="test-secret",
+        addons=ctx.addons,
     )
 
 

@@ -102,6 +102,7 @@ def _scaffold(tmp_path: Path, name: str, template: str, addons: list[str]) -> Pa
         template=template,
         has_postgres=template == "fastapi",
         has_redis="redis" in addons,
+        addons=addons,
     )
 
     contributions = collect_all(template_config, selected_addon_configs)
@@ -202,7 +203,7 @@ class TestSourceOwnership:
         assert addon_pkgs["fakeredis"].dev is True
 
     def test_addon_recipes_carry_addon_source(self, tmp_path: Path) -> None:
-        project_dir = _scaffold(tmp_path, "myapp", "fastapi", ["redis"])
+        project_dir = _scaffold(tmp_path, "myapp", "fastapi", ["docker", "redis"])
         m = read_manifest(project_dir)
 
         addon_recipes = {r.name: r for r in m.just_recipes if r.source == "addon"}

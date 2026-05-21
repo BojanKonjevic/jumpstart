@@ -53,6 +53,7 @@ def run_dry(ctx: Context) -> None:
         template=ctx.template,
         has_postgres=ctx.template == "fastapi",
         has_redis="redis" in ctx.addons,
+        addons=dry_ctx.addons,
     )
 
     apply_contributions(

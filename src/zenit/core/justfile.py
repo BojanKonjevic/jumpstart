@@ -23,7 +23,7 @@ def inject_just_recipes(project_dir: Path, recipes: list[str]) -> list[str]:
     existing_text = justfile_path.read_text(encoding="utf-8")
     existing_names = _extract_recipe_names(existing_text)
 
-    to_add = [r for r in recipes if _recipe_name(r) not in existing_names]
+    to_add = [r for r in recipes if r.strip() and _recipe_name(r) not in existing_names]
     if not to_add:
         return []
 

@@ -77,6 +77,7 @@ def _scaffold(tmp_path: Path, name: str, template: str, addons: list[str]) -> Pa
         template=template,
         has_postgres=template == "fastapi",
         has_redis="redis" in addons,
+        addons=addons,
     )
 
     contributions = collect_all(template_config, selected)
@@ -194,7 +195,7 @@ def test_add_docker_adds_just_recipes(tmp_path, monkeypatch):
 
 
 def test_add_redis_adds_just_recipes(tmp_path, monkeypatch):
-    project_dir = _scaffold(tmp_path, "myapp", "blank", [])
+    project_dir = _scaffold(tmp_path, "myapp", "blank", ["docker"])
     monkeypatch.chdir(project_dir)
     with suppress_stdin():
         add_addon("redis")

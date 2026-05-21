@@ -54,19 +54,27 @@ config = AddonConfig(
     deps=["celery[redis]>=5", "flower"],
     dev_deps=["pytest-celery"],
     just_recipes=[
+        '[% if "docker" in addons %]'
         "# start celery worker and beat scheduler\n"
         "celery-up:\n"
-        "    docker compose up -d celery-worker celery-beat",
+        "    docker compose up -d celery-worker celery-beat\n"
+        '[% endif %]',
+        '[% if "docker" in addons %]'
         "# stop celery worker and beat scheduler\n"
         "celery-down:\n"
-        "    docker compose stop celery-worker celery-beat",
+        "    docker compose stop celery-worker celery-beat\n"
+        '[% endif %]',
+        '[% if "docker" in addons %]'
         "# open flower monitoring UI on port 5555\n"
         "celery-flower:\n"
         "    docker compose run --rm celery-worker "
-        "celery -A (( pkg_name )).tasks.celery_app flower --port=5555",
+        "celery -A (( pkg_name )).tasks.celery_app flower --port=5555\n"
+        '[% endif %]',
+        '[% if "docker" in addons %]'
         "# tail celery worker logs\n"
         "celery-logs:\n"
-        "    docker compose logs -f celery-worker",
+        "    docker compose logs -f celery-worker\n"
+        '[% endif %]',
     ],
 )
 

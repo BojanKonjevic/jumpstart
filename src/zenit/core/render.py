@@ -66,6 +66,7 @@ def build_render_vars(
     secret_key: str = "change-me-run-openssl-rand-hex-32",
     has_postgres: bool = False,
     has_redis: bool = False,
+    addons: list[str] | None = None,
 ) -> dict[str, object]:
     """Build the standard render-variables dict for template rendering.
 
@@ -79,6 +80,7 @@ def build_render_vars(
         "secret_key": secret_key,
         "has_postgres": has_postgres,
         "has_redis": has_redis,
+        "addons": addons or [],
     }
 
 

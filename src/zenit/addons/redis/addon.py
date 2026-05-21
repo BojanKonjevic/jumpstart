@@ -51,8 +51,8 @@ config = AddonConfig(
     deps=["redis>=5", "hiredis"],
     dev_deps=["fakeredis"],
     just_recipes=[
-        "# start redis\nredis-up:\n    docker compose up -d redis",
-        "# stop redis\nredis-down:\n    docker compose stop redis",
+        '[% if "docker" in addons %]# start redis\nredis-up:\n    docker compose up -d redis\n[% endif %]',
+        '[% if "docker" in addons %]# stop redis\nredis-down:\n    docker compose stop redis\n[% endif %]',
         "# open redis-cli\nredis-cli:\n    redis-cli",
     ],
     injections=[

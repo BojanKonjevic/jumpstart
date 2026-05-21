@@ -58,11 +58,11 @@ def generate_all(
 
     # Drop addon recipes whose name already appears in the template set so
     # that addon authors can override a template recipe without duplication.
-    template_recipe_names = {_recipe_name(r) for r in rendered_template_recipes}
+    template_recipe_names = {_recipe_name(r) for r in rendered_template_recipes if r.strip()}
     unique_addon_recipes = [
         r
         for r in rendered_addon_recipes
-        if _recipe_name(r) not in template_recipe_names
+        if r.strip() and _recipe_name(r) not in template_recipe_names
     ]
 
     template_vars = {

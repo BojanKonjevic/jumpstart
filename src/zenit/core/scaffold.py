@@ -96,6 +96,7 @@ def scaffold_project(name: str, dry_run: bool = False) -> None:
             template=template,
             has_postgres=template == "fastapi",
             has_redis="redis" in addons,
+            addons=addons,
         )
 
         write_lockfile(project_dir, template, addons)

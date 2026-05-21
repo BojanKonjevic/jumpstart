@@ -61,6 +61,7 @@ def _scaffold(tmp_path: Path, name: str, template: str, addons: list[str]) -> Pa
         template=template,
         has_postgres=template == "fastapi",
         has_redis="redis" in addons,
+        addons=addons,
     )
 
     contributions = collect_all(template_config, selected_addon_configs)

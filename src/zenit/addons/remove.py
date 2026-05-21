@@ -82,6 +82,7 @@ def remove_addon(
         template=template,
         has_postgres=template == "fastapi",
         has_redis="redis" in lockfile.addons,
+        addons=lockfile.addons,
     )
 
     # ── files ──────────────────────────────────────────────────────────────
