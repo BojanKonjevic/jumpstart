@@ -4,7 +4,6 @@ recording context that captures every file operation without touching disk."""
 from __future__ import annotations
 
 import secrets
-from typing import Any
 
 from zenit.addons._registry import get_available_addons
 from zenit.cli.ui import (
@@ -22,52 +21,22 @@ from zenit.core._apply_loader import load_apply
 from zenit.core.apply import apply_contributions
 from zenit.core.collect import collect_all
 from zenit.core.context import Context
+from zenit.core.filesystem import RecordingFileSystem
 from zenit.core.generate import generate_all
 from zenit.templates._load_config import load_template_config
 
 
-class DryRunContext(Context):
-    """A ``Context`` subclass that records every file operation instead of
-    executing it, leaving the filesystem completely untouched."""
-
-    # List of (action, path, details) tuples recorded during the dry run.
-    recorded_files: list[tuple[str, str, str]]
-
-    def __init__(self, **kwargs: Any) -> None:
-        super().__init__(**kwargs)
-        self.recorded_files = []
-        object.__setattr__(self, "_dry_run", True)
-
-    @property
-    def dry_run(self) -> bool:
-        return True
-
-    def _record_write(self, path: str, content: str = "") -> None:
-        self.recorded_files.append(("create", path, ""))
-
-    def _record_dir(self, path: str) -> None:
-        self.recorded_files.append(("mkdir", path, ""))
-
-    def _record_copy(self, path: str) -> None:
-        self.recorded_files.append(("copy", path, ""))
-
-    def _record_append(self, path: str, content: str) -> None:
-        preview = content.replace("\n", " ").strip()[:80]
-        self.recorded_files.append(("append", path, preview))
-
-    def _record_action(self, action: str, path: str, description: str) -> None:
-        self.recorded_files.append((action, path, description))
-
-
 def run_dry(ctx: Context) -> None:
-    """Run the scaffold pipeline with a ``DryRunContext`` and print the manifest."""
-    dry_ctx = DryRunContext(
+    """Run the scaffold pipeline with a ``RecordingFileSystem`` and print the manifest."""
+    fs = RecordingFileSystem(ctx.project_dir)
+    dry_ctx = Context(
         name=ctx.name,
         pkg_name=ctx.pkg_name,
         template=ctx.template,
         addons=ctx.addons,
         zenit_root=ctx.zenit_root,
         project_dir=ctx.project_dir,
+        _fs=fs,
     )
 
     sr = dry_ctx.zenit_root
@@ -108,7 +77,7 @@ def run_dry(ctx: Context) -> None:
 
     dry_header("Files that would be created or modified")
 
-    for action, path, details in dry_ctx.recorded_files:
+    for action, path, details in fs.recorded_files:
         if action == "mkdir":
             print(f"  {MAGENTA}►{RESET} {path}/")
         elif action in ("create", "copy"):

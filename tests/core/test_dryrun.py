@@ -1,6 +1,6 @@
 """Tests for zenit.dryrun — preview mode that records operations without writing.
 
-Verifies that DryRunContext records all file operations and that run_dry
+Verifies that RecordingFileSystem captures all file operations and that run_dry
 produces the expected output without touching the filesystem.
 """
 
@@ -11,7 +11,8 @@ from pathlib import Path
 from conftest import ZENIT_ROOT
 
 from zenit.core.context import Context
-from zenit.core.dryrun import DryRunContext, run_dry
+from zenit.core.dryrun import run_dry
+from zenit.core.filesystem import RecordingFileSystem
 
 
 def _real_ctx(
@@ -30,18 +31,28 @@ def _real_ctx(
     )
 
 
-# ── DryRunContext.dry_run property ────────────────────────────────────────────
-
-
-def test_dry_run_context_dry_run_is_true(tmp_path):
-    ctx = DryRunContext(
-        name="myapp",
-        pkg_name="myapp",
+def _dry_ctx(
+    tmp_path: Path,
+    name: str = "myapp",
+) -> tuple[Context, RecordingFileSystem]:
+    fs = RecordingFileSystem(tmp_path / name)
+    ctx = Context(
+        name=name,
+        pkg_name=name.replace("-", "_"),
         template="blank",
         addons=[],
         zenit_root=ZENIT_ROOT,
-        project_dir=tmp_path / "myapp",
+        project_dir=tmp_path / name,
+        _fs=fs,
     )
+    return ctx, fs
+
+
+# ── dry_run property ─────────────────────────────────────────────────────────
+
+
+def test_dry_run_context_dry_run_is_true(tmp_path):
+    ctx, _ = _dry_ctx(tmp_path)
     assert ctx.dry_run is True
 
 
@@ -50,77 +61,42 @@ def test_real_context_dry_run_is_false(tmp_path):
     assert ctx.dry_run is False
 
 
-# ── DryRunContext recording ───────────────────────────────────────────────────
+# ── RecordingFileSystem recording ──────────────────────────────────────────────
 
 
 def test_write_file_is_recorded_not_written(tmp_path):
-    ctx = DryRunContext(
-        name="myapp",
-        pkg_name="myapp",
-        template="blank",
-        addons=[],
-        zenit_root=ZENIT_ROOT,
-        project_dir=tmp_path / "myapp",
-    )
+    ctx, fs = _dry_ctx(tmp_path)
     ctx.write_file("src/myapp/main.py", "# content")
     assert not (tmp_path / "myapp" / "src" / "myapp" / "main.py").exists()
-    assert any(path == "src/myapp/main.py" for (action, path, _) in ctx.recorded_files)
+    assert any(path == "src/myapp/main.py" for (action, path, _) in fs.recorded_files)
 
 
 def test_create_dir_is_recorded_not_created(tmp_path):
-    ctx = DryRunContext(
-        name="myapp",
-        pkg_name="myapp",
-        template="blank",
-        addons=[],
-        zenit_root=ZENIT_ROOT,
-        project_dir=tmp_path / "myapp",
-    )
+    ctx, fs = _dry_ctx(tmp_path)
     ctx.create_dir("src/myapp")
     assert not (tmp_path / "myapp" / "src" / "myapp").exists()
-    assert any(action == "mkdir" for (action, _, __) in ctx.recorded_files)
+    assert any(action == "mkdir" for (action, _, __) in fs.recorded_files)
 
 
 def test_copy_file_is_recorded_not_copied(tmp_path):
     src = tmp_path / "source.txt"
     src.write_text("data")
-    ctx = DryRunContext(
-        name="myapp",
-        pkg_name="myapp",
-        template="blank",
-        addons=[],
-        zenit_root=ZENIT_ROOT,
-        project_dir=tmp_path / "myapp",
-    )
+    ctx, fs = _dry_ctx(tmp_path)
     ctx.copy_file(src, "dest.txt")
     assert not (tmp_path / "myapp" / "dest.txt").exists()
-    assert any(action == "copy" for (action, _, __) in ctx.recorded_files)
+    assert any(action == "copy" for (action, _, __) in fs.recorded_files)
 
 
 def test_append_to_file_is_recorded(tmp_path):
-    ctx = DryRunContext(
-        name="myapp",
-        pkg_name="myapp",
-        template="blank",
-        addons=[],
-        zenit_root=ZENIT_ROOT,
-        project_dir=tmp_path / "myapp",
-    )
+    ctx, fs = _dry_ctx(tmp_path)
     ctx.append_to_file("somefile.py", "# appended")
-    assert any(action == "append" for (action, _, __) in ctx.recorded_files)
+    assert any(action == "append" for (action, _, __) in fs.recorded_files)
 
 
 def test_record_modification_is_recorded(tmp_path):
-    ctx = DryRunContext(
-        name="myapp",
-        pkg_name="myapp",
-        template="blank",
-        addons=[],
-        zenit_root=ZENIT_ROOT,
-        project_dir=tmp_path / "myapp",
-    )
+    ctx, fs = _dry_ctx(tmp_path)
     ctx.record_modification("settings.py", "injected redis_url field")
-    assert any(action == "modify" for (action, _, __) in ctx.recorded_files)
+    assert any(action == "modify" for (action, _, __) in fs.recorded_files)
 
 
 # ── run_dry — no filesystem side-effects ─────────────────────────────────────
@@ -239,26 +215,18 @@ def test_run_dry_all_fastapi_addons(tmp_path, capsys):
     )
     run_dry(ctx)
     captured = capsys.readouterr()
-    # Should complete without raising and mention all addons
     for addon in ["docker", "redis", "celery", "sentry"]:
         assert addon in captured.out
 
 
-# ── DryRunContext recorded_files structure ─────────────────────────────────────
+# ── recorded_files structure ──────────────────────────────────────────────────
 
 
 def test_recorded_files_is_list_of_tuples(tmp_path):
-    ctx = DryRunContext(
-        name="myapp",
-        pkg_name="myapp",
-        template="blank",
-        addons=[],
-        zenit_root=ZENIT_ROOT,
-        project_dir=tmp_path / "myapp",
-    )
+    ctx, fs = _dry_ctx(tmp_path)
     ctx.write_file("a.py", "x")
     ctx.create_dir("mydir")
-    for entry in ctx.recorded_files:
+    for entry in fs.recorded_files:
         assert isinstance(entry, tuple)
         assert len(entry) == 3
         action, path, details = entry
@@ -268,10 +236,5 @@ def test_recorded_files_is_list_of_tuples(tmp_path):
 
 
 def test_run_dry_blank_recorded_files_are_non_empty(tmp_path):
-    """After run_dry, the internal DryRunContext should have recorded files."""
-    # We verify indirectly: output mentions at least one file path
     ctx = _real_ctx(tmp_path, template="blank")
     run_dry(ctx)
-    # If DryRunContext recorded nothing, output would be empty of file paths;
-    # we already checked main.py appears above. This is a belt-and-suspenders check.
-    # The real assertion: no exception was raised.

@@ -28,7 +28,7 @@ from zenit.core.apply import apply_contributions
 from zenit.core.collect import collect_addon_only
 from zenit.core.context import Context
 from zenit.core.deps import inject_deps
-from zenit.core.dryrun import DryRunContext
+from zenit.core.filesystem import RecordingFileSystem
 from zenit.core.generate import _recipe_name
 from zenit.core.justfile import inject_just_recipes
 from zenit.core.lockfile import read_lockfile, write_lockfile
@@ -167,13 +167,15 @@ def _dry_add(
     """Print what `zenit add` would do without writing anything."""
 
     zenit_root = ctx.zenit_root
-    dry_ctx = DryRunContext(
+    fs = RecordingFileSystem(ctx.project_dir)
+    dry_ctx = Context(
         name=ctx.name,
         pkg_name=ctx.pkg_name,
         template=template,
         addons=ctx.addons,
         zenit_root=zenit_root,
         project_dir=ctx.project_dir,
+        _fs=fs,
     )
 
     template_config = load_template_config(zenit_root, template)
@@ -202,7 +204,7 @@ def _dry_add(
     )
 
     dry_header("Files that would be created or modified")
-    for action, path, details in dry_ctx.recorded_files:
+    for action, path, details in fs.recorded_files:
         if action in ("create", "copy"):
             print(f"  {GREEN}+{RESET} {path}")
         elif action == "append":

@@ -30,3 +30,6 @@ node_modules
 
 #Vitepress cache
 **/.vitepress/cache/
+
+#AGENTS.md
+AGENTS.md

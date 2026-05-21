@@ -1,12 +1,21 @@
-import shutil
-import subprocess
-from dataclasses import dataclass
+"""Runtime state passed through the entire scaffold pipeline."""
+
+from __future__ import annotations
+
+from dataclasses import dataclass, field
 from pathlib import Path
+
+from zenit.core.filesystem import FileSystem, RealFileSystem, RecordingFileSystem
 
 
 @dataclass
 class Context:
-    """Runtime state passed through the entire scaffold pipeline."""
+    """Runtime state passed through the entire scaffold pipeline.
+
+    Filesystem operations are delegated to a ``FileSystem`` instance.
+    By default a ``RealFileSystem`` is used.  Pass ``RecordingFileSystem``
+    for dry-run mode.
+    """
 
     name: str
     pkg_name: str
@@ -14,71 +23,35 @@ class Context:
     addons: list[str]
     zenit_root: Path
     project_dir: Path
-    _dry_run: bool = False
+    _fs: FileSystem | None = field(default=None, repr=False, compare=False)
+
+    def __post_init__(self) -> None:
+        if self._fs is None:
+            self._fs = RealFileSystem(self.project_dir)
 
     @property
     def dry_run(self) -> bool:
-        return self._dry_run
+        return isinstance(self._fs, RecordingFileSystem)
 
     def has(self, addon: str) -> bool:
         return addon in self.addons
 
-    # ── Filesystem abstraction ────────────────────────────────────────────────
-    # Each method checks dry_run first; DryRunContext overrides the _record_*
-    # hooks so the same codepaths exercise the recording logic without I/O.
+    # ── Filesystem delegation ─────────────────────────────────────────────────
 
     def write_file(self, path: str, content: str) -> None:
-        if self.dry_run:
-            self._record_write(path, content)
-            return
-        dest = self.project_dir / path
-        dest.parent.mkdir(parents=True, exist_ok=True)
-        dest.write_text(content)
+        self._fs.write_file(path, content)  # type: ignore[union-attr]
 
     def create_dir(self, path: str) -> None:
-        if self.dry_run:
-            self._record_dir(path)
-            return
-        (self.project_dir / path).mkdir(parents=True, exist_ok=True)
+        self._fs.create_dir(path)  # type: ignore[union-attr]
 
     def copy_file(self, src: Path, dest_relative: str) -> None:
-        if self.dry_run:
-            self._record_copy(dest_relative)
-            return
-        dest = self.project_dir / dest_relative
-        dest.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy(src, dest)
+        self._fs.copy_file(src, dest_relative)  # type: ignore[union-attr]
 
     def append_to_file(self, path: str, content: str) -> None:
-        if self.dry_run:
-            self._record_append(path, content)
-            return
-        file_path = self.project_dir / path
-        with open(file_path, "a") as f:
-            f.write(content)
+        self._fs.append_to_file(path, content)  # type: ignore[union-attr]
 
     def record_modification(self, path: str, description: str) -> None:
-        if self.dry_run:
-            self._record_action("modify", path, description)
+        self._fs.record_modification(path, description)  # type: ignore[union-attr]
 
     def execute_command(self, cmd: list[str], check: bool = True) -> None:
-        if self.dry_run:
-            return
-        subprocess.run(cmd, check=check, capture_output=True)
-
-    # ── Recording hooks (overridden in DryRunContext) ─────────────────────────
-
-    def _record_write(self, path: str, content: str = "") -> None:
-        pass
-
-    def _record_dir(self, path: str) -> None:
-        pass
-
-    def _record_copy(self, path: str) -> None:
-        pass
-
-    def _record_append(self, path: str, content: str) -> None:
-        pass
-
-    def _record_action(self, action: str, path: str, description: str) -> None:
-        pass
+        self._fs.execute_command(cmd, check=check)  # type: ignore[union-attr]
