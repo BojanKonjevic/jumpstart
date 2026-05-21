@@ -34,4 +34,4 @@ class ExitAssertion:
         return True
 
 
-SCAFFOLDER_ROOT = Path(__file__).parent.parent / "src" / "scaffolder"
+ZENIT_ROOT = Path(__file__).parent.parent / "src" / "zenit"

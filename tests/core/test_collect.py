@@ -1,7 +1,7 @@
-"""Tests for scaffolder.assembler — collecting and merging contributions."""
+"""Tests for zenit.assembler — collecting and merging contributions."""
 
-from scaffolder.core.collect import collect_all
-from scaffolder.schema.models import (
+from zenit.core.collect import collect_all
+from zenit.schema.models import (
     AddonConfig,
     ComposeService,
     Contributions,

@@ -1,4 +1,4 @@
-"""Tests for scaffolder.render — Jinja2 environment configuration.
+"""Tests for zenit.render — Jinja2 environment configuration.
 
 Includes a regression test for ``line_comment_prefix=None``, which must stay
 set to prevent Jinja2's default ``##`` from silently eating comment lines in
@@ -10,7 +10,7 @@ from __future__ import annotations
 import jinja2
 import pytest
 
-from scaffolder.core.render import make_env
+from zenit.core.render import make_env
 
 # ── Delimiter configuration ───────────────────────────────────────────────────
 

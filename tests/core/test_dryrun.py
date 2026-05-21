@@ -1,4 +1,4 @@
-"""Tests for scaffolder.dryrun — preview mode that records operations without writing.
+"""Tests for zenit.dryrun — preview mode that records operations without writing.
 
 Verifies that DryRunContext records all file operations and that run_dry
 produces the expected output without touching the filesystem.
@@ -8,10 +8,10 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from conftest import SCAFFOLDER_ROOT
+from conftest import ZENIT_ROOT
 
-from scaffolder.core.context import Context
-from scaffolder.core.dryrun import DryRunContext, run_dry
+from zenit.core.context import Context
+from zenit.core.dryrun import DryRunContext, run_dry
 
 
 def _real_ctx(
@@ -25,7 +25,7 @@ def _real_ctx(
         pkg_name=name.replace("-", "_"),
         template=template,
         addons=addons or [],
-        scaffolder_root=SCAFFOLDER_ROOT,
+        zenit_root=ZENIT_ROOT,
         project_dir=tmp_path / name,
     )
 
@@ -39,7 +39,7 @@ def test_dry_run_context_dry_run_is_true(tmp_path):
         pkg_name="myapp",
         template="blank",
         addons=[],
-        scaffolder_root=SCAFFOLDER_ROOT,
+        zenit_root=ZENIT_ROOT,
         project_dir=tmp_path / "myapp",
     )
     assert ctx.dry_run is True
@@ -59,7 +59,7 @@ def test_write_file_is_recorded_not_written(tmp_path):
         pkg_name="myapp",
         template="blank",
         addons=[],
-        scaffolder_root=SCAFFOLDER_ROOT,
+        zenit_root=ZENIT_ROOT,
         project_dir=tmp_path / "myapp",
     )
     ctx.write_file("src/myapp/main.py", "# content")
@@ -73,7 +73,7 @@ def test_create_dir_is_recorded_not_created(tmp_path):
         pkg_name="myapp",
         template="blank",
         addons=[],
-        scaffolder_root=SCAFFOLDER_ROOT,
+        zenit_root=ZENIT_ROOT,
         project_dir=tmp_path / "myapp",
     )
     ctx.create_dir("src/myapp")
@@ -89,7 +89,7 @@ def test_copy_file_is_recorded_not_copied(tmp_path):
         pkg_name="myapp",
         template="blank",
         addons=[],
-        scaffolder_root=SCAFFOLDER_ROOT,
+        zenit_root=ZENIT_ROOT,
         project_dir=tmp_path / "myapp",
     )
     ctx.copy_file(src, "dest.txt")
@@ -103,7 +103,7 @@ def test_append_to_file_is_recorded(tmp_path):
         pkg_name="myapp",
         template="blank",
         addons=[],
-        scaffolder_root=SCAFFOLDER_ROOT,
+        zenit_root=ZENIT_ROOT,
         project_dir=tmp_path / "myapp",
     )
     ctx.append_to_file("somefile.py", "# appended")
@@ -116,7 +116,7 @@ def test_record_modification_is_recorded(tmp_path):
         pkg_name="myapp",
         template="blank",
         addons=[],
-        scaffolder_root=SCAFFOLDER_ROOT,
+        zenit_root=ZENIT_ROOT,
         project_dir=tmp_path / "myapp",
     )
     ctx.record_modification("settings.py", "injected redis_url field")
@@ -253,7 +253,7 @@ def test_recorded_files_is_list_of_tuples(tmp_path):
         pkg_name="myapp",
         template="blank",
         addons=[],
-        scaffolder_root=SCAFFOLDER_ROOT,
+        zenit_root=ZENIT_ROOT,
         project_dir=tmp_path / "myapp",
     )
     ctx.write_file("a.py", "x")

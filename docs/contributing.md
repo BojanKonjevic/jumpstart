@@ -50,7 +50,7 @@ Small, focused changes move faster than large refactors.
 
 **Comments.** Don't add file-header path comments. Don't explain what the code already says. Comment non-obvious intent or domain quirks only.
 
-**Errors.** Use the `ScaffoldError` hierarchy — no raw `ValueError` or `RuntimeError` in user-facing paths. Error messages must say what failed, why it failed, and how to fix it.
+**Errors.** Use the `ZenitError` hierarchy — no raw `ValueError` or `RuntimeError` in user-facing paths. Error messages must say what failed, why it failed, and how to fix it.
 
 ---
 

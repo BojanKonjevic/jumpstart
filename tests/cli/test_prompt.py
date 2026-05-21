@@ -1,4 +1,4 @@
-"""Tests for scaffolder.prompt fallback functions.
+"""Tests for zenit.prompt fallback functions.
 
 The TUI path requires a real terminal and is not tested here.
 The fallback functions (``_fallback_template``, ``_fallback_addons``) run
@@ -12,8 +12,8 @@ from unittest.mock import patch
 
 import pytest
 
-from scaffolder.cli.prompt._multi import _fallback_multi
-from scaffolder.cli.prompt._single import _fallback_template
+from zenit.cli.prompt._multi import _fallback_multi
+from zenit.cli.prompt._single import _fallback_template
 
 # ── _fallback_template ────────────────────────────────────────────────────────
 

@@ -1,4 +1,4 @@
-"""Tests for scaffolder.remove — addon removal from existing projects."""
+"""Tests for zenit.remove — addon removal from existing projects."""
 
 from __future__ import annotations
 
@@ -10,19 +10,19 @@ from pathlib import Path
 
 import pytest
 import yaml
-from conftest import SCAFFOLDER_ROOT
+from conftest import ZENIT_ROOT
 
-from scaffolder.addons._registry import get_available_addons
-from scaffolder.addons.remove import remove_addon
-from scaffolder.core._apply_loader import load_apply
-from scaffolder.core.apply import apply_contributions
-from scaffolder.core.collect import collect_all
-from scaffolder.core.context import Context
-from scaffolder.core.generate import generate_all
-from scaffolder.core.git import init
-from scaffolder.core.lockfile import read_lockfile, write_lockfile
-from scaffolder.schema.exceptions import ScaffoldError
-from scaffolder.templates._load_config import load_template_config
+from zenit.addons._registry import get_available_addons
+from zenit.addons.remove import remove_addon
+from zenit.core._apply_loader import load_apply
+from zenit.core.apply import apply_contributions
+from zenit.core.collect import collect_all
+from zenit.core.context import Context
+from zenit.core.generate import generate_all
+from zenit.core.git import init
+from zenit.core.lockfile import read_lockfile, write_lockfile
+from zenit.schema.exceptions import ZenitError
+from zenit.templates._load_config import load_template_config
 
 
 @contextmanager
@@ -54,17 +54,17 @@ def _scaffold(tmp_path: Path, name: str, template: str, addons: list[str]) -> Pa
         pkg_name=pkg_name,
         template=template,
         addons=addons,
-        scaffolder_root=SCAFFOLDER_ROOT,
+        zenit_root=ZENIT_ROOT,
         project_dir=project_dir,
     )
 
     # Common files
 
-    load_apply(SCAFFOLDER_ROOT / "templates" / "_common" / "apply.py")(ctx)
+    load_apply(ZENIT_ROOT / "templates" / "_common" / "apply.py")(ctx)
 
     # Template + addon contributions
     available = get_available_addons()
-    template_config = load_template_config(SCAFFOLDER_ROOT, template)
+    template_config = load_template_config(ZENIT_ROOT, template)
     selected_addon_configs = [cfg for cfg in available if cfg.id in addons]
 
     secret_key = secrets.token_hex(32) if template == "fastapi" else None
@@ -218,7 +218,7 @@ class TestRemoveAddonUnit:
         assert not integrations_dir.exists()
 
     def test_cannot_remove_unknown_addon(self):
-        with suppress_stdin(), pytest.raises(ScaffoldError):
+        with suppress_stdin(), pytest.raises(ZenitError):
             remove_addon("nonexistent")
 
     def test_cannot_remove_from_non_zenit_project(self, tmp_path, monkeypatch):
@@ -226,7 +226,7 @@ class TestRemoveAddonUnit:
         project_dir.mkdir()
         monkeypatch.chdir(project_dir)
 
-        with suppress_stdin(), pytest.raises(ScaffoldError):
+        with suppress_stdin(), pytest.raises(ZenitError):
             remove_addon("docker", project_dir=project_dir)
 
 
@@ -382,7 +382,7 @@ class TestRemoveAddonIntegration:
 
         main_before = (project_dir / "src" / "myapp" / "main.py").read_text()
 
-        with suppress_stdin(), pytest.raises(ScaffoldError):
+        with suppress_stdin(), pytest.raises(ZenitError):
             remove_addon("nonexistent", project_dir=project_dir)
 
         main_after = (project_dir / "src" / "myapp" / "main.py").read_text()
@@ -395,7 +395,7 @@ class TestRemoveAddonIntegration:
         )
         monkeypatch.chdir(project_dir)
 
-        with suppress_stdin(), pytest.raises(ScaffoldError):
+        with suppress_stdin(), pytest.raises(ZenitError):
             remove_addon("redis", project_dir=project_dir)  # celery depends on redis
 
     def test_remove_sentry_from_fastapi_removes_settings_fields(
@@ -419,5 +419,5 @@ class TestRemoveAddonIntegration:
         monkeypatch.chdir(project_dir)
 
         # Can't remove docker from fastapi since it's required
-        with suppress_stdin(), pytest.raises(ScaffoldError):
+        with suppress_stdin(), pytest.raises(ZenitError):
             remove_addon("docker", project_dir=project_dir)

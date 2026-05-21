@@ -1,4 +1,4 @@
-"""Tests for scaffolder.validate — name validation, preflight checks,
+"""Tests for zenit.validate — name validation, preflight checks,
 and addon dependency/template-compatibility validation.
 """
 
@@ -10,8 +10,8 @@ from unittest.mock import patch
 import pytest
 from conftest import ExitAssertion
 
-from scaffolder.core.validate import check_preflight, validate_addon_deps, validate_name
-from scaffolder.schema.models import AddonConfig
+from zenit.core.validate import check_preflight, validate_addon_deps, validate_name
+from zenit.schema.models import AddonConfig
 
 # ── helpers ───────────────────────────────────────────────────────────────────
 

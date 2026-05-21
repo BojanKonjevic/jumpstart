@@ -1,4 +1,4 @@
-"""Unit tests for the fingerprinting contract in scaffolder.core.manifest.
+"""Unit tests for the fingerprinting contract in zenit.core.manifest.
 
 The fingerprint contract is frozen: changing _normalise requires bumping
 MANIFEST_SCHEMA_VERSION. These tests document the contract boundaries and
@@ -7,7 +7,7 @@ the guarantees made to removal Stages A and B.
 
 from __future__ import annotations
 
-from scaffolder.core.manifest import _normalise, fingerprint
+from zenit.core.manifest import _normalise, fingerprint
 
 # ── fingerprint() — top-level contract ───────────────────────────────────────
 

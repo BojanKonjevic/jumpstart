@@ -34,7 +34,7 @@ When an addon requires another (e.g. `celery` → `redis`), `zenit add celery` r
 
 ## How addons work
 
-Each addon is a directory under `src/scaffolder/addons/` containing:
+Each addon is a directory under `src/zenit/addons/` containing:
 
 - `addon.py` — the manifest that declares everything the addon does
 - `files/` — optional Jinja2 templates and static files to copy

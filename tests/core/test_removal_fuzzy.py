@@ -16,14 +16,14 @@ from pathlib import Path
 import libcst as cst
 import pytest
 
-from scaffolder.core.handlers.python_handler import (
+from zenit.core.handlers.python_handler import (
     FUZZY_WINDOW_LINES,
     RemovalError,
     apply,
     remove,
 )
-from scaffolder.core.manifest import fingerprint as _fp
-from scaffolder.schema.models import ManifestBlock
+from zenit.core.manifest import fingerprint as _fp
+from zenit.schema.models import ManifestBlock
 
 # ── helpers ───────────────────────────────────────────────────────────────────
 

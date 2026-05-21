@@ -15,7 +15,7 @@ Templates are the foundation of every Zenit project. When you run `zenit create`
 
 ## How templates work
 
-Each template is a directory under `src/scaffolder/templates/` containing:
+Each template is a directory under `src/zenit/templates/` containing:
 
 - `template.py` — the manifest that declares everything the template provides
 - `files/` — Jinja2 templates and static files rendered into the project

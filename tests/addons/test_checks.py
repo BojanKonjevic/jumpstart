@@ -1,13 +1,13 @@
-"""Tests for scaffolder.checks — precondition checking for zenit add."""
+"""Tests for zenit.checks — precondition checking for zenit add."""
 
 from pathlib import Path
 
 import pytest
 
-from scaffolder.addons.checks import check_can_add
-from scaffolder.core.lockfile import write_lockfile
-from scaffolder.schema.exceptions import ScaffoldError
-from scaffolder.schema.models import AddonConfig
+from zenit.addons.checks import check_can_add
+from zenit.core.lockfile import write_lockfile
+from zenit.schema.exceptions import ZenitError
+from zenit.schema.models import AddonConfig
 
 
 def _make_addon(id: str, requires: list[str] | None = None) -> AddonConfig:
@@ -20,35 +20,35 @@ def _write_lock(project_dir: Path, template: str, addons: list[str]) -> None:
 
 def test_raises_when_no_lockfile(tmp_path):
     available = [_make_addon("docker")]
-    with pytest.raises(ScaffoldError, match=".zenit.toml"):
+    with pytest.raises(ZenitError, match=".zenit.toml"):
         check_can_add(tmp_path, "docker", available)
 
 
 def test_raises_when_lockfile_has_no_template(tmp_path):
     (tmp_path / ".zenit.toml").write_text("[project]\naddons = []\n")
     available = [_make_addon("docker")]
-    with pytest.raises(ScaffoldError, match="template"):
+    with pytest.raises(ZenitError, match="template"):
         check_can_add(tmp_path, "docker", available)
 
 
 def test_raises_for_unknown_addon(tmp_path):
     _write_lock(tmp_path, "blank", [])
     available = [_make_addon("docker")]
-    with pytest.raises(ScaffoldError, match="Unknown addon"):
+    with pytest.raises(ZenitError, match="Unknown addon"):
         check_can_add(tmp_path, "nonexistent", available)
 
 
 def test_raises_when_addon_already_installed(tmp_path):
     _write_lock(tmp_path, "blank", ["docker"])
     available = [_make_addon("docker")]
-    with pytest.raises(ScaffoldError, match="already listed"):
+    with pytest.raises(ZenitError, match="already listed"):
         check_can_add(tmp_path, "docker", available)
 
 
 def test_raises_when_dependency_missing(tmp_path):
     _write_lock(tmp_path, "blank", [])
     available = [_make_addon("redis"), _make_addon("celery", requires=["redis"])]
-    with pytest.raises(ScaffoldError, match="requires"):
+    with pytest.raises(ZenitError, match="requires"):
         check_can_add(tmp_path, "celery", available)
 
 
@@ -80,7 +80,7 @@ def test_raises_when_can_apply_returns_reason(tmp_path):
     addon._module = FakeModule()
     available = [addon]
 
-    with pytest.raises(ScaffoldError, match="Custom reason"):
+    with pytest.raises(ZenitError, match="Custom reason"):
         check_can_add(tmp_path, "docker", available)
 
 
@@ -110,5 +110,5 @@ def test_passes_when_no_can_apply_hook(tmp_path):
 def test_error_message_lists_known_addons_on_unknown(tmp_path):
     _write_lock(tmp_path, "blank", [])
     available = [_make_addon("docker"), _make_addon("redis")]
-    with pytest.raises(ScaffoldError, match="docker"):
+    with pytest.raises(ZenitError, match="docker"):
         check_can_add(tmp_path, "bogus", available)

@@ -1,4 +1,4 @@
-"""Tests for scaffolder.checks_remove — precondition checking for zenit remove.
+"""Tests for zenit.checks_remove — precondition checking for zenit remove.
 
 Mirrors the structure of test_checks.py.  Every public failure path in
 check_can_remove gets its own test; the happy path verifies the returned
@@ -11,10 +11,10 @@ from pathlib import Path
 
 import pytest
 
-from scaffolder.addons.checks_remove import check_can_remove
-from scaffolder.core.lockfile import write_lockfile
-from scaffolder.schema.exceptions import ScaffoldError
-from scaffolder.schema.models import AddonConfig
+from zenit.addons.checks_remove import check_can_remove
+from zenit.core.lockfile import write_lockfile
+from zenit.schema.exceptions import ZenitError
+from zenit.schema.models import AddonConfig
 
 # ── helpers ───────────────────────────────────────────────────────────────────
 
@@ -41,14 +41,14 @@ def _write_lock(project_dir: Path, template: str, addons: list[str]) -> None:
 
 def test_raises_when_no_lockfile(tmp_path):
     available = [_make_addon("docker")]
-    with pytest.raises(ScaffoldError, match=".zenit.toml"):
+    with pytest.raises(ZenitError, match=".zenit.toml"):
         check_can_remove(tmp_path, "docker", available)
 
 
 def test_raises_when_lockfile_has_no_template(tmp_path):
     (tmp_path / ".zenit.toml").write_text("[project]\naddons = []\n")
     available = [_make_addon("docker")]
-    with pytest.raises(ScaffoldError, match="template"):
+    with pytest.raises(ZenitError, match="template"):
         check_can_remove(tmp_path, "docker", available)
 
 
@@ -58,14 +58,14 @@ def test_raises_when_lockfile_has_no_template(tmp_path):
 def test_raises_for_unknown_addon(tmp_path):
     _write_lock(tmp_path, "blank", ["docker"])
     available = [_make_addon("docker")]
-    with pytest.raises(ScaffoldError, match="Unknown addon"):
+    with pytest.raises(ZenitError, match="Unknown addon"):
         check_can_remove(tmp_path, "nonexistent", available)
 
 
 def test_error_message_lists_known_addons_on_unknown(tmp_path):
     _write_lock(tmp_path, "blank", ["docker"])
     available = [_make_addon("docker"), _make_addon("redis")]
-    with pytest.raises(ScaffoldError, match="docker"):
+    with pytest.raises(ZenitError, match="docker"):
         check_can_remove(tmp_path, "bogus", available)
 
 
@@ -75,14 +75,14 @@ def test_error_message_lists_known_addons_on_unknown(tmp_path):
 def test_raises_when_addon_not_installed(tmp_path):
     _write_lock(tmp_path, "blank", ["docker"])
     available = [_make_addon("docker"), _make_addon("redis")]
-    with pytest.raises(ScaffoldError, match="not listed"):
+    with pytest.raises(ZenitError, match="not listed"):
         check_can_remove(tmp_path, "redis", available)
 
 
 def test_raises_when_addons_list_is_empty(tmp_path):
     _write_lock(tmp_path, "blank", [])
     available = [_make_addon("docker")]
-    with pytest.raises(ScaffoldError, match="not listed"):
+    with pytest.raises(ZenitError, match="not listed"):
         check_can_remove(tmp_path, "docker", available)
 
 
@@ -95,7 +95,7 @@ def test_raises_when_another_addon_depends_on_it(tmp_path):
         _make_addon("redis"),
         _make_addon("celery", requires=["redis"]),
     ]
-    with pytest.raises(ScaffoldError, match="celery"):
+    with pytest.raises(ZenitError, match="celery"):
         check_can_remove(tmp_path, "redis", available)
 
 
@@ -106,7 +106,7 @@ def test_error_message_names_all_dependents(tmp_path):
         _make_addon("celery", requires=["redis"]),
         _make_addon("worker", requires=["redis"]),
     ]
-    with pytest.raises(ScaffoldError) as exc_info:
+    with pytest.raises(ZenitError) as exc_info:
         check_can_remove(tmp_path, "redis", available)
     msg = str(exc_info.value)
     assert "celery" in msg
@@ -131,7 +131,7 @@ def test_raises_when_template_requires_addon(tmp_path):
     # fastapi template requires docker — docker cannot be removed
     _write_lock(tmp_path, "fastapi", ["docker"])
     available = [_make_addon("docker")]
-    with pytest.raises(ScaffoldError, match="required by the 'fastapi' template"):
+    with pytest.raises(ZenitError, match="required by the 'fastapi' template"):
         check_can_remove(tmp_path, "docker", available)
 
 
@@ -164,7 +164,7 @@ def test_raises_when_can_remove_returns_reason(tmp_path):
     addon._module = FakeHooks()
     available = [addon]
 
-    with pytest.raises(ScaffoldError, match="Custom reason"):
+    with pytest.raises(ZenitError, match="Custom reason"):
         check_can_remove(tmp_path, "docker", available)
 
 
@@ -243,7 +243,7 @@ def test_passes_removing_last_addon(tmp_path):
 def test_raises_lockfile_check_before_dependent_check(tmp_path):
     # No lockfile at all — should raise on lockfile, not dependent check
     available = [_make_addon("redis"), _make_addon("celery", requires=["redis"])]
-    with pytest.raises(ScaffoldError, match=".zenit.toml"):
+    with pytest.raises(ZenitError, match=".zenit.toml"):
         check_can_remove(tmp_path, "redis", available)
 
 
@@ -254,5 +254,5 @@ def test_raises_installed_check_before_dependent_check(tmp_path):
         _make_addon("redis"),
         _make_addon("celery", requires=["redis"]),
     ]
-    with pytest.raises(ScaffoldError, match="not listed"):
+    with pytest.raises(ZenitError, match="not listed"):
         check_can_remove(tmp_path, "redis", available)

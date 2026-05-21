@@ -1,4 +1,4 @@
-"""Unit tests for scaffolder.core.handlers.yaml_handler.YamlHandler.
+"""Unit tests for zenit.core.handlers.yaml_handler.YamlHandler.
 
 Covers: apply() merge semantics and duplicate-skip by first key,
 remove() by line range, and missing-file no-op on remove.
@@ -8,8 +8,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from scaffolder.core.handlers.yaml_handler import YamlHandler
-from scaffolder.schema.models import ManifestBlock
+from zenit.core.handlers.yaml_handler import YamlHandler
+from zenit.schema.models import ManifestBlock
 
 # ── helpers ───────────────────────────────────────────────────────────────────
 

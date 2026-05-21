@@ -9,7 +9,7 @@ Reference for the `AddonConfig` and `TemplateConfig` APIs. For step-by-step walk
 ## Directory layout
 
 ```
-src/scaffolder/
+src/zenit/
 ├── templates/
 │   ├── _common/          # copied to every project regardless of template
 │   ├── blank/

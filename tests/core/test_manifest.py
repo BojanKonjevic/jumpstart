@@ -1,4 +1,4 @@
-"""Unit tests for scaffolder.core.manifest.
+"""Unit tests for zenit.core.manifest.
 
 Covers: TOML round-trip fidelity, all mutation helpers, idempotency contracts,
 and I/O edge cases (missing file, corrupt TOML, project-section preservation).
@@ -11,7 +11,7 @@ from pathlib import Path
 import pytest
 import tomlkit
 
-from scaffolder.core.manifest import (
+from zenit.core.manifest import (
     MANIFEST_SCHEMA_VERSION,
     add_compose_service,
     add_dependency,
@@ -22,7 +22,7 @@ from scaffolder.core.manifest import (
     remove_blocks_for_addon,
     write_manifest,
 )
-from scaffolder.schema.models import (
+from zenit.schema.models import (
     DependencyEntry,
     EnvEntry,
     Manifest,

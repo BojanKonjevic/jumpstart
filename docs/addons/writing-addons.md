@@ -9,7 +9,7 @@ For the full `AddonConfig` API reference, see [Addons & Templates](../architectu
 ## Step 1: create the directory
 
 ```bash
-mkdir src/scaffolder/addons/hello
+mkdir src/zenit/addons/hello
 ```
 
 The registry scans `addons/` on every run. No registration step needed.
@@ -19,8 +19,8 @@ The registry scans `addons/` on every run. No registration step needed.
 ## Step 2: minimal `addon.py`
 
 ```python
-# src/scaffolder/addons/hello/addon.py
-from scaffolder.schema.models import AddonConfig, Injection
+# src/zenit/addons/hello/addon.py
+from zenit.schema.models import AddonConfig, Injection
 
 config = AddonConfig(
     id="hello",
@@ -60,7 +60,7 @@ cat src/hello_test/main.py  # verify it's gone
 
 ```python
 from pathlib import Path
-from scaffolder.schema.models import AddonConfig, FileContribution, Injection
+from zenit.schema.models import AddonConfig, FileContribution, Injection
 
 _HERE = Path(__file__).parent.absolute()
 
@@ -85,7 +85,7 @@ config = AddonConfig(
 ```
 
 ```python
-# src/scaffolder/addons/hello/files/greeter.py.j2
+# src/zenit/addons/hello/files/greeter.py.j2
 def greet() -> None:
     print("hello from (( name ))")
 ```
@@ -100,7 +100,7 @@ The `(( name ))` variable expands to the project name at render time. See [Jinja
 
 ```python
 from pathlib import Path
-from scaffolder.core.lockfile import ZenitLockfile
+from zenit.core.lockfile import ZenitLockfile
 
 def can_apply(project_dir: Path, lockfile: ZenitLockfile) -> str | None:
     pkg_name = project_dir.name.replace("-", "_")
@@ -120,7 +120,7 @@ def can_apply(project_dir: Path, lockfile: ZenitLockfile) -> str | None:
 `health_check` is called by `zenit doctor`. Return a list of `HealthIssue` objects describing what you expect to be true.
 
 ```python
-from scaffolder.doctor.doctor import HealthIssue, Severity
+from zenit.doctor.doctor import HealthIssue, Severity
 
 def health_check(project_dir: Path, lockfile: ZenitLockfile) -> list[HealthIssue]:
     pkg_name = project_dir.name.replace("-", "_")
@@ -141,9 +141,9 @@ def health_check(project_dir: Path, lockfile: ZenitLockfile) -> list[HealthIssue
 ```python
 from pathlib import Path
 
-from scaffolder.core.lockfile import ZenitLockfile
-from scaffolder.doctor.doctor import HealthIssue, Severity
-from scaffolder.schema.models import AddonConfig, FileContribution, Injection
+from zenit.core.lockfile import ZenitLockfile
+from zenit.doctor.doctor import HealthIssue, Severity
+from zenit.schema.models import AddonConfig, FileContribution, Injection
 
 _HERE = Path(__file__).parent.absolute()
 

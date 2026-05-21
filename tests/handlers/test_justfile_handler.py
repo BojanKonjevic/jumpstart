@@ -1,4 +1,4 @@
-"""Unit tests for scaffolder.core.handlers.justfile_handler.JustfileHandler.
+"""Unit tests for zenit.core.handlers.justfile_handler.JustfileHandler.
 
 Covers: can_handle() dispatches by filename not suffix, apply() appends
 recipes and skips duplicates, remove() deletes by line range, and
@@ -9,8 +9,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from scaffolder.core.handlers.justfile_handler import JustfileHandler
-from scaffolder.schema.models import ManifestBlock
+from zenit.core.handlers.justfile_handler import JustfileHandler
+from zenit.schema.models import ManifestBlock
 
 # ── helpers ───────────────────────────────────────────────────────────────────
 

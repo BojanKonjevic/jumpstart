@@ -1,4 +1,4 @@
-"""Tests for scaffolder.justfile — injecting just recipes into existing justfiles.
+"""Tests for zenit.justfile — injecting just recipes into existing justfiles.
 
 Covers inject_just_recipes, _recipe_name, and _extract_recipe_names for all
 relevant cases: adding new recipes, skipping duplicates, preserving formatting,
@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from scaffolder.core.justfile import (
+from zenit.core.justfile import (
     _extract_recipe_names,
     _recipe_name,
     inject_just_recipes,

@@ -1,4 +1,4 @@
-"""Unit tests for scaffolder.core.handlers.toml_handler.TomlHandler.
+"""Unit tests for zenit.core.handlers.toml_handler.TomlHandler.
 
 Covers: apply() append semantics and duplicate top-level key skip,
 remove() produces valid TOML, and missing-file no-op on remove.
@@ -10,8 +10,8 @@ from pathlib import Path
 
 import tomlkit
 
-from scaffolder.core.handlers.toml_handler import TomlHandler
-from scaffolder.schema.models import ManifestBlock
+from zenit.core.handlers.toml_handler import TomlHandler
+from zenit.schema.models import ManifestBlock
 
 # ── helpers ───────────────────────────────────────────────────────────────────
 

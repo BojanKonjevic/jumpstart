@@ -1,4 +1,4 @@
-"""Unit tests for scaffolder.core.handlers.env_handler.EnvHandler.
+"""Unit tests for zenit.core.handlers.env_handler.EnvHandler.
 
 Covers: apply() append semantics, duplicate-key skip, comment/blank
 preservation, trailing-newline insertion, remove() by line range, and
@@ -9,8 +9,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from scaffolder.core.handlers.env_handler import EnvHandler
-from scaffolder.schema.models import ManifestBlock
+from zenit.core.handlers.env_handler import EnvHandler
+from zenit.schema.models import ManifestBlock
 
 # ── helpers ───────────────────────────────────────────────────────────────────
 

@@ -1,4 +1,4 @@
-"""Unit tests for scaffolder.core.handlers.locators.
+"""Unit tests for zenit.core.handlers.locators.
 
 Each locator is a pure function: libcst.Module → insertion index.
 Tests cover success cases (parametrized), failure cases (LocatorError with
@@ -11,7 +11,7 @@ from __future__ import annotations
 import libcst as cst
 import pytest
 
-from scaffolder.core.handlers.locators import (
+from zenit.core.handlers.locators import (
     LocatorError,
     after_last_class_attribute,
     after_last_import,

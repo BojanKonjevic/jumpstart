@@ -1,4 +1,4 @@
-"""Tests for scaffolder.deps — dependency injection into pyproject.toml.
+"""Tests for zenit.deps — dependency injection into pyproject.toml.
 
 Covers inject_deps and the _pkg_name helper for all relevant cases:
 adding new deps, skipping existing ones, handling both [dependency-groups]
@@ -19,7 +19,7 @@ from pathlib import Path
 
 import pytest
 
-from scaffolder.core.deps import _pkg_name, inject_deps
+from zenit.core.deps import _pkg_name, inject_deps
 
 # ── _pkg_name ─────────────────────────────────────────────────────────────────
 

@@ -16,11 +16,11 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from scaffolder.core.apply import apply_contributions
-from scaffolder.core.context import Context
-from scaffolder.core.manifest import fingerprint as _fp
-from scaffolder.core.manifest import read_manifest
-from scaffolder.schema.models import (
+from zenit.core.apply import apply_contributions
+from zenit.core.context import Context
+from zenit.core.manifest import fingerprint as _fp
+from zenit.core.manifest import read_manifest
+from zenit.schema.models import (
     AddonConfig,
     ComposeService,
     Contributions,
@@ -32,7 +32,7 @@ from scaffolder.schema.models import (
 
 # ── helpers ───────────────────────────────────────────────────────────────────
 
-_SCAFFOLDER_ROOT = Path(__file__).parent.parent.parent / "src" / "scaffolder"
+_ZENIT_ROOT = Path(__file__).parent.parent.parent / "src" / "zenit"
 
 
 def _ctx(tmp_path: Path, name: str = "myapp") -> Context:
@@ -43,7 +43,7 @@ def _ctx(tmp_path: Path, name: str = "myapp") -> Context:
         pkg_name=name.replace("-", "_"),
         template="blank",
         addons=[],
-        scaffolder_root=_SCAFFOLDER_ROOT,
+        zenit_root=_ZENIT_ROOT,
         project_dir=project_dir,
     )
 

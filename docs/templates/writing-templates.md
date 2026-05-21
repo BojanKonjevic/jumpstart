@@ -29,14 +29,14 @@ The `cli_commands` injection point at the end of `main.py` lets addons register 
 ## Step 1: create the directories
 
 ```bash
-mkdir -p src/scaffolder/templates/cli/files/tests
+mkdir -p src/zenit/templates/cli/files/tests
 ```
 
 ---
 
 ## Step 2: register in `_render.py`
 
-Unlike addons, **templates are not auto-discovered for the interactive picker**. The filesystem loader finds `template.py` automatically, but you must add the template to `TEMPLATES` in `src/scaffolder/cli/prompt/_render.py`:
+Unlike addons, **templates are not auto-discovered for the interactive picker**. The filesystem loader finds `template.py` automatically, but you must add the template to `TEMPLATES` in `src/zenit/cli/prompt/_render.py`:
 
 ```python
 TEMPLATES: list[tuple[str, str]] = [
@@ -98,10 +98,10 @@ def test_cli_invokes() -> None:
 ## Step 4: write `template.py`
 
 ```python
-# src/scaffolder/templates/cli/template.py
+# src/zenit/templates/cli/template.py
 from pathlib import Path
 
-from scaffolder.schema.models import (
+from zenit.schema.models import (
     FileContribution,
     InjectionPoint,
     LocatorSpec,
@@ -182,8 +182,8 @@ zenit doctor      # should be clean
 Write a minimal addon that targets `cli_commands`:
 
 ```python
-# src/scaffolder/addons/hello-cmd/addon.py
-from scaffolder.schema.models import AddonConfig, Injection
+# src/zenit/addons/hello-cmd/addon.py
+from zenit.schema.models import AddonConfig, Injection
 
 config = AddonConfig(
     id="hello-cmd",

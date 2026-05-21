@@ -1,11 +1,11 @@
-"""Tests for scaffolder.generate — recipe rendering and deduplication."""
+"""Tests for zenit.generate — recipe rendering and deduplication."""
 
 from pathlib import Path
 from unittest.mock import MagicMock
 
-from scaffolder.core._paths import get_scaffolder_root
-from scaffolder.core.generate import _recipe_name, generate_all
-from scaffolder.schema.models import Contributions, TemplateConfig
+from zenit.core._paths import get_zenit_root
+from zenit.core.generate import _recipe_name, generate_all
+from zenit.schema.models import Contributions, TemplateConfig
 
 # ── _recipe_name ──────────────────────────────────────────────────────────────
 
@@ -65,7 +65,7 @@ def _make_ctx(tmp_path: Path) -> MagicMock:
     ctx.template = "blank"
     ctx.addons = []
     ctx.dry_run = False
-    ctx.scaffolder_root = get_scaffolder_root()
+    ctx.zenit_root = get_zenit_root()
     ctx.project_dir = tmp_path
     written: dict[str, str] = {}
     ctx._written = written

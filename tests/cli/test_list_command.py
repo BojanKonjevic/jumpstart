@@ -6,12 +6,12 @@ from unittest.mock import patch
 
 from typer.testing import CliRunner
 
-from scaffolder.cli.main import app
-from scaffolder.core.lockfile import ZenitLockfile
+from zenit.cli.main import app
+from zenit.core.lockfile import ZenitLockfile
 
 runner = CliRunner()
 
-_PATCH = "scaffolder.cli.main.read_lockfile"
+_PATCH = "zenit.cli.main.read_lockfile"
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -130,7 +130,7 @@ def test_default_hides_incompatible_addons_for_template() -> None:
 
 
 def test_default_all_addons_installed_shows_message() -> None:
-    from scaffolder.addons._registry import get_available_addons
+    from zenit.addons._registry import get_available_addons
 
     all_ids = [a.id for a in get_available_addons()]
     lf = _lockfile(template="fastapi", addons=all_ids)

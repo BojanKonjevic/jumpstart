@@ -1,4 +1,4 @@
-"""Tests for scaffolder.add — adding addons to existing projects.
+"""Tests for zenit.add — adding addons to existing projects.
 
 Organised in two sections:
   - Pipeline unit tests: verify that add_addon correctly writes files,
@@ -19,20 +19,20 @@ from unittest.mock import patch
 import pytest
 import yaml
 from click.exceptions import Exit as ClickExit
-from conftest import SCAFFOLDER_ROOT
+from conftest import ZENIT_ROOT
 
-from scaffolder.addons._registry import get_available_addons
-from scaffolder.addons.add import add_addon, add_addon_interactive
-from scaffolder.addons.remove import remove_addon
-from scaffolder.cli.prompt._single import prompt_single_addon
-from scaffolder.core._apply_loader import load_apply
-from scaffolder.core.apply import apply_contributions
-from scaffolder.core.collect import collect_all
-from scaffolder.core.context import Context
-from scaffolder.core.generate import generate_all
-from scaffolder.core.git import init
-from scaffolder.core.lockfile import read_lockfile, write_lockfile
-from scaffolder.templates._load_config import load_template_config
+from zenit.addons._registry import get_available_addons
+from zenit.addons.add import add_addon, add_addon_interactive
+from zenit.addons.remove import remove_addon
+from zenit.cli.prompt._single import prompt_single_addon
+from zenit.core._apply_loader import load_apply
+from zenit.core.apply import apply_contributions
+from zenit.core.collect import collect_all
+from zenit.core.context import Context
+from zenit.core.generate import generate_all
+from zenit.core.git import init
+from zenit.core.lockfile import read_lockfile, write_lockfile
+from zenit.templates._load_config import load_template_config
 
 # ── helpers ───────────────────────────────────────────────────────────────────
 
@@ -62,14 +62,14 @@ def _scaffold(tmp_path: Path, name: str, template: str, addons: list[str]) -> Pa
         pkg_name=pkg_name,
         template=template,
         addons=addons,
-        scaffolder_root=SCAFFOLDER_ROOT,
+        zenit_root=ZENIT_ROOT,
         project_dir=project_dir,
     )
 
-    load_apply(SCAFFOLDER_ROOT / "templates" / "_common" / "apply.py")(ctx)
+    load_apply(ZENIT_ROOT / "templates" / "_common" / "apply.py")(ctx)
 
     available = get_available_addons()
-    template_config = load_template_config(SCAFFOLDER_ROOT, template)
+    template_config = load_template_config(ZENIT_ROOT, template)
     selected = [c for c in available if c.id in addons]
     render_vars: dict[str, object] = {
         "name": name,
@@ -456,7 +456,7 @@ class TestAlreadyInstalledMessage:
             ("redis", "Redis description", []),
         ]
         with (
-            patch("scaffolder.cli.prompt._keys.tty_available", return_value=False),
+            patch("zenit.cli.prompt._keys.tty_available", return_value=False),
             patch("builtins.input", return_value=""),
         ):
             prompt_single_addon(items)
@@ -469,7 +469,7 @@ class TestAlreadyInstalledMessage:
         project_dir = _scaffold(tmp_path, "myapp", "blank", ["docker"])
         monkeypatch.chdir(project_dir)
         with (
-            patch("scaffolder.cli.prompt._keys.tty_available", return_value=False),
+            patch("zenit.cli.prompt._keys.tty_available", return_value=False),
             patch("builtins.input", return_value=""),
         ):
             add_addon_interactive()

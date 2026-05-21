@@ -1,4 +1,4 @@
-"""Tests for scaffolder.schema — dataclass defaults, construction, and field behavior.
+"""Tests for zenit.schema — dataclass defaults, construction, and field behavior.
 
 The schema module is the backbone of the entire contribution pipeline.
 These tests verify that every dataclass initialises correctly, that mutable
@@ -8,7 +8,7 @@ the injection machinery are stable.
 
 from __future__ import annotations
 
-from scaffolder.schema.models import (
+from zenit.schema.models import (
     AddonConfig,
     AddonHooks,
     ComposeService,

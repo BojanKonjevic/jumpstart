@@ -9,8 +9,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from scaffolder.addons._registry import get_available_addons
-from scaffolder.core.lockfile import ZenitLockfile
+from zenit.addons._registry import get_available_addons
+from zenit.core.lockfile import ZenitLockfile
 
 # ── helpers ───────────────────────────────────────────────────────────────────
 

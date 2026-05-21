@@ -1,4 +1,4 @@
-"""Tests for scaffolder.context — Context and its filesystem abstraction.
+"""Tests for zenit.context — Context and its filesystem abstraction.
 
 Covers the real Context (which performs I/O) and the DryRunContext subclass
 (which records operations without touching disk).  The DryRunContext rendering
@@ -11,10 +11,10 @@ import subprocess
 from pathlib import Path
 
 import pytest
-from conftest import SCAFFOLDER_ROOT
+from conftest import ZENIT_ROOT
 
-from scaffolder.core.context import Context
-from scaffolder.core.dryrun import DryRunContext
+from zenit.core.context import Context
+from zenit.core.dryrun import DryRunContext
 
 # ── helpers ───────────────────────────────────────────────────────────────────
 
@@ -25,7 +25,7 @@ def _ctx(tmp_path: Path, name: str = "myapp") -> Context:
         pkg_name=name.replace("-", "_"),
         template="blank",
         addons=[],
-        scaffolder_root=SCAFFOLDER_ROOT,
+        zenit_root=ZENIT_ROOT,
         project_dir=tmp_path / name,
     )
 
@@ -36,7 +36,7 @@ def _dry(tmp_path: Path, name: str = "myapp") -> DryRunContext:
         pkg_name=name.replace("-", "_"),
         template="blank",
         addons=[],
-        scaffolder_root=SCAFFOLDER_ROOT,
+        zenit_root=ZENIT_ROOT,
         project_dir=tmp_path / name,
     )
 
@@ -63,7 +63,7 @@ def test_has_returns_true_for_installed_addon(tmp_path):
         pkg_name="myapp",
         template="blank",
         addons=["docker", "redis"],
-        scaffolder_root=SCAFFOLDER_ROOT,
+        zenit_root=ZENIT_ROOT,
         project_dir=tmp_path / "myapp",
     )
     assert ctx.has("docker") is True
@@ -76,7 +76,7 @@ def test_has_returns_false_for_missing_addon(tmp_path):
         pkg_name="myapp",
         template="blank",
         addons=["docker"],
-        scaffolder_root=SCAFFOLDER_ROOT,
+        zenit_root=ZENIT_ROOT,
         project_dir=tmp_path / "myapp",
     )
     assert ctx.has("redis") is False
@@ -366,7 +366,7 @@ def test_context_stores_pkg_name(tmp_path):
         pkg_name="cool_project",
         template="blank",
         addons=[],
-        scaffolder_root=SCAFFOLDER_ROOT,
+        zenit_root=ZENIT_ROOT,
         project_dir=tmp_path / "cool-project",
     )
     assert ctx.pkg_name == "cool_project"
@@ -383,15 +383,15 @@ def test_context_stores_addons(tmp_path):
         pkg_name="myapp",
         template="fastapi",
         addons=["docker", "redis"],
-        scaffolder_root=SCAFFOLDER_ROOT,
+        zenit_root=ZENIT_ROOT,
         project_dir=tmp_path / "myapp",
     )
     assert ctx.addons == ["docker", "redis"]
 
 
-def test_context_stores_scaffolder_root(tmp_path):
+def test_context_stores_zenit_root(tmp_path):
     ctx = _ctx(tmp_path)
-    assert ctx.scaffolder_root == SCAFFOLDER_ROOT
+    assert ctx.zenit_root == ZENIT_ROOT
 
 
 def test_context_stores_project_dir(tmp_path):

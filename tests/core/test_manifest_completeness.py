@@ -14,15 +14,15 @@ from __future__ import annotations
 import secrets
 from pathlib import Path
 
-from scaffolder.addons._registry import get_available_addons
-from scaffolder.core._apply_loader import load_apply
-from scaffolder.core.apply import apply_contributions
-from scaffolder.core.collect import collect_all
-from scaffolder.core.context import Context
-from scaffolder.core.generate import generate_all
-from scaffolder.core.git import init
-from scaffolder.core.lockfile import write_lockfile
-from scaffolder.core.manifest import (
+from zenit.addons._registry import get_available_addons
+from zenit.core._apply_loader import load_apply
+from zenit.core.apply import apply_contributions
+from zenit.core.collect import collect_all
+from zenit.core.context import Context
+from zenit.core.generate import generate_all
+from zenit.core.git import init
+from zenit.core.lockfile import write_lockfile
+from zenit.core.manifest import (
     add_compose_service,
     add_compose_volume,
     add_dependency,
@@ -31,10 +31,10 @@ from scaffolder.core.manifest import (
     read_manifest,
     write_manifest,
 )
-from scaffolder.core.manifest import fingerprint as _fp
-from scaffolder.templates._load_config import load_template_config
+from zenit.core.manifest import fingerprint as _fp
+from zenit.templates._load_config import load_template_config
 
-_SCAFFOLDER_ROOT = Path(__file__).parent.parent.parent / "src" / "scaffolder"
+_ZENIT_ROOT = Path(__file__).parent.parent.parent / "src" / "zenit"
 
 
 # ── inline stamp (avoids importing CLI-heavy scaffold.py) ─────────────────────
@@ -85,14 +85,14 @@ def _scaffold(tmp_path: Path, name: str, template: str, addons: list[str]) -> Pa
         pkg_name=pkg_name,
         template=template,
         addons=addons,
-        scaffolder_root=_SCAFFOLDER_ROOT,
+        zenit_root=_ZENIT_ROOT,
         project_dir=project_dir,
     )
 
-    load_apply(_SCAFFOLDER_ROOT / "templates" / "_common" / "apply.py")(ctx)
+    load_apply(_ZENIT_ROOT / "templates" / "_common" / "apply.py")(ctx)
 
     available = get_available_addons()
-    template_config = load_template_config(_SCAFFOLDER_ROOT, template)
+    template_config = load_template_config(_ZENIT_ROOT, template)
     selected_addon_configs = [cfg for cfg in available if cfg.id in addons]
 
     render_vars: dict[str, object] = {

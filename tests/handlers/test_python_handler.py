@@ -1,4 +1,4 @@
-"""Unit tests for scaffolder.core.handlers.python_handler.
+"""Unit tests for zenit.core.handlers.python_handler.
 
 Covers:
   - apply(): insertion position, line-range arithmetic, error propagation
@@ -17,15 +17,15 @@ from pathlib import Path
 import libcst as cst
 import pytest
 
-from scaffolder.core.handlers.python_handler import (
+from zenit.core.handlers.python_handler import (
     InjectionError,
     RemovalError,
     _collapse_blank_lines,
     apply,
     remove,
 )
-from scaffolder.core.manifest import fingerprint as _fp
-from scaffolder.schema.models import ManifestBlock
+from zenit.core.manifest import fingerprint as _fp
+from zenit.schema.models import ManifestBlock
 
 # ── helpers ───────────────────────────────────────────────────────────────────
 

@@ -1,6 +1,6 @@
-"""Tests for scaffolder.lockfile — read/write round-trip."""
+"""Tests for zenit.lockfile — read/write round-trip."""
 
-from scaffolder.core.lockfile import (
+from zenit.core.lockfile import (
     LOCKFILE_NAME,
     ZenitLockfile,
     read_lockfile,

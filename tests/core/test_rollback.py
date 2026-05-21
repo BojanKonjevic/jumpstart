@@ -1,4 +1,4 @@
-"""Tests for scaffolder.rollback — cleanup context managers.
+"""Tests for zenit.rollback — cleanup context managers.
 
 Covers scaffold_or_rollback (removes the whole project dir on failure) and
 addon_or_rollback (removes only files added during the failed addon apply).
@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import pytest
 
-from scaffolder.core.rollback import addon_or_rollback, scaffold_or_rollback
+from zenit.core.rollback import addon_or_rollback, scaffold_or_rollback
 
 # ── scaffold_or_rollback — success ────────────────────────────────────────────
 

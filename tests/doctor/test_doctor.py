@@ -1,4 +1,4 @@
-"""Tests for scaffolder.doctor — all health check phases."""
+"""Tests for zenit.doctor — all health check phases."""
 
 from __future__ import annotations
 
@@ -9,17 +9,17 @@ from pathlib import Path
 
 import tomlkit
 import yaml
-from conftest import SCAFFOLDER_ROOT
+from conftest import ZENIT_ROOT
 
-from scaffolder.addons._registry import get_available_addons
-from scaffolder.core._apply_loader import load_apply
-from scaffolder.core.apply import apply_contributions
-from scaffolder.core.collect import collect_all
-from scaffolder.core.context import Context
-from scaffolder.core.generate import generate_all
-from scaffolder.core.git import init
-from scaffolder.core.lockfile import ZenitLockfile, read_lockfile, write_lockfile
-from scaffolder.doctor.doctor import (
+from zenit.addons._registry import get_available_addons
+from zenit.core._apply_loader import load_apply
+from zenit.core.apply import apply_contributions
+from zenit.core.collect import collect_all
+from zenit.core.context import Context
+from zenit.core.generate import generate_all
+from zenit.core.git import init
+from zenit.core.lockfile import ZenitLockfile, read_lockfile, write_lockfile
+from zenit.doctor.doctor import (
     HealthIssue,
     HealthResult,
     Severity,
@@ -34,8 +34,8 @@ from scaffolder.doctor.doctor import (
     print_results,
     run_doctor,
 )
-from scaffolder.schema.models import AddonConfig, AddonHooks
-from scaffolder.templates._load_config import load_template_config
+from zenit.schema.models import AddonConfig, AddonHooks
+from zenit.templates._load_config import load_template_config
 
 # ── helpers ───────────────────────────────────────────────────────────────────
 
@@ -58,13 +58,13 @@ def _scaffold(
         pkg_name=pkg_name,
         template=template,
         addons=addons,
-        scaffolder_root=SCAFFOLDER_ROOT,
+        zenit_root=ZENIT_ROOT,
         project_dir=project_dir,
     )
 
-    load_apply(SCAFFOLDER_ROOT / "templates" / "_common" / "apply.py")(ctx)
+    load_apply(ZENIT_ROOT / "templates" / "_common" / "apply.py")(ctx)
     available = get_available_addons()
-    template_config = load_template_config(SCAFFOLDER_ROOT, template)
+    template_config = load_template_config(ZENIT_ROOT, template)
     selected_addon_configs = [cfg for cfg in available if cfg.id in addons]
     secret_key = secrets.token_hex(32) if template == "fastapi" else None
 
@@ -551,7 +551,7 @@ class TestCheckAddonHealth:
         cfg._module = hooks
 
         with mock.patch(
-            "scaffolder.doctor.doctor.get_available_addons", return_value=[cfg]
+            "zenit.doctor.doctor.get_available_addons", return_value=[cfg]
         ):
             result = _check_addon_health(project_dir, lockfile)
         assert result.has_warnings
@@ -897,7 +897,7 @@ class TestCheckPythonLinePresence:
     def test_error_when_file_truncated_below_recorded_end(self, tmp_path: Path) -> None:
         """Fast-tier line check fires when a tracked file has fewer lines
         than the manifest block's recorded end line."""
-        from scaffolder.core.manifest import read_manifest
+        from zenit.core.manifest import read_manifest
 
         project_dir = _scaffold(tmp_path, template="fastapi", addons=["redis"])
         m = read_manifest(project_dir)
@@ -947,7 +947,7 @@ class TestCheckPythonIntegrity:
         raw fingerprint but the normalised fingerprint still matches → WARN."""
         import libcst as cst
 
-        from scaffolder.core.manifest import read_manifest
+        from zenit.core.manifest import read_manifest
 
         project_dir = _scaffold(tmp_path, template="fastapi", addons=["redis"])
         m = read_manifest(project_dir)
@@ -967,7 +967,7 @@ class TestCheckPythonIntegrity:
     def test_error_when_block_semantically_changed(self, tmp_path: Path) -> None:
         """Thorough check: renaming a field in the tracked block breaks both
         fingerprints → ERROR with file name and point in message."""
-        from scaffolder.core.manifest import read_manifest
+        from zenit.core.manifest import read_manifest
 
         project_dir = _scaffold(tmp_path, template="fastapi", addons=["redis"])
         m = read_manifest(project_dir)
@@ -994,7 +994,7 @@ class TestCheckPythonIntegrity:
     def test_warn_when_block_is_unparseable_python(self, tmp_path: Path) -> None:
         """Thorough check: block text that libcst cannot parse → WARN (not ERROR).
         The block may be a class-body fragment; this must not crash the check."""
-        from scaffolder.core.manifest import read_manifest
+        from zenit.core.manifest import read_manifest
 
         project_dir = _scaffold(tmp_path, template="fastapi", addons=["redis"])
         m = read_manifest(project_dir)

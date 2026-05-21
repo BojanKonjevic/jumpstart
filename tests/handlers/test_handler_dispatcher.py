@@ -1,4 +1,4 @@
-"""Unit tests for scaffolder.core.handlers.base.HandlerDispatcher.
+"""Unit tests for zenit.core.handlers.base.HandlerDispatcher.
 
 Covers: correct handler returned per file type, ValueError on unknown
 extension, and Python-wins priority assertion.
@@ -10,12 +10,12 @@ from pathlib import Path
 
 import pytest
 
-from scaffolder.core.handlers.base import HandlerDispatcher
-from scaffolder.core.handlers.env_handler import EnvHandler
-from scaffolder.core.handlers.justfile_handler import JustfileHandler
-from scaffolder.core.handlers.python_handler import PythonHandler
-from scaffolder.core.handlers.toml_handler import TomlHandler
-from scaffolder.core.handlers.yaml_handler import YamlHandler
+from zenit.core.handlers.base import HandlerDispatcher
+from zenit.core.handlers.env_handler import EnvHandler
+from zenit.core.handlers.justfile_handler import JustfileHandler
+from zenit.core.handlers.python_handler import PythonHandler
+from zenit.core.handlers.toml_handler import TomlHandler
+from zenit.core.handlers.yaml_handler import YamlHandler
 
 # ── helpers ───────────────────────────────────────────────────────────────────
 

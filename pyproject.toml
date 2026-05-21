@@ -29,8 +29,8 @@ Repository = "https://github.com/BojanKonjevic/zenit"
 Issues = "https://github.com/BojanKonjevic/zenit/issues"
 
 [project.scripts]
-zenit = "scaffolder.cli.main:main"
-zn = "scaffolder.cli.main:main"
+zenit = "zenit.cli.main:main"
+zn = "zenit.cli.main:main"
 
 [dependency-groups]
 dev = [
@@ -46,7 +46,7 @@ dev = [
 where = ["src"]
 
 [tool.setuptools.package-data]
-"scaffolder" = [
+"zenit" = [
     "templates/**/*",
     "templates/**/.*",
     "addons/**/*",
@@ -56,8 +56,8 @@ where = ["src"]
 
 [tool.ruff]
 exclude = [
-    "src/scaffolder/addons/**/files",
-    "src/scaffolder/templates/**/files",
+    "src/zenit/addons/**/files",
+    "src/zenit/templates/**/files",
 ]
 
 [tool.ruff.lint]
@@ -67,9 +67,9 @@ ignore = ["E501"]
 [tool.mypy]
 strict = true
 exclude = [
-    "src/scaffolder/templates/",
-    "src/scaffolder/templates/.*/addons/",
-    "src/scaffolder/addons/[^/]+/",
+    "src/zenit/templates/",
+    "src/zenit/templates/.*/addons/",
+    "src/zenit/addons/[^/]+/",
 ]
 
 [tool.pytest.ini_options]

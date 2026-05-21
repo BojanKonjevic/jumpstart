@@ -1,4 +1,4 @@
-"""Tests for scaffolder.doctor.print_results — terminal output format.
+"""Tests for zenit.doctor.print_results — terminal output format.
 
 test_doctor.py already verifies the return value (True/False) and that
 category names and messages appear in output.  This file focuses on the
@@ -8,7 +8,7 @@ ordering, and multi-section layout.
 
 from __future__ import annotations
 
-from scaffolder.doctor.doctor import HealthResult, print_results
+from zenit.doctor.doctor import HealthResult, print_results
 
 # ── icon characters ───────────────────────────────────────────────────────────
 

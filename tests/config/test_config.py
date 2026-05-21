@@ -1,11 +1,11 @@
-"""Tests for scaffolder.config — user config loading."""
+"""Tests for zenit.config — user config loading."""
 
 import sys
 from pathlib import Path
 
 import pytest
 
-from scaffolder.config.config import ZenitConfig, config_path, load_config
+from zenit.config.config import ZenitConfig, config_path, load_config
 
 
 def test_load_config_returns_empty_when_file_missing(tmp_path, monkeypatch):
