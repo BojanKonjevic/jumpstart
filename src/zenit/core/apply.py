@@ -22,6 +22,7 @@ from zenit.core.manifest import (
     read_manifest,
     write_manifest,
 )
+from zenit.core.pkg_name import resolve_dest_placeholder
 from zenit.core.render import make_env
 from zenit.schema.exceptions import ZenitError
 from zenit.schema.models import Manifest, ManifestBlock
@@ -77,24 +78,24 @@ def apply_contributions(
     pkg_name = str(render_vars["pkg_name"])
 
     for d in contributions.dirs:
-        ctx.create_dir(d.replace("{{pkg_name}}", pkg_name))
+        ctx.create_dir(resolve_dest_placeholder(d, pkg_name))
 
     # Pre-render {{pkg_name}} placeholders in compose service fields
     for svc in contributions.compose_services:
         if svc.command and "{{pkg_name}}" in svc.command:
-            svc.command = svc.command.replace("{{pkg_name}}", pkg_name)
+            svc.command = resolve_dest_placeholder(svc.command, pkg_name)
         if svc.environment:
             svc.environment = {
-                k: v.replace("{{pkg_name}}", pkg_name) if isinstance(v, str) else v
+                k: resolve_dest_placeholder(v, pkg_name) if isinstance(v, str) else v
                 for k, v in svc.environment.items()
             }
         if svc.develop_watch:
             for watch in svc.develop_watch:
                 if "path" in watch and isinstance(watch["path"], str):
-                    watch["path"] = watch["path"].replace("{{pkg_name}}", pkg_name)
+                    watch["path"] = resolve_dest_placeholder(watch["path"], pkg_name)
 
     for fc in contributions.files:
-        dest = fc.dest.replace("{{pkg_name}}", pkg_name)
+        dest = resolve_dest_placeholder(fc.dest, pkg_name)
         if fc.content is not None:
             if fc.template:
                 string_env = make_env()
@@ -125,7 +126,7 @@ def apply_contributions(
         if point is None:
             continue
 
-        resolved_file = point.file.replace("{{pkg_name}}", pkg_name)
+        resolved_file = resolve_dest_placeholder(point.file, pkg_name)
         file_path = project_dir / resolved_file
 
         if not file_path.exists():

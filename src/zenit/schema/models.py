@@ -110,7 +110,13 @@ class Manifest:
 
 @dataclass
 class FileContribution:
-    """A single file to be written into the project directory."""
+    """A single file to be written into the project directory.
+
+    ``dest`` may contain ``{{pkg_name}}`` which is resolved at apply time
+    by plain string substitution (see :func:`resolve_dest_placeholder`).
+    No other ``{{…}}`` placeholders are allowed in dest paths — use
+    ``(( var_name ))`` (Jinja2 custom delimiters) in file content instead.
+    """
 
     dest: str  # relative path; may contain ``{{pkg_name}}``
     source: str | None = None

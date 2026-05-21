@@ -18,7 +18,7 @@ from zenit.core._paths import get_zenit_root
 from zenit.core.collect import collect_all
 from zenit.core.lockfile import SCHEMA_VERSION, ZenitLockfile, read_lockfile
 from zenit.core.manifest import read_manifest
-from zenit.core.pkg_name import normalise_pkg_name
+from zenit.core.pkg_name import normalise_pkg_name, resolve_dest_placeholder
 from zenit.schema.models import (
     DependencyEntry,
     EnvEntry,
@@ -634,7 +634,7 @@ def _check_files(project_dir: Path, lockfile: ZenitLockfile) -> HealthResult:
     checked = 0
 
     for source, fc in all_files:
-        dest = fc.dest.replace("{{pkg_name}}", pkg_name)
+        dest = resolve_dest_placeholder(fc.dest, pkg_name)
         if dest.endswith("__init__.py"):
             continue
         checked += 1

@@ -547,9 +547,7 @@ class TestCheckAddonHealth:
         cfg = AddonConfig(id="docker", description="")
         cfg._module = hooks
 
-        with mock.patch(
-            "zenit.doctor.doctor.get_available_addons", return_value=[cfg]
-        ):
+        with mock.patch("zenit.doctor.doctor.get_available_addons", return_value=[cfg]):
             result = _check_addon_health(project_dir, lockfile)
         assert result.has_warnings
         assert any("health_check" in i.message for i in _warnings(result))

@@ -38,7 +38,7 @@ from zenit.core.manifest import (
     remove_blocks_for_addon,
     write_manifest,
 )
-from zenit.core.pkg_name import normalise_pkg_name
+from zenit.core.pkg_name import normalise_pkg_name, resolve_dest_placeholder
 from zenit.core.render import build_render_vars, make_env
 from zenit.schema.exceptions import ZenitError
 from zenit.schema.models import AddonConfig
@@ -165,12 +165,12 @@ def _remove_files(
 ) -> list[str]:
     """Delete files that were created by this addon. Returns list of removed paths."""
 
-    all_dests = {fc.dest.replace("{{pkg_name}}", pkg_name) for fc in addon_cfg.files}
+    all_dests = {resolve_dest_placeholder(fc.dest, pkg_name) for fc in addon_cfg.files}
 
     removed: list[str] = []
 
     for fc in addon_cfg.files:
-        dest = fc.dest.replace("{{pkg_name}}", pkg_name)
+        dest = resolve_dest_placeholder(fc.dest, pkg_name)
         full = project_dir / dest
 
         if dest.endswith("__init__.py") and fc.content == "":
@@ -448,9 +448,9 @@ def _dry_remove(
     )
 
     dry_header("Files that would be removed")
-    all_dests = {fc.dest.replace("{{pkg_name}}", pkg_name) for fc in addon_cfg.files}
+    all_dests = {resolve_dest_placeholder(fc.dest, pkg_name) for fc in addon_cfg.files}
     for fc in addon_cfg.files:
-        dest = fc.dest.replace("{{pkg_name}}", pkg_name)
+        dest = resolve_dest_placeholder(fc.dest, pkg_name)
         full = project_dir / dest
         if dest.endswith("__init__.py") and fc.content == "":
             parent = full.parent
