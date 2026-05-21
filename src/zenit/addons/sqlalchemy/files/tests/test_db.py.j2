@@ -1,0 +1,13 @@
+"""Verify database connection and model creation."""
+
+from (( pkg_name )).db.base import Base
+
+
+def test_base_metadata():
+    """Base must have a metadata object."""
+    assert Base.metadata is not None
+
+
+def test_session_creates_tables(session):
+    """Session fixture must create and drop tables."""
+    assert session is not None

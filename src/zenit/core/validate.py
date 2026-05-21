@@ -83,6 +83,7 @@ def validate_addon_deps(
     """Abort with exit code 1 if any selected addon's requirements are missing
     or if an addon is incompatible with the selected template."""
     requires_map = {cfg.id: cfg.requires for cfg in available}
+    conflicts_map = {cfg.id: cfg.conflicts_with for cfg in available}
     templates_map = {cfg.id: cfg.templates for cfg in available}
 
     for addon in addons:
@@ -100,4 +101,10 @@ def validate_addon_deps(
         for req in requires_map.get(addon, []):
             if req not in addons:
                 error(f"Addon '{addon}' requires '{req}', but it wasn't selected.")
+                raise typer.Exit(1)
+
+        # Conflict check.
+        for conflict in conflicts_map.get(addon, []):
+            if conflict in addons:
+                error(f"Addon '{addon}' conflicts with '{conflict}'.")
                 raise typer.Exit(1)

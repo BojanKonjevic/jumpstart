@@ -70,8 +70,6 @@ def _scaffold(
         name=name,
         pkg_name=pkg_name,
         template=template,
-        has_postgres=template == "fastapi",
-        has_redis="redis" in addons,
         addons=addons,
     )
 
@@ -680,7 +678,7 @@ class TestCheckEnv:
         assert any("No env vars expected" in i.message for i in _ok(result))
 
     def test_error_when_env_var_missing_from_env(self, tmp_path):
-        project_dir = _scaffold(tmp_path, template="fastapi", addons=["docker"])
+        project_dir = _scaffold(tmp_path, template="fastapi", addons=["docker", "postgres"])
         env_path = project_dir / ".env"
         text = env_path.read_text()
         env_path.write_text(
@@ -691,7 +689,7 @@ class TestCheckEnv:
         assert any("DATABASE_URL" in i.message for i in _errors(result))
 
     def test_error_when_env_var_missing_from_env_example(self, tmp_path):
-        project_dir = _scaffold(tmp_path, template="fastapi", addons=["docker"])
+        project_dir = _scaffold(tmp_path, template="fastapi", addons=["docker", "postgres"])
         env_example = project_dir / ".env.example"
         text = env_example.read_text()
         env_example.write_text(
@@ -702,7 +700,7 @@ class TestCheckEnv:
         assert any("DATABASE_URL" in i.message for i in _errors(result))
 
     def test_warn_when_env_file_missing(self, tmp_path):
-        project_dir = _scaffold(tmp_path, template="fastapi", addons=["docker"])
+        project_dir = _scaffold(tmp_path, template="fastapi", addons=["docker", "postgres"])
         (project_dir / ".env").unlink()
         result = _check_env(project_dir, self._lockfile(project_dir))
         assert result.has_warnings

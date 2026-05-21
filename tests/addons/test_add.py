@@ -75,8 +75,6 @@ def _scaffold(tmp_path: Path, name: str, template: str, addons: list[str]) -> Pa
         name=name,
         pkg_name=pkg_name,
         template=template,
-        has_postgres=template == "fastapi",
-        has_redis="redis" in addons,
         addons=addons,
     )
 

@@ -25,6 +25,13 @@ config = TemplateConfig(
             file=".env",
             locator=LocatorSpec(name="at_file_end", args={}),
         ),
+        "settings_fields": InjectionPoint(
+            file="src/{{pkg_name}}/settings.py",
+            locator=LocatorSpec(
+                name="after_last_class_attribute",
+                args={"class_name": "Settings"},
+            ),
+        ),
     },
     dirs=[
         "src/{{pkg_name}}",

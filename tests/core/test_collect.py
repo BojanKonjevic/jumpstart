@@ -50,6 +50,7 @@ def _addon(
     compose_services: list[ComposeService] | None = None,
     compose_volumes: list[str] | None = None,
     env_vars: list[EnvVar] | None = None,
+    dirs: list[str] | None = None,
 ) -> AddonConfig:
     return AddonConfig(
         id=id,
@@ -62,6 +63,7 @@ def _addon(
         compose_services=compose_services or [],
         compose_volumes=compose_volumes or [],
         env_vars=env_vars or [],
+        dirs=dirs or [],
     )
 
 
@@ -240,6 +242,15 @@ def test_collect_all_dirs_from_template():
     result = collect_all(_template(dirs=["src/{{pkg_name}}", "tests"]), [])
     assert "src/{{pkg_name}}" in result.dirs
     assert "tests" in result.dirs
+
+
+def test_collect_all_dirs_from_addon():
+    result = collect_all(
+        _template(),
+        [_addon(dirs=["src/{{pkg_name}}/db", "alembic/versions"])],
+    )
+    assert "src/{{pkg_name}}/db" in result.dirs
+    assert "alembic/versions" in result.dirs
 
 
 # ── addon_configs stored ──────────────────────────────────────────────────────

@@ -91,18 +91,6 @@ def test_fallback_multi_empty_input_returns_only_locked():
     assert result == []
 
 
-def test_fallback_multi_locked_from_template():
-    items = _items("docker", "redis", "celery")
-    with patch("builtins.input", return_value=""):
-        result = _fallback_multi(
-            items,
-            _requires(),
-            template="fastapi",
-            default_addon_names=[],
-        )
-    assert result == ["docker"]
-
-
 def test_fallback_multi_empty_input_no_locked_returns_empty():
     items = _items("docker", "redis")
     with patch("builtins.input", return_value=""):
@@ -112,11 +100,12 @@ def test_fallback_multi_empty_input_no_locked_returns_empty():
     assert result == []
 
 
-def test_fallback_multi_no_items_returns_locked_immediately():
+def test_fallback_multi_no_items_returns_empty():
+    """No template requires addons anymore, so no locked addons."""
     result = _fallback_multi(
         [], _requires(), template="fastapi", default_addon_names=[]
     )
-    assert "docker" in result
+    assert result == []
 
 
 # ── _fallback_multi — selection by number ─────────────────────────────────────
@@ -151,35 +140,25 @@ def test_fallback_multi_select_multiple():
     assert "redis" not in result
 
 
-def test_fallback_multi_always_locked_included_even_if_not_typed():
+def test_fallback_multi_auto_selects_required():
     items = _items("docker", "redis", "celery")
-    with patch("builtins.input", return_value="2"):
+    with patch("builtins.input", return_value="3"):
         result = _fallback_multi(
-            items, _requires(), template="fastapi", default_addon_names=[]
+            items, _requires(("celery", ["redis"])), template="", default_addon_names=[]
         )
-    assert "docker" in result
+    assert "docker" not in result
     assert "redis" in result
+    assert "celery" in result
 
 
 def test_fallback_multi_locked_not_duplicated():
+    """No template requires addons — no locking."""
     items = _items("docker", "redis")
     with patch("builtins.input", return_value="1"):
         result = _fallback_multi(
-            items, _requires(), template="fastapi", default_addon_names=[]
+            items, _requires(), template="", default_addon_names=[]
         )
     assert result.count("docker") == 1
-
-
-# ── _fallback_multi — auto-selection of required addons ───────────────────────
-
-
-def test_fallback_multi_auto_selects_required():
-    items = _items("docker", "redis", "celery")
-    requires = _requires(("celery", ["redis"]))
-    with patch("builtins.input", return_value="3"):
-        result = _fallback_multi(items, requires, template="", default_addon_names=[])
-    assert "celery" in result
-    assert "redis" in result
 
 
 def test_fallback_multi_auto_selects_only_direct_requirements():

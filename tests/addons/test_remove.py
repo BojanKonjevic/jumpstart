@@ -71,8 +71,6 @@ def _scaffold(tmp_path: Path, name: str, template: str, addons: list[str]) -> Pa
         name=name,
         pkg_name=pkg_name,
         template=template,
-        has_postgres=template == "fastapi",
-        has_redis="redis" in addons,
         addons=addons,
     )
 
@@ -409,13 +407,15 @@ class TestRemoveAddonIntegration:
         assert "sentry_dsn" not in settings
         assert "sentry_environment" not in settings
 
-    def test_remove_docker_from_fastapi_leaves_db_configuration(
+    def test_remove_docker_from_fastapi_succeeds(
         self, tmp_path, monkeypatch
     ):
-        """Removing docker from fastapi should still keep database configuration."""
+        """Docker is no longer required by fastapi — removing it should succeed."""
         project_dir = _scaffold(tmp_path, "myapi", "fastapi", ["docker", "sentry"])
         monkeypatch.chdir(project_dir)
 
-        # Can't remove docker from fastapi since it's required
-        with suppress_stdin(), pytest.raises(ZenitError):
+        with suppress_stdin():
             remove_addon("docker", project_dir=project_dir)
+
+        assert not (project_dir / "compose.yml").exists()
+        assert not (project_dir / "Dockerfile").exists()

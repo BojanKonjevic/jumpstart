@@ -127,12 +127,12 @@ def test_passes_when_dependent_is_not_installed(tmp_path):
 # ── template-required addon check ─────────────────────────────────────────────
 
 
-def test_raises_when_template_requires_addon(tmp_path):
-    # fastapi template requires docker — docker cannot be removed
+def test_passes_when_no_template_requires_addon(tmp_path):
+    # No template has required addons anymore — docker can be removed from any template
     _write_lock(tmp_path, "fastapi", ["docker"])
     available = [_make_addon("docker")]
-    with pytest.raises(ZenitError, match="required by the 'fastapi' template"):
-        check_can_remove(tmp_path, "docker", available)
+    lockfile = check_can_remove(tmp_path, "docker", available)
+    assert lockfile.template == "fastapi"
 
 
 def test_passes_when_addon_not_required_by_template(tmp_path):

@@ -200,18 +200,18 @@ def test_run_dry_fastapi_output_mentions_fastapi_dep(tmp_path, capsys):
     assert "fastapi" in captured.out
 
 
-def test_run_dry_fastapi_output_mentions_alembic(tmp_path, capsys):
+def test_run_dry_fastapi_output_mentions_pydantic_settings(tmp_path, capsys):
     ctx = _real_ctx(tmp_path, template="fastapi", addons=["docker"])
     run_dry(ctx)
     captured = capsys.readouterr()
-    assert "alembic" in captured.out.lower() or "alembic" in captured.out
+    assert "pydantic-settings" in captured.out
 
 
 def test_run_dry_all_fastapi_addons(tmp_path, capsys):
     ctx = _real_ctx(
         tmp_path,
         template="fastapi",
-        addons=["docker", "redis", "celery", "sentry", "github-actions"],
+        addons=["docker", "postgres", "sqlalchemy", "redis", "celery", "sentry", "github-actions"],
     )
     run_dry(ctx)
     captured = capsys.readouterr()

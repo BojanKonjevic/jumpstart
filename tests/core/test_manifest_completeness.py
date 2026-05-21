@@ -100,8 +100,6 @@ def _scaffold(tmp_path: Path, name: str, template: str, addons: list[str]) -> Pa
         name=name,
         pkg_name=pkg_name,
         template=template,
-        has_postgres=template == "fastapi",
-        has_redis="redis" in addons,
         addons=addons,
     )
 
@@ -139,31 +137,37 @@ class TestSourceOwnership:
             )
 
     def test_template_env_vars_carry_template_source(self, tmp_path: Path) -> None:
-        project_dir = _scaffold(tmp_path, "myapp", "fastapi", [])
+        project_dir = _scaffold(tmp_path, "myapp", "fastapi", ["postgres"])
         m = read_manifest(project_dir)
 
         template_env = {e.key: e for e in m.env if e.source == "template"}
-        assert "DATABASE_URL" in template_env
         assert "DEBUG" in template_env
-        assert template_env["DATABASE_URL"].addon == ""
         assert template_env["DEBUG"].addon == ""
 
+        addon_env = {e.key: e for e in m.env if e.source == "addon"}
+        assert "DATABASE_URL" in addon_env
+        assert addon_env["DATABASE_URL"].addon == "postgres"
+
     def test_template_deps_carry_template_source(self, tmp_path: Path) -> None:
-        project_dir = _scaffold(tmp_path, "myapp", "fastapi", [])
+        project_dir = _scaffold(tmp_path, "myapp", "fastapi", ["sqlalchemy"])
         m = read_manifest(project_dir)
 
         template_pkgs = {d.package for d in m.dependencies if d.source == "template"}
         assert "fastapi" in template_pkgs
         assert "uvicorn" in template_pkgs
-        assert "sqlalchemy" in template_pkgs
+
+        addon_pkgs = {d.package for d in m.dependencies if d.source == "addon"}
+        assert "sqlalchemy" in addon_pkgs
 
     def test_template_recipes_carry_template_source(self, tmp_path: Path) -> None:
-        project_dir = _scaffold(tmp_path, "myapp", "fastapi", [])
+        project_dir = _scaffold(tmp_path, "myapp", "fastapi", ["sqlalchemy"])
         m = read_manifest(project_dir)
 
         template_recipes = {r.name for r in m.just_recipes if r.source == "template"}
         assert "run" in template_recipes
-        assert "upgrade" in template_recipes
+
+        addon_recipes = {r.name for r in m.just_recipes if r.source == "addon"}
+        assert "upgrade" in addon_recipes
 
     def test_addon_env_vars_carry_addon_source(self, tmp_path: Path) -> None:
         project_dir = _scaffold(tmp_path, "myapp", "fastapi", ["redis"])
@@ -295,13 +299,13 @@ class TestBlankTemplateManifest:
 class TestAdditiveManifest:
     def test_addon_does_not_corrupt_template_entries(self, tmp_path: Path) -> None:
         """Template-owned entries must survive addon addition unchanged."""
-        project_dir = _scaffold(tmp_path, "myapp", "fastapi", ["redis"])
+        project_dir = _scaffold(tmp_path, "myapp", "fastapi", ["postgres", "redis"])
         m = read_manifest(project_dir)
 
         db_entry = next((e for e in m.env if e.key == "DATABASE_URL"), None)
         assert db_entry is not None
-        assert db_entry.source == "template"
-        assert db_entry.addon == ""
+        assert db_entry.source == "addon"
+        assert db_entry.addon == "postgres"
 
     def test_no_duplicate_entries_after_scaffold(self, tmp_path: Path) -> None:
         project_dir = _scaffold(tmp_path, "myapp", "fastapi", ["redis"])

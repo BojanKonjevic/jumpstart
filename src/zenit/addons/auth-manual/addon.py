@@ -16,7 +16,7 @@ _HERE = Path(__file__).parent.absolute()
 config = AddonConfig(
     id="auth-manual",
     description="JWT auth: register, login, refresh, logout, current user",
-    requires=[],
+    requires=["sqlalchemy"],
     templates=["fastapi"],  # only valid for the fastapi template
     files=[
         FileContribution(

@@ -99,7 +99,7 @@ def prompt_single_addon(
                     tmpl = template_blocks[0].replace("__template__", "")
                     flash = f"{addon_id} is required by the {tmpl} template and cannot be removed"
                 elif addon_deps:
-                    flash = f"{addon_id} requires: {', '.join(addon_deps)} — remove those first"
+                    flash = f"{addon_id} needs: {', '.join(addon_deps)}"
                 return None
             return _DONE
         elif key == "\x03":

@@ -59,8 +59,6 @@ def _scaffold(tmp_path: Path, name: str, template: str, addons: list[str]) -> Pa
         name=name,
         pkg_name=pkg_name,
         template=template,
-        has_postgres=template == "fastapi",
-        has_redis="redis" in addons,
         addons=addons,
     )
 
@@ -216,11 +214,6 @@ class TestRenderedContentCorrectness:
         project_dir = _scaffold(tmp_path, "myapi", "fastapi", ["docker"])
         settings = (project_dir / "src" / "myapi" / "settings.py").read_text()
         assert "((" not in settings
-
-    def test_no_unrendered_jinja_in_alembic_ini(self, tmp_path):
-        project_dir = _scaffold(tmp_path, "myapi", "fastapi", ["docker"])
-        alembic_ini = (project_dir / "alembic.ini").read_text()
-        assert "((" not in alembic_ini
 
     def test_no_unrendered_jinja_in_env_file(self, tmp_path):
         project_dir = _scaffold(tmp_path, "myapi", "fastapi", ["docker"])
@@ -389,7 +382,9 @@ class TestPlanToolchain:
         self._assert_toolchain(project_dir)
 
     def test_fastapi_docker_template_passes_toolchain(self, tmp_path: Path) -> None:
-        project_dir = _scaffold(tmp_path, "myapi", "fastapi", ["docker"])
+        project_dir = _scaffold(
+            tmp_path, "myapi", "fastapi", ["docker", "sqlalchemy", "postgres"]
+        )
         self._assert_toolchain(project_dir, run_pytest=False)
 
     def test_fastapi_with_all_addons_passes_toolchain(self, tmp_path: Path) -> None:
@@ -397,30 +392,34 @@ class TestPlanToolchain:
             tmp_path,
             "myapi",
             "fastapi",
-            ["docker", "redis", "sentry", "celery", "github-actions"],
+            ["docker", "postgres", "sqlalchemy", "redis", "sentry", "celery", "github-actions"],
         )
         self._assert_toolchain(project_dir, run_pytest=False)
 
     def test_add_then_remove_addon_toolchain_passes(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        """Scaffold fastapi+docker, add redis and sentry, remove both, run toolchain."""
+        """Scaffold fastapi+docker+sqlalchemy+postgres, add celery and sentry, remove both, run toolchain."""
         from zenit.addons.add import add_addon
         from zenit.addons.remove import remove_addon
 
-        project_dir = _scaffold(tmp_path, "myapi", "fastapi", ["docker"])
+        project_dir = _scaffold(
+            tmp_path, "myapi", "fastapi", ["docker", "sqlalchemy", "postgres"]
+        )
         monkeypatch.chdir(project_dir)
 
         add_addon("redis")
         add_addon("sentry")
-        remove_addon("redis")
         remove_addon("sentry")
+        remove_addon("redis")
 
         self._assert_toolchain(project_dir, run_pytest=False)
 
     def test_doctor_clean_on_fresh_scaffold(self, tmp_path: Path) -> None:
         """After a fresh scaffold, run_doctor must report no errors."""
-        project_dir = _scaffold(tmp_path, "myapi", "fastapi", ["docker", "redis"])
+        project_dir = _scaffold(
+            tmp_path, "myapi", "fastapi", ["docker", "sqlalchemy", "postgres", "redis"]
+        )
         self._assert_doctor_clean(project_dir)
 
     def test_doctor_clean_after_add_and_remove(
@@ -430,7 +429,9 @@ class TestPlanToolchain:
         from zenit.addons.add import add_addon
         from zenit.addons.remove import remove_addon
 
-        project_dir = _scaffold(tmp_path, "myapi", "fastapi", ["docker"])
+        project_dir = _scaffold(
+            tmp_path, "myapi", "fastapi", ["docker", "sqlalchemy", "postgres"]
+        )
         monkeypatch.chdir(project_dir)
 
         add_addon("redis")

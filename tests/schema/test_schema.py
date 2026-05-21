@@ -173,7 +173,9 @@ def test_addon_config_required_fields():
 def test_addon_config_list_defaults_are_empty():
     cfg = AddonConfig(id="docker", description="")
     assert cfg.requires == []
+    assert cfg.conflicts_with == []
     assert cfg.templates == []
+    assert cfg.dirs == []
     assert cfg.files == []
     assert cfg.compose_services == []
     assert cfg.compose_volumes == []

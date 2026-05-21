@@ -46,8 +46,6 @@ def _scaffold(tmp_path: Path, name: str, template: str, addons: list[str]) -> Pa
         name=name,
         pkg_name=pkg_name,
         template=template,
-        has_postgres=template == "fastapi",
-        has_redis="redis" in addons,
         addons=addons,
     )
 
@@ -208,53 +206,27 @@ class TestFastapiTemplate:
         assert (src / "api" / "router.py").exists()
         assert (src / "api" / "routes" / "health.py").exists()
 
-    def test_db_structure(self, tmp_path):
-        project_dir = _scaffold(tmp_path, "myapi", "fastapi", ["docker"])
-        src = project_dir / "src" / "myapi"
-        assert (src / "db" / "base.py").exists()
-        assert (src / "db" / "session.py").exists()
-
-    def test_alembic_structure(self, tmp_path):
-        project_dir = _scaffold(tmp_path, "myapi", "fastapi", ["docker"])
-        assert (project_dir / "alembic.ini").exists()
-        assert (project_dir / "alembic" / "env.py").exists()
-
-    def test_env_file_created_with_db_url(self, tmp_path):
-        project_dir = _scaffold(tmp_path, "myapi", "fastapi", ["docker"])
-        env = (project_dir / ".env").read_text()
-        assert "DATABASE_URL=" in env
-        assert "DEBUG=" in env
-        assert "SECRET_KEY" not in env
-
-    def test_env_file_contains_database_url(self, tmp_path):
-        project_dir = _scaffold(tmp_path, "myapi", "fastapi", ["docker"])
-        env = (project_dir / ".env").read_text()
-        assert "DATABASE_URL=" in env
-        assert "myapi" in env
-
-    def test_settings_py_contains_project_name(self, tmp_path):
+    def test_settings_py_has_settings_class(self, tmp_path):
         project_dir = _scaffold(tmp_path, "myapi", "fastapi", ["docker"])
         settings = (project_dir / "src" / "myapi" / "settings.py").read_text()
-        assert "myapi" in settings
+        assert "class Settings" in settings
+
+    def test_settings_py_no_database_url(self, tmp_path):
+        """Plain fastapi skeleton has no database_url — it comes from postgres addon."""
+        project_dir = _scaffold(tmp_path, "myapi", "fastapi", ["docker"])
+        settings = (project_dir / "src" / "myapi" / "settings.py").read_text()
+        assert "database_url" not in settings
+
+    def test_lifecycle_py_no_engine_dispose(self, tmp_path):
+        """Plain fastapi skeleton has no engine.dispose() — it comes from sqlalchemy addon."""
+        project_dir = _scaffold(tmp_path, "myapi", "fastapi", ["docker"])
+        lifecycle = (project_dir / "src" / "myapi" / "lifecycle.py").read_text()
+        assert "engine.dispose" not in lifecycle
 
     def test_fastapi_recipes_in_justfile(self, tmp_path):
         project_dir = _scaffold(tmp_path, "myapi", "fastapi", ["docker"])
         justfile = (project_dir / "justfile").read_text()
-        for recipe in [
-            "run:",
-            "migrate",
-            "upgrade:",
-            "downgrade:",
-            "db-create:",
-            "db-reset:",
-        ]:
-            assert recipe in justfile, f"missing recipe: {recipe}"
-
-    def test_compose_yml_has_db_service(self, tmp_path):
-        project_dir = _scaffold(tmp_path, "myapi", "fastapi", ["docker"])
-        compose = (project_dir / "compose.yml").read_text()
-        assert "db:" in compose
-        assert "postgres" in compose
+        assert "run:" in justfile
 
     def test_no_duplicate_recipes(self, tmp_path):
         project_dir = _scaffold(tmp_path, "myapi", "fastapi", ["docker"])
@@ -278,7 +250,7 @@ class TestFastapiTemplate:
 
 
 class TestFastapiAllAddons:
-    ADDONS = ["docker", "redis", "celery", "sentry", "github-actions"]
+    ADDONS = ["docker", "postgres", "sqlalchemy", "redis", "celery", "sentry", "github-actions"]
 
     def test_scaffolds_successfully(self, tmp_path):
         project_dir = _scaffold(tmp_path, "myapi", "fastapi", self.ADDONS)
@@ -318,6 +290,12 @@ class TestFastapiAllAddons:
         for service in ["app:", "db:", "redis:", "celery-worker:", "celery-beat:"]:
             assert service in compose, f"missing compose service: {service}"
 
+    def test_settings_py_has_database_url(self, tmp_path):
+        """database_url comes from postgres addon injection."""
+        project_dir = _scaffold(tmp_path, "myapi", "fastapi", self.ADDONS)
+        settings = (project_dir / "src" / "myapi" / "settings.py").read_text()
+        assert "database_url" in settings
+
     def test_settings_py_has_redis_url(self, tmp_path):
         project_dir = _scaffold(tmp_path, "myapi", "fastapi", self.ADDONS)
         settings = (project_dir / "src" / "myapi" / "settings.py").read_text()
@@ -327,6 +305,12 @@ class TestFastapiAllAddons:
         project_dir = _scaffold(tmp_path, "myapi", "fastapi", self.ADDONS)
         settings = (project_dir / "src" / "myapi" / "settings.py").read_text()
         assert "sentry_dsn" in settings
+
+    def test_lifecycle_py_disposes_engine(self, tmp_path):
+        """engine.dispose() comes from sqlalchemy addon injection."""
+        project_dir = _scaffold(tmp_path, "myapi", "fastapi", self.ADDONS)
+        lifecycle = (project_dir / "src" / "myapi" / "lifecycle.py").read_text()
+        assert "engine.dispose" in lifecycle
 
     def test_lifecycle_py_calls_init_sentry(self, tmp_path):
         project_dir = _scaffold(tmp_path, "myapi", "fastapi", self.ADDONS)
@@ -339,6 +323,12 @@ class TestFastapiAllAddons:
         for recipe in [
             "docker-up:",
             "docker-down:",
+            "migrate",
+            "upgrade:",
+            "downgrade:",
+            "wait-db:",
+            "db-create:",
+            "db-reset:",
             "redis-up:",
             "redis-down:",
             "redis-cli:",
@@ -365,6 +355,12 @@ class TestFastapiAllAddons:
         assert len(recipe_lines) == len(set(recipe_lines)), (
             f"Duplicate recipes: {[r for r in recipe_lines if recipe_lines.count(r) > 1]}"
         )
+
+    def test_env_file_has_database_url(self, tmp_path):
+        """DATABASE_URL comes from postgres addon."""
+        project_dir = _scaffold(tmp_path, "myapi", "fastapi", self.ADDONS)
+        env = (project_dir / ".env").read_text()
+        assert "DATABASE_URL=" in env
 
     def test_env_file_has_redis_url(self, tmp_path):
         project_dir = _scaffold(tmp_path, "myapi", "fastapi", self.ADDONS)

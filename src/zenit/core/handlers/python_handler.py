@@ -42,7 +42,14 @@ def _locate_line(
         # Insert BEFORE body[idx].
         # Positions are 1-based; splitlines() is 0-based.
         if idx < len(body):
-            return positions[body[idx]].start.line - 1  # 0-based split
+            if idx > 0:
+                # Use end of previous element so we don't land between a
+                # decorator and its function/class definition.
+                return positions[body[idx - 1]].end.line
+            # idx == 0 → insert before the first element.
+            # For function bodies (before_yield etc.) line 0 is wrong — we
+            # need the global line of the first body statement.
+            return positions[body[0]].start.line - 1
         # Past end → insert after the last statement.
         if body:
             # end.line is 1-based, so it doubles as the 0-based "after" index.

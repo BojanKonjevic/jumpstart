@@ -64,23 +64,23 @@ def build_render_vars(
     template: str,
     *,
     secret_key: str = "change-me-run-openssl-rand-hex-32",
-    has_postgres: bool = False,
-    has_redis: bool = False,
     addons: list[str] | None = None,
 ) -> dict[str, object]:
     """Build the standard render-variables dict for template rendering.
 
-    This is the canonical construction site so that adding a new variable
-    only needs a change in *one* place.
+    ``has_postgres`` and ``has_redis`` are derived from the ``addons`` list
+    so that all rendering code stays in sync without callers having to pass
+    redundant flags.
     """
+    addon_list = addons or []
     return {
         "name": name,
         "pkg_name": pkg_name,
         "template": template,
         "secret_key": secret_key,
-        "has_postgres": has_postgres,
-        "has_redis": has_redis,
-        "addons": addons or [],
+        "has_postgres": "postgres" in addon_list,
+        "has_redis": "redis" in addon_list,
+        "addons": addon_list,
     }
 
 

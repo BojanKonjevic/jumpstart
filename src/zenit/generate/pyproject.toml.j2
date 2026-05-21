@@ -44,7 +44,7 @@ select = ["E", "F", "I", "UP", "B", "ANN", "SIM"]
 
 [tool.mypy]
 strict = true
-[% if template == "fastapi" %]
+[% if "sqlalchemy" in addons %]
 [[tool.mypy.overrides]]
 module = ["sqlalchemy.*", "alembic.*"]
 ignore_missing_imports = true

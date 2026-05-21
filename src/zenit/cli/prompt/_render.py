@@ -54,12 +54,10 @@ DESC_INDENT = "  "
 
 TEMPLATES: list[tuple[str, str]] = [
     ("blank", "dev tools only  (pytest, ruff, mypy)"),
-    ("fastapi", "FastAPI + SQLAlchemy + Alembic + asyncpg"),
+    ("fastapi", "FastAPI web framework skeleton"),
 ]
 
-TEMPLATE_REQUIRES: dict[str, list[str]] = {
-    "fastapi": ["docker"],
-}
+TEMPLATE_REQUIRES: dict[str, list[str]] = {}
 
 
 # ── Renderers ─────────────────────────────────────────────────────────────────

@@ -94,8 +94,6 @@ def scaffold_project(name: str, dry_run: bool = False) -> None:
             name=name,
             pkg_name=pkg_name,
             template=template,
-            has_postgres=template == "fastapi",
-            has_redis="redis" in addons,
             addons=addons,
         )
 

@@ -72,8 +72,6 @@ def _run_add_pipeline(
         name=ctx.name,
         pkg_name=pkg_name,
         template=template,
-        has_postgres=template == "fastapi",
-        has_redis="redis" in ctx.addons,
         addons=ctx.addons,
     )
 

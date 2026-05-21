@@ -1,0 +1,18 @@
+import pytest
+from sqlalchemy import create_engine
+from sqlalchemy.orm import Session, sessionmaker
+
+from (( pkg_name )).db.base import Base
+
+TEST_DATABASE_URL = "sqlite://"
+
+
+@pytest.fixture
+def session() -> Session:
+    engine = create_engine(TEST_DATABASE_URL)
+    Base.metadata.create_all(engine)
+    factory = sessionmaker(engine, expire_on_commit=False)
+    with factory() as s:
+        yield s
+    Base.metadata.drop_all(engine)
+    engine.dispose()

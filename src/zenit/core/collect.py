@@ -39,6 +39,7 @@ def collect_all(
         c.injections.append(inj)
 
     for addon in addon_configs:
+        c.dirs.extend(addon.dirs)
         c.files.extend(addon.files)
         c.compose_services.extend(addon.compose_services)
         c.compose_volumes.extend(addon.compose_volumes)
@@ -89,6 +90,7 @@ def collect_addon_only(addon_configs: list[AddonConfig]) -> Contributions:
     """
     c = Contributions()
     for addon in addon_configs:
+        c.dirs.extend(addon.dirs)
         c.files.extend(addon.files)
         c.compose_services.extend(addon.compose_services)
         c.compose_volumes.extend(addon.compose_volumes)
