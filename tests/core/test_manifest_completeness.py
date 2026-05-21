@@ -11,7 +11,6 @@ Verifies that after a full scaffold run:
 
 from __future__ import annotations
 
-import secrets
 from pathlib import Path
 
 from zenit.addons._registry import get_available_addons
@@ -32,6 +31,7 @@ from zenit.core.manifest import (
     write_manifest,
 )
 from zenit.core.manifest import fingerprint as _fp
+from zenit.core.render import build_render_vars
 from zenit.templates._load_config import load_template_config
 
 _ZENIT_ROOT = Path(__file__).parent.parent.parent / "src" / "zenit"
@@ -95,14 +95,13 @@ def _scaffold(tmp_path: Path, name: str, template: str, addons: list[str]) -> Pa
     template_config = load_template_config(_ZENIT_ROOT, template)
     selected_addon_configs = [cfg for cfg in available if cfg.id in addons]
 
-    render_vars: dict[str, object] = {
-        "name": name,
-        "pkg_name": pkg_name,
-        "template": template,
-        "secret_key": secrets.token_hex(32) if template == "fastapi" else "change-me",
-        "has_postgres": template == "fastapi",
-        "has_redis": "redis" in addons,
-    }
+    render_vars = build_render_vars(
+        name=name,
+        pkg_name=pkg_name,
+        template=template,
+        has_postgres=template == "fastapi",
+        has_redis="redis" in addons,
+    )
 
     contributions = collect_all(template_config, selected_addon_configs)
     apply_contributions(

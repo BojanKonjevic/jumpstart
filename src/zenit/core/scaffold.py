@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import secrets
 import shutil
 import sys
 from pathlib import Path
@@ -32,6 +31,7 @@ from zenit.core.manifest import (
     read_manifest,
     write_manifest,
 )
+from zenit.core.render import build_render_vars
 from zenit.core.rollback import scaffold_or_rollback
 from zenit.core.validate import (
     check_preflight,
@@ -87,18 +87,15 @@ def scaffold_project(name: str, dry_run: bool = False) -> None:
         template_config = load_template_config(zenit_root, template)
         selected_addon_configs = [a for a in available if a.id in addons]
 
-        secret_key = secrets.token_hex(32) if template == "fastapi" else None
-
         contributions = collect_all(template_config, selected_addon_configs)
 
-        render_vars: dict[str, object] = {
-            "name": name,
-            "pkg_name": pkg_name,
-            "template": template,
-            "secret_key": secret_key or "change-me-run-openssl-rand-hex-32",
-            "has_postgres": template == "fastapi",
-            "has_redis": "redis" in addons,
-        }
+        render_vars = build_render_vars(
+            name=name,
+            pkg_name=pkg_name,
+            template=template,
+            has_postgres=template == "fastapi",
+            has_redis="redis" in addons,
+        )
 
         write_lockfile(project_dir, template, addons)
 

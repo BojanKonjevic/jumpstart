@@ -3,8 +3,6 @@ recording context that captures every file operation without touching disk."""
 
 from __future__ import annotations
 
-import secrets
-
 from zenit.addons._registry import get_available_addons
 from zenit.cli.ui import (
     BOLD,
@@ -23,6 +21,7 @@ from zenit.core.collect import collect_all
 from zenit.core.context import Context
 from zenit.core.filesystem import RecordingFileSystem
 from zenit.core.generate import generate_all
+from zenit.core.render import build_render_vars
 from zenit.templates._load_config import load_template_config
 
 
@@ -46,18 +45,15 @@ def run_dry(ctx: Context) -> None:
     template_config = load_template_config(sr, dry_ctx.template)
     selected_addon_configs = [cfg for cfg in available if cfg.id in dry_ctx.addons]
 
-    secret_key = secrets.token_hex(32) if dry_ctx.template == "fastapi" else None
-
     contributions = collect_all(template_config, selected_addon_configs)
 
-    render_vars: dict[str, object] = {
-        "name": ctx.name,
-        "pkg_name": ctx.pkg_name,
-        "template": ctx.template,
-        "secret_key": secret_key or "change-me-run-openssl-rand-hex-32",
-        "has_postgres": ctx.template == "fastapi",
-        "has_redis": "redis" in ctx.addons,
-    }
+    render_vars = build_render_vars(
+        name=ctx.name,
+        pkg_name=ctx.pkg_name,
+        template=ctx.template,
+        has_postgres=ctx.template == "fastapi",
+        has_redis="redis" in ctx.addons,
+    )
 
     apply_contributions(
         dry_ctx,

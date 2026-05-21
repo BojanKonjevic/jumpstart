@@ -32,7 +32,7 @@ from zenit.core.filesystem import RecordingFileSystem
 from zenit.core.generate import _recipe_name
 from zenit.core.justfile import inject_just_recipes
 from zenit.core.lockfile import read_lockfile, write_lockfile
-from zenit.core.render import make_env
+from zenit.core.render import build_recipe_render_vars, build_render_vars, make_env
 from zenit.core.rollback import addon_or_rollback
 from zenit.schema.exceptions import ZenitError
 from zenit.schema.models import AddonConfig
@@ -90,14 +90,13 @@ def add_addon(addon_id: str, dry_run: bool = False) -> None:
         template_config = load_template_config(zenit_root, template)
         selected_addon_configs = [a for a in available if a.id == addon_id]
 
-        render_vars: dict[str, object] = {
-            "name": project_dir.name,
-            "pkg_name": pkg_name,
-            "template": template,
-            "secret_key": "",
-            "has_postgres": template == "fastapi",
-            "has_redis": "redis" in ctx.addons,
-        }
+        render_vars = build_render_vars(
+            name=project_dir.name,
+            pkg_name=pkg_name,
+            template=template,
+            has_postgres=template == "fastapi",
+            has_redis="redis" in ctx.addons,
+        )
 
         contributions = collect_addon_only(selected_addon_configs)
 
@@ -118,12 +117,12 @@ def add_addon(addon_id: str, dry_run: bool = False) -> None:
             warn(str(exc))
             added_deps, added_dev_deps = [], []
 
-        recipe_render_vars: dict[str, object] = {
-            "name": project_dir.name,
-            "pkg_name": pkg_name,
-            "template": template,
-            "addons": ctx.addons,
-        }
+        recipe_render_vars = build_recipe_render_vars(
+            name=project_dir.name,
+            pkg_name=pkg_name,
+            template=template,
+            addons=ctx.addons,
+        )
         string_env = make_env()
         rendered_recipes = [
             string_env.from_string(r).render(**recipe_render_vars)
@@ -182,14 +181,13 @@ def _dry_add(
     selected_addon_configs = [a for a in available if a.id == addon_id]
     contributions = collect_addon_only(selected_addon_configs)
 
-    render_vars: dict[str, object] = {
-        "name": ctx.name,
-        "pkg_name": ctx.pkg_name,
-        "template": template,
-        "secret_key": "",
-        "has_postgres": template == "fastapi",
-        "has_redis": "redis" in ctx.addons,
-    }
+    render_vars = build_render_vars(
+        name=ctx.name,
+        pkg_name=ctx.pkg_name,
+        template=template,
+        has_postgres=template == "fastapi",
+        has_redis="redis" in ctx.addons,
+    )
 
     apply_contributions(
         dry_ctx,
@@ -221,12 +219,12 @@ def _dry_add(
 
     if contributions.just_recipes:
         dry_header("Just recipes that would be added")
-        recipe_render_vars: dict[str, object] = {
-            "name": ctx.name,
-            "pkg_name": ctx.pkg_name,
-            "template": template,
-            "addons": ctx.addons,
-        }
+        recipe_render_vars = build_recipe_render_vars(
+            name=ctx.name,
+            pkg_name=ctx.pkg_name,
+            template=template,
+            addons=ctx.addons,
+        )
         string_env = make_env()
         for recipe in contributions.just_recipes:
             rendered = string_env.from_string(recipe).render(**recipe_render_vars)

@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import os
-import secrets
 import subprocess
 from contextlib import contextmanager
 from pathlib import Path
@@ -21,6 +20,7 @@ from zenit.core.context import Context
 from zenit.core.generate import generate_all
 from zenit.core.git import init
 from zenit.core.lockfile import read_lockfile, write_lockfile
+from zenit.core.render import build_render_vars
 from zenit.schema.exceptions import ZenitError
 from zenit.templates._load_config import load_template_config
 
@@ -67,16 +67,13 @@ def _scaffold(tmp_path: Path, name: str, template: str, addons: list[str]) -> Pa
     template_config = load_template_config(ZENIT_ROOT, template)
     selected_addon_configs = [cfg for cfg in available if cfg.id in addons]
 
-    secret_key = secrets.token_hex(32) if template == "fastapi" else None
-
-    render_vars: dict[str, object] = {
-        "name": name,
-        "pkg_name": pkg_name,
-        "template": template,
-        "secret_key": secret_key or "change-me-run-openssl-rand-hex-32",
-        "has_postgres": template == "fastapi",
-        "has_redis": "redis" in addons,
-    }
+    render_vars = build_render_vars(
+        name=name,
+        pkg_name=pkg_name,
+        template=template,
+        has_postgres=template == "fastapi",
+        has_redis="redis" in addons,
+    )
 
     contributions = collect_all(template_config, selected_addon_configs)
     apply_contributions(

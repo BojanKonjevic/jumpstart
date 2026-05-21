@@ -11,7 +11,6 @@ from __future__ import annotations
 
 import os
 import re
-import secrets
 from contextlib import contextmanager
 from pathlib import Path
 from unittest.mock import patch
@@ -32,6 +31,7 @@ from zenit.core.context import Context
 from zenit.core.generate import generate_all
 from zenit.core.git import init
 from zenit.core.lockfile import read_lockfile, write_lockfile
+from zenit.core.render import build_render_vars
 from zenit.templates._load_config import load_template_config
 
 # ── helpers ───────────────────────────────────────────────────────────────────
@@ -71,14 +71,13 @@ def _scaffold(tmp_path: Path, name: str, template: str, addons: list[str]) -> Pa
     available = get_available_addons()
     template_config = load_template_config(ZENIT_ROOT, template)
     selected = [c for c in available if c.id in addons]
-    render_vars: dict[str, object] = {
-        "name": name,
-        "pkg_name": pkg_name,
-        "template": template,
-        "secret_key": secrets.token_hex(32) if template == "fastapi" else "change-me",
-        "has_postgres": template == "fastapi",
-        "has_redis": "redis" in addons,
-    }
+    render_vars = build_render_vars(
+        name=name,
+        pkg_name=pkg_name,
+        template=template,
+        has_postgres=template == "fastapi",
+        has_redis="redis" in addons,
+    )
 
     contributions = collect_all(template_config, selected)
     apply_contributions(

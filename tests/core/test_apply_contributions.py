@@ -20,6 +20,7 @@ from zenit.core.apply import apply_contributions
 from zenit.core.context import Context
 from zenit.core.manifest import fingerprint as _fp
 from zenit.core.manifest import read_manifest
+from zenit.core.render import build_render_vars
 from zenit.schema.models import (
     AddonConfig,
     ComposeService,
@@ -49,14 +50,12 @@ def _ctx(tmp_path: Path, name: str = "myapp") -> Context:
 
 
 def _render_vars(ctx: Context) -> dict[str, object]:
-    return {
-        "name": ctx.name,
-        "pkg_name": ctx.pkg_name,
-        "template": ctx.template,
-        "secret_key": "test-secret",
-        "has_postgres": False,
-        "has_redis": False,
-    }
+    return build_render_vars(
+        name=ctx.name,
+        pkg_name=ctx.pkg_name,
+        template=ctx.template,
+        secret_key="test-secret",
+    )
 
 
 def _injection_points(

@@ -1,4 +1,4 @@
-"""Central Jinja2 environment factory.
+"""Central Jinja2 environment factory and render-variables builder.
 
 All templates and addons use ``make_env()`` so the custom delimiters stay
 defined in exactly one place.
@@ -14,12 +14,14 @@ files and YAML that use ``{{}}`` and ``{%%}`` as literal text (e.g. Docker
 Compose files, Alembic scripts).
 
 trim_blocks / lstrip_blocks
-----------------------------
+---------------------------
 Both are enabled so that ``[% if … %]`` / ``[% endif %]`` block tags do not
 leave behind blank lines in the rendered output when their body is empty or
 omitted. Without these options, a conditional block that evaluates to nothing
 still contributes a newline for the tag line itself.
 """
+
+from __future__ import annotations
 
 from pathlib import Path
 
@@ -54,3 +56,42 @@ def make_env(loader_path: Path | None = None) -> jinja2.Environment:
         # double-hash comments in generated Python files are never stripped.
         line_comment_prefix=None,
     )
+
+
+def build_render_vars(
+    name: str,
+    pkg_name: str,
+    template: str,
+    *,
+    secret_key: str = "change-me-run-openssl-rand-hex-32",
+    has_postgres: bool = False,
+    has_redis: bool = False,
+) -> dict[str, object]:
+    """Build the standard render-variables dict for template rendering.
+
+    This is the canonical construction site so that adding a new variable
+    only needs a change in *one* place.
+    """
+    return {
+        "name": name,
+        "pkg_name": pkg_name,
+        "template": template,
+        "secret_key": secret_key,
+        "has_postgres": has_postgres,
+        "has_redis": has_redis,
+    }
+
+
+def build_recipe_render_vars(
+    name: str,
+    pkg_name: str,
+    template: str,
+    addons: list[str],
+) -> dict[str, object]:
+    """Build render-variables for Justfile recipe rendering only."""
+    return {
+        "name": name,
+        "pkg_name": pkg_name,
+        "template": template,
+        "addons": addons,
+    }

@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from zenit.cli.ui import step, success
-from zenit.core.render import make_env
+from zenit.core.render import build_recipe_render_vars, make_env
 
 if TYPE_CHECKING:
     from zenit.core.context import Context
@@ -39,12 +39,12 @@ def generate_all(
     env = make_env(ctx.zenit_root / "generate")
     string_env = make_env()
 
-    render_vars = {
-        "name": ctx.name,
-        "pkg_name": ctx.pkg_name,
-        "template": ctx.template,
-        "addons": ctx.addons,
-    }
+    render_vars = build_recipe_render_vars(
+        name=ctx.name,
+        pkg_name=ctx.pkg_name,
+        template=ctx.template,
+        addons=ctx.addons,
+    )
 
     rendered_template_recipes = [
         string_env.from_string(raw).render(**render_vars)

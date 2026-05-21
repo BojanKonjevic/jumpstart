@@ -38,7 +38,7 @@ from zenit.core.manifest import (
     remove_blocks_for_addon,
     write_manifest,
 )
-from zenit.core.render import make_env
+from zenit.core.render import build_render_vars, make_env
 from zenit.schema.exceptions import ZenitError
 from zenit.schema.models import AddonConfig
 
@@ -80,14 +80,13 @@ def remove_addon(
     else:
         warn("Non-interactive mode — proceeding automatically.")
 
-    render_vars: dict[str, object] = {
-        "name": project_dir.name,
-        "pkg_name": pkg_name,
-        "template": template,
-        "secret_key": "",
-        "has_postgres": template == "fastapi",
-        "has_redis": "redis" in lockfile.addons,
-    }
+    render_vars = build_render_vars(
+        name=project_dir.name,
+        pkg_name=pkg_name,
+        template=template,
+        has_postgres=template == "fastapi",
+        has_redis="redis" in lockfile.addons,
+    )
 
     # ── files ──────────────────────────────────────────────────────────────
     removed_files = _remove_files(project_dir, addon_cfg, pkg_name)
