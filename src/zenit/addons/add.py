@@ -46,6 +46,7 @@ from zenit.templates._load_config import load_template_config
 @dataclass
 class _AddResult:
     """Result of running the add-on pipeline."""
+
     added_deps: list[str] = field(default_factory=list)
     added_dev_deps: list[str] = field(default_factory=list)
     added_recipes: list[str] = field(default_factory=list)
@@ -130,7 +131,7 @@ def _run_add_pipeline(
     )
 
 
-def add_addon(addon_id: str, dry_run: bool = False) -> None:
+def add_addon(addon_id: str, dry_run: bool = False, yes: bool = False) -> None:
     """Apply a single addon to an existing zenit project."""
 
     project_dir = Path.cwd()
@@ -184,17 +185,20 @@ def add_addon(addon_id: str, dry_run: bool = False) -> None:
     # ── Real mode: prompt ─────────────────────────────────────────────────────
     addon_summary("add", addon_id, project_dir, template)
 
-    if sys.stdin.isatty():
+    if sys.stdin.isatty() and not yes:
         try:
             raw = input(f"  Proceed? {DIM}[Y/n]{RESET}  ").strip().lower()
-        except (EOFError, KeyboardInterrupt):
+        except EOFError, KeyboardInterrupt:
             print()
             raise typer.Exit(0) from None
         if raw not in ("", "y", "yes"):
             warn("Aborted.")
             raise typer.Exit(0)
     else:
-        warn("Non‑interactive mode — proceeding automatically.")
+        if yes:
+            pass
+        else:
+            warn("Non‑interactive mode — proceeding automatically.")
 
     with addon_or_rollback(project_dir, addon_id):
         ctx = Context(
@@ -212,15 +216,28 @@ def add_addon(addon_id: str, dry_run: bool = False) -> None:
     success(f"Addon '{addon_id}' added to '{project_dir.name}'.")
 
     if result.added_deps or result.added_dev_deps:
-        bullet_list("Dependencies added to pyproject.toml:", result.added_deps, bullet="+", bullet_color=GREEN)
+        bullet_list(
+            "Dependencies added to pyproject.toml:",
+            result.added_deps,
+            bullet="+",
+            bullet_color=GREEN,
+        )
         if result.added_dev_deps:
-            bullet_list("", result.added_dev_deps, bullet="+", bullet_color=GREEN, suffix="(dev)")
+            bullet_list(
+                "",
+                result.added_dev_deps,
+                bullet="+",
+                bullet_color=GREEN,
+                suffix="(dev)",
+            )
         info("Run 'uv sync' to install them.")
     else:
         info("No new dependencies were needed.")
 
     if result.added_recipes:
-        bullet_list("Just recipes added:", result.added_recipes, bullet="+", bullet_color=GREEN)
+        bullet_list(
+            "Just recipes added:", result.added_recipes, bullet="+", bullet_color=GREEN
+        )
 
     print()
 

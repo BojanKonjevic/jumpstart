@@ -10,7 +10,8 @@ import typer
 
 from zenit.addons._registry import get_available_addons
 from zenit.cli.prompt import prompt_addons, prompt_template
-from zenit.cli.ui import confirm, info, print_commands_from_just, success
+from zenit.cli.prompt._render import TEMPLATES
+from zenit.cli.ui import confirm, error, info, print_commands_from_just, success
 from zenit.config.config import load_config
 from zenit.core._apply_loader import load_apply
 from zenit.core._paths import get_zenit_root
@@ -43,7 +44,36 @@ from zenit.schema.models import EntrySource, TemplateConfig
 from zenit.templates._load_config import load_template_config
 
 
-def scaffold_project(name: str, dry_run: bool = False) -> None:
+def validate_template_exists(template: str) -> None:
+    """Exit with code 1 if template is not in the available templates list."""
+    valid = {name for name, _ in TEMPLATES}
+    if template not in valid:
+        error(f"Unknown template '{template}'.")
+        available = "\n    ".join(f"• {name}" for name, _ in TEMPLATES)
+        print(f"\n  Available templates:\n    {available}\n")
+        raise typer.Exit(1)
+
+
+def validate_addons_exist(addons: list[str]) -> None:
+    """Exit with code 1 if any addon doesn't exist."""
+    available = {cfg.id for cfg in get_available_addons()}
+    for addon in addons:
+        if addon not in available:
+            error(f"Unknown addon '{addon}'.")
+            valid = "\n    ".join(
+                f"• {cfg.id}  — {cfg.description}" for cfg in get_available_addons()
+            )
+            print(f"\n  Available addons:\n    {valid}\n")
+            raise typer.Exit(1)
+
+
+def scaffold_project(
+    name: str,
+    dry_run: bool = False,
+    template: str | None = None,
+    addons: list[str] | None = None,
+    yes: bool = False,
+) -> None:
     """Core scaffold pipeline — called by the main CLI command."""
 
     zenit_root = get_zenit_root()
@@ -54,19 +84,31 @@ def scaffold_project(name: str, dry_run: bool = False) -> None:
     if not dry_run:
         check_preflight()
 
+    # Validate explicit arguments before any prompts
+    if template is not None:
+        validate_template_exists(template)
+    if addons is not None:
+        validate_addons_exist(addons)
+
     cfg = load_config()
 
-    template = prompt_template(default=cfg.default_template)
+    if template is not None:
+        tpl = template
+    else:
+        tpl = prompt_template(default=cfg.default_template)
 
     available = get_available_addons()
-    addons = prompt_addons(available, template, default_addons=cfg.default_addons)
-    validate_addon_deps(addons, available, template=template)
+    if addons is not None:
+        adns = addons
+    else:
+        adns = prompt_addons(available, tpl, default_addons=cfg.default_addons)
+    validate_addon_deps(adns, available, template=tpl)
 
     ctx = Context(
         name=name,
         pkg_name=pkg_name,
-        template=template,
-        addons=addons,
+        template=tpl,
+        addons=adns,
         zenit_root=zenit_root,
         project_dir=Path.cwd() / name,
     )
@@ -75,7 +117,7 @@ def scaffold_project(name: str, dry_run: bool = False) -> None:
         run_dry(ctx)
         return
 
-    if not confirm(ctx):
+    if not yes and not confirm(ctx):
         print("\n  \033[0;33mAborted.\033[0m\n")
         raise typer.Exit(0)
 
@@ -85,19 +127,19 @@ def scaffold_project(name: str, dry_run: bool = False) -> None:
 
         load_apply(zenit_root / "templates" / "_common" / "apply.py")(ctx)
 
-        template_config = load_template_config(zenit_root, template)
-        selected_addon_configs = [a for a in available if a.id in addons]
+        template_config = load_template_config(zenit_root, tpl)
+        selected_addon_configs = [a for a in available if a.id in adns]
 
         contributions = collect_all(template_config, selected_addon_configs)
 
         render_vars = build_render_vars(
             name=name,
             pkg_name=pkg_name,
-            template=template,
-            addons=addons,
+            template=tpl,
+            addons=adns,
         )
 
-        write_lockfile(project_dir, template, addons)
+        write_lockfile(project_dir, tpl, adns)
 
         apply_contributions(
             ctx,
@@ -111,8 +153,8 @@ def scaffold_project(name: str, dry_run: bool = False) -> None:
         _stamp_template_manifest(project_dir, template_config)
 
     print()
-    addon_suffix = (" + " + ", ".join(addons)) if addons else ""
-    success(f"Project '{name}' ready!  ({template}{addon_suffix})")
+    addon_suffix = (" + " + ", ".join(adns)) if adns else ""
+    success(f"Project '{name}' ready!  ({tpl}{addon_suffix})")
     print()
     print(f"  cd {name}")
 
@@ -127,7 +169,7 @@ def scaffold_project(name: str, dry_run: bool = False) -> None:
         info("direnv not detected — run 'uv sync' once to set up your environment,")
         info("or install direnv and run 'direnv allow' for auto-activation on cd.")
 
-    if "github-actions" in addons:
+    if "github-actions" in adns:
         print()
         info("GitHub Actions CI is set up at .github/workflows/ci.yml")
         print(
@@ -162,11 +204,15 @@ def _stamp_template_manifest(
 
     for dep in template_config.deps:
         pkg = _pkg_name(dep)
-        add_dependency(manifest, pkg, dep, source=EntrySource.TEMPLATE, addon="", dev=False)
+        add_dependency(
+            manifest, pkg, dep, source=EntrySource.TEMPLATE, addon="", dev=False
+        )
 
     for dep in template_config.dev_deps:
         pkg = _pkg_name(dep)
-        add_dependency(manifest, pkg, dep, source=EntrySource.TEMPLATE, addon="", dev=True)
+        add_dependency(
+            manifest, pkg, dep, source=EntrySource.TEMPLATE, addon="", dev=True
+        )
 
     for recipe_raw in template_config.just_recipes:
         m = _RECIPE_NAME_RE.search(recipe_raw)

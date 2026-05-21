@@ -44,7 +44,10 @@ from zenit.schema.models import AddonConfig
 
 
 def remove_addon(
-    addon_id: str, dry_run: bool = False, project_dir: Path | None = None
+    addon_id: str,
+    dry_run: bool = False,
+    yes: bool = False,
+    project_dir: Path | None = None,
 ) -> None:
     """Remove a single addon from an existing zenit project."""
 
@@ -64,7 +67,7 @@ def remove_addon(
 
     addon_summary("remove", addon_id, project_dir, template)
 
-    if sys.stdin.isatty():
+    if sys.stdin.isatty() and not yes:
         try:
             raw = input(f"  Proceed? {DIM}[Y/n]{RESET}  ").strip().lower()
         except EOFError, KeyboardInterrupt:
@@ -74,7 +77,10 @@ def remove_addon(
             warn("Aborted.")
             raise typer.Exit(0)
     else:
-        warn("Non-interactive mode — proceeding automatically.")
+        if yes:
+            pass
+        else:
+            warn("Non-interactive mode — proceeding automatically.")
 
     render_vars = build_render_vars(
         name=project_dir.name,
@@ -119,16 +125,27 @@ def remove_addon(
         bullet_list("Files removed:", removed_files, bullet="-", bullet_color=RED)
 
     if removed_deps or removed_dev_deps:
-        bullet_list("Dependencies removed from pyproject.toml:", removed_deps, bullet="-", bullet_color=RED)
+        bullet_list(
+            "Dependencies removed from pyproject.toml:",
+            removed_deps,
+            bullet="-",
+            bullet_color=RED,
+        )
         if removed_dev_deps:
-            bullet_list("", removed_dev_deps, bullet="-", bullet_color=RED, suffix="(dev)")
+            bullet_list(
+                "", removed_dev_deps, bullet="-", bullet_color=RED, suffix="(dev)"
+            )
         info("Run 'uv sync' to uninstall them.")
 
     if removed_recipes:
-        bullet_list("Just recipes removed:", removed_recipes, bullet="-", bullet_color=RED)
+        bullet_list(
+            "Just recipes removed:", removed_recipes, bullet="-", bullet_color=RED
+        )
 
     if removed_services:
-        bullet_list("Compose services removed:", removed_services, bullet="-", bullet_color=RED)
+        bullet_list(
+            "Compose services removed:", removed_services, bullet="-", bullet_color=RED
+        )
 
     if removed_env_vars:
         bullet_list("Env vars removed:", removed_env_vars, bullet="-", bullet_color=RED)
@@ -447,15 +464,32 @@ def _dry_remove(
             print(f"  {DIM}  {dest}  (already missing){RESET}")
 
     if addon_cfg.compose_services:
-        bullet_list("Compose services that would be removed:", [svc.name for svc in addon_cfg.compose_services], bullet="-", bullet_color=RED)
+        bullet_list(
+            "Compose services that would be removed:",
+            [svc.name for svc in addon_cfg.compose_services],
+            bullet="-",
+            bullet_color=RED,
+        )
 
     if addon_cfg.env_vars:
-        bullet_list("Env vars that would be removed:", [ev.key for ev in addon_cfg.env_vars], bullet="-", bullet_color=RED)
+        bullet_list(
+            "Env vars that would be removed:",
+            [ev.key for ev in addon_cfg.env_vars],
+            bullet="-",
+            bullet_color=RED,
+        )
 
     if addon_cfg.deps or addon_cfg.dev_deps:
-        bullet_list("Dependencies that would be removed from pyproject.toml:", addon_cfg.deps, bullet="-", bullet_color=RED)
+        bullet_list(
+            "Dependencies that would be removed from pyproject.toml:",
+            addon_cfg.deps,
+            bullet="-",
+            bullet_color=RED,
+        )
         if addon_cfg.dev_deps:
-            bullet_list("", addon_cfg.dev_deps, bullet="-", bullet_color=RED, suffix="(dev)")
+            bullet_list(
+                "", addon_cfg.dev_deps, bullet="-", bullet_color=RED, suffix="(dev)"
+            )
 
     print()
 

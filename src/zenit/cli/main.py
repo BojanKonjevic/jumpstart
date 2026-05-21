@@ -20,6 +20,15 @@ from zenit.core.scaffold import scaffold_project
 from zenit.doctor.doctor import print_results, run_doctor
 from zenit.schema.models import AddonConfig
 
+
+def _parse_addon_list(raw: str | None) -> list[str] | None:
+    """Parse comma-separated addon list from CLI arg."""
+    if raw is None:
+        return None
+    parts = [p.strip() for p in raw.split(",") if p.strip()]
+    return parts if parts else None
+
+
 app = typer.Typer(
     name="zenit",
     add_completion=False,
@@ -44,12 +53,35 @@ def main_callback(
 @app.command("create")
 def cmd_create(
     name: Annotated[str, typer.Argument(help="Name of the project to create")],
+    template: Annotated[
+        str | None,
+        typer.Option(
+            "--template",
+            "-t",
+            help="Template to use (skip interactive picker)",
+        ),
+    ] = None,
+    addons: Annotated[
+        str | None,
+        typer.Option(
+            "--addons",
+            "-a",
+            help="Comma-separated addon(s) to include (skip interactive picker)",
+        ),
+    ] = None,
+    yes: Annotated[
+        bool,
+        typer.Option("--yes", "-y", help="Skip confirmation prompt"),
+    ] = False,
     dry_run: Annotated[
         bool, typer.Option("--dry-run", help="Preview without writing anything")
     ] = False,
 ) -> None:
     """Create a new project from a template."""
-    scaffold_project(name, dry_run=dry_run)
+    parsed_addons = _parse_addon_list(addons)
+    scaffold_project(
+        name, dry_run=dry_run, template=template, addons=parsed_addons, yes=yes
+    )
 
 
 @app.command("list")
@@ -235,6 +267,10 @@ def cmd_add(
             help="Addon to add to the current project (omit for interactive selection)"
         ),
     ] = None,
+    yes: Annotated[
+        bool,
+        typer.Option("--yes", "-y", help="Skip confirmation prompt"),
+    ] = False,
     dry_run: Annotated[
         bool, typer.Option("--dry-run", help="Preview without writing anything")
     ] = False,
@@ -248,7 +284,7 @@ def cmd_add(
 
         add_addon_interactive(dry_run=dry_run)
     else:
-        add_addon(addon, dry_run=dry_run)
+        add_addon(addon, dry_run=dry_run, yes=yes)
 
 
 @app.command("remove")
@@ -259,6 +295,10 @@ def cmd_remove(
             help="Addon to remove from the current project (omit for interactive selection)"
         ),
     ] = None,
+    yes: Annotated[
+        bool,
+        typer.Option("--yes", "-y", help="Skip confirmation prompt"),
+    ] = False,
     dry_run: Annotated[
         bool, typer.Option("--dry-run", help="Preview without writing anything")
     ] = False,
@@ -276,7 +316,7 @@ def cmd_remove(
         from zenit.schema.exceptions import ZenitError
 
         try:
-            remove_addon(addon, dry_run=dry_run)
+            remove_addon(addon, dry_run=dry_run, yes=yes)
         except ZenitError as exc:
             from zenit.cli.ui import error
 
