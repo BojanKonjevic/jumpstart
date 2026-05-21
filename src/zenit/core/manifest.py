@@ -37,6 +37,7 @@ import tomlkit.items
 
 from zenit.schema.models import (
     DependencyEntry,
+    EntrySource,
     EnvEntry,
     LocatorSpec,
     Manifest,
@@ -116,19 +117,19 @@ def remove_blocks_for_addon(manifest: Manifest, addon_id: str) -> None:
     manifest.just_recipes = [r for r in manifest.just_recipes if r.addon != addon_id]
 
 
-def add_env_entry(manifest: Manifest, key: str, source: str, addon: str) -> None:
+def add_env_entry(manifest: Manifest, key: str, source: EntrySource, addon: str) -> None:
     if not any(e.key == key for e in manifest.env):
         manifest.env.append(EnvEntry(key=key, source=source, addon=addon))
 
 
-def add_compose_service(manifest: Manifest, name: str, source: str, addon: str) -> None:
+def add_compose_service(manifest: Manifest, name: str, source: EntrySource, addon: str) -> None:
     if not any(s.name == name for s in manifest.compose_services):
         manifest.compose_services.append(
             OwnedEntry(name=name, source=source, addon=addon)
         )
 
 
-def add_compose_volume(manifest: Manifest, name: str, source: str, addon: str) -> None:
+def add_compose_volume(manifest: Manifest, name: str, source: EntrySource, addon: str) -> None:
     if not any(v.name == name for v in manifest.compose_volumes):
         manifest.compose_volumes.append(
             OwnedEntry(name=name, source=source, addon=addon)
@@ -136,7 +137,7 @@ def add_compose_volume(manifest: Manifest, name: str, source: str, addon: str) -
 
 
 def add_dependency(
-    manifest: Manifest, package: str, spec: str, source: str, addon: str, dev: bool
+    manifest: Manifest, package: str, spec: str, source: EntrySource, addon: str, dev: bool
 ) -> None:
     if not any(d.package == package for d in manifest.dependencies):
         manifest.dependencies.append(
@@ -146,7 +147,7 @@ def add_dependency(
         )
 
 
-def add_just_recipe(manifest: Manifest, name: str, source: str, addon: str) -> None:
+def add_just_recipe(manifest: Manifest, name: str, source: EntrySource, addon: str) -> None:
     if not any(r.name == name for r in manifest.just_recipes):
         manifest.just_recipes.append(OwnedEntry(name=name, source=source, addon=addon))
 
@@ -225,7 +226,7 @@ def _encode_manifest(m: Manifest) -> tomlkit.items.Table:
         for e in m.env:
             item = tomlkit.table()
             item.add("key", e.key)
-            item.add("source", e.source)
+            item.add("source", str(e.source))
             item.add("addon", e.addon)
             arr.append(item)
         tbl.add("env", arr)
@@ -235,7 +236,7 @@ def _encode_manifest(m: Manifest) -> tomlkit.items.Table:
         for s in m.compose_services:
             item = tomlkit.table()
             item.add("name", s.name)
-            item.add("source", s.source)
+            item.add("source", str(s.source))
             item.add("addon", s.addon)
             arr.append(item)
         tbl.add("compose_services", arr)
@@ -245,7 +246,7 @@ def _encode_manifest(m: Manifest) -> tomlkit.items.Table:
         for v in m.compose_volumes:
             item = tomlkit.table()
             item.add("name", v.name)
-            item.add("source", v.source)
+            item.add("source", str(v.source))
             item.add("addon", v.addon)
             arr.append(item)
         tbl.add("compose_volumes", arr)
@@ -256,7 +257,7 @@ def _encode_manifest(m: Manifest) -> tomlkit.items.Table:
             item = tomlkit.table()
             item.add("package", d.package)
             item.add("spec", d.spec)
-            item.add("source", d.source)
+            item.add("source", str(d.source))
             item.add("addon", d.addon)
             item.add("dev", d.dev)
             arr.append(item)
@@ -267,12 +268,20 @@ def _encode_manifest(m: Manifest) -> tomlkit.items.Table:
         for r in m.just_recipes:
             item = tomlkit.table()
             item.add("name", r.name)
-            item.add("source", r.source)
+            item.add("source", str(r.source))
             item.add("addon", r.addon)
             arr.append(item)
         tbl.add("just_recipes", arr)
 
     return tbl
+
+
+def _parse_source(raw: str) -> EntrySource:
+    """Parse a TOML source field into an EntrySource, defaulting to TEMPLATE."""
+    try:
+        return EntrySource(raw)
+    except ValueError:
+        return EntrySource.TEMPLATE
 
 
 def _decode_manifest(raw: dict[str, Any]) -> Manifest:
@@ -299,7 +308,7 @@ def _decode_manifest(raw: dict[str, Any]) -> Manifest:
         m.env.append(
             EnvEntry(
                 key=e.get("key", ""),
-                source=e.get("source", ""),
+                source=_parse_source(e.get("source", "")),
                 addon=e.get("addon", ""),
             )
         )
@@ -308,7 +317,7 @@ def _decode_manifest(raw: dict[str, Any]) -> Manifest:
         m.compose_services.append(
             OwnedEntry(
                 name=s.get("name", ""),
-                source=s.get("source", ""),
+                source=_parse_source(s.get("source", "")),
                 addon=s.get("addon", ""),
             )
         )
@@ -317,7 +326,7 @@ def _decode_manifest(raw: dict[str, Any]) -> Manifest:
         m.compose_volumes.append(
             OwnedEntry(
                 name=v.get("name", ""),
-                source=v.get("source", ""),
+                source=_parse_source(v.get("source", "")),
                 addon=v.get("addon", ""),
             )
         )
@@ -327,7 +336,7 @@ def _decode_manifest(raw: dict[str, Any]) -> Manifest:
             DependencyEntry(
                 package=d.get("package", ""),
                 spec=d.get("spec", ""),
-                source=d.get("source", ""),
+                source=_parse_source(d.get("source", "")),
                 addon=d.get("addon", ""),
                 dev=bool(d.get("dev", False)),
             )
@@ -337,7 +346,7 @@ def _decode_manifest(raw: dict[str, Any]) -> Manifest:
         m.just_recipes.append(
             OwnedEntry(
                 name=r.get("name", ""),
-                source=r.get("source", ""),
+                source=_parse_source(r.get("source", "")),
                 addon=r.get("addon", ""),
             )
         )

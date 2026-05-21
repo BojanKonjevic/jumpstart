@@ -25,7 +25,7 @@ from zenit.core.manifest import (
 from zenit.core.pkg_name import resolve_dest_placeholder
 from zenit.core.render import make_env
 from zenit.schema.exceptions import ZenitError
-from zenit.schema.models import LocatorSpec, Manifest, ManifestBlock
+from zenit.schema.models import EntrySource, LocatorSpec, Manifest, ManifestBlock
 
 if TYPE_CHECKING:
     from zenit.core.context import Context
@@ -215,20 +215,20 @@ def _record_addon_manifest_entries(
     addon_id = addon_cfg.id
 
     for ev in addon_cfg.env_vars:
-        add_env_entry(manifest, ev.key, source="addon", addon=addon_id)
+        add_env_entry(manifest, ev.key, source=EntrySource.ADDON, addon=addon_id)
 
     for svc in addon_cfg.compose_services:
-        add_compose_service(manifest, svc.name, source="addon", addon=addon_id)
+        add_compose_service(manifest, svc.name, source=EntrySource.ADDON, addon=addon_id)
 
     for vol in addon_cfg.compose_volumes:
-        add_compose_volume(manifest, vol, source="addon", addon=addon_id)
+        add_compose_volume(manifest, vol, source=EntrySource.ADDON, addon=addon_id)
 
     for dep in addon_cfg.deps:
         add_dependency(
             manifest,
             _pkg_name(dep),
             dep,
-            source="addon",
+            source=EntrySource.ADDON,
             addon=addon_id,
             dev=False,
         )
@@ -238,7 +238,7 @@ def _record_addon_manifest_entries(
             manifest,
             _pkg_name(dep),
             dep,
-            source="addon",
+            source=EntrySource.ADDON,
             addon=addon_id,
             dev=True,
         )
@@ -247,7 +247,7 @@ def _record_addon_manifest_entries(
         rendered = string_env.from_string(recipe_raw).render(**render_vars)
         m = _RECIPE_NAME_RE.search(rendered)
         if m:
-            add_just_recipe(manifest, m.group(1), source="addon", addon=addon_id)
+            add_just_recipe(manifest, m.group(1), source=EntrySource.ADDON, addon=addon_id)
 
 
 # ── Internal helpers ──────────────────────────────────────────────────────────

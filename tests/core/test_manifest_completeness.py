@@ -32,6 +32,7 @@ from zenit.core.manifest import (
 )
 from zenit.core.manifest import fingerprint as _fp
 from zenit.core.render import build_render_vars
+from zenit.schema.models import EntrySource
 from zenit.templates._load_config import load_template_config
 
 _ZENIT_ROOT = Path(__file__).parent.parent.parent / "src" / "zenit"
@@ -47,18 +48,18 @@ def _pkg_name(spec: str) -> str:
 def _stamp_template_manifest(project_dir: Path, template_config: object) -> None:
     manifest = read_manifest(project_dir)
     for ev in template_config.env_vars:
-        add_env_entry(manifest, ev.key, source="template", addon="")
+        add_env_entry(manifest, ev.key, source=EntrySource.TEMPLATE, addon="")
     for svc in template_config.compose_services:
-        add_compose_service(manifest, svc.name, source="template", addon="")
+        add_compose_service(manifest, svc.name, source=EntrySource.TEMPLATE, addon="")
     for vol in template_config.compose_volumes:
-        add_compose_volume(manifest, vol, source="template", addon="")
+        add_compose_volume(manifest, vol, source=EntrySource.TEMPLATE, addon="")
     for dep in template_config.deps:
         add_dependency(
-            manifest, _pkg_name(dep), dep, source="template", addon="", dev=False
+            manifest, _pkg_name(dep), dep, source=EntrySource.TEMPLATE, addon="", dev=False
         )
     for dep in template_config.dev_deps:
         add_dependency(
-            manifest, _pkg_name(dep), dep, source="template", addon="", dev=True
+            manifest, _pkg_name(dep), dep, source=EntrySource.TEMPLATE, addon="", dev=True
         )
     for recipe in template_config.just_recipes:
         name = ""
@@ -68,7 +69,7 @@ def _stamp_template_manifest(project_dir: Path, template_config: object) -> None
                 name = stripped.split(":")[0].strip()
                 break
         if name:
-            add_just_recipe(manifest, name, source="template", addon="")
+            add_just_recipe(manifest, name, source=EntrySource.TEMPLATE, addon="")
     write_manifest(project_dir, manifest)
 
 

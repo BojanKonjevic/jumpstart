@@ -1,4 +1,4 @@
-"""Tests for zenit.checks_remove — precondition checking for zenit remove.
+"""Tests for :func:`check_can_remove` — precondition checking for zenit remove.
 
 Mirrors the structure of test_checks.py.  Every public failure path in
 check_can_remove gets its own test; the happy path verifies the returned
@@ -11,7 +11,7 @@ from pathlib import Path
 
 import pytest
 
-from zenit.addons.checks_remove import check_can_remove
+from zenit.addons.checks import check_can_remove
 from zenit.core.lockfile import write_lockfile
 from zenit.schema.exceptions import ZenitError
 from zenit.schema.models import AddonConfig

@@ -14,7 +14,7 @@ import yaml
 from tomlkit.items import Array
 
 from zenit.addons._registry import get_available_addons
-from zenit.addons.checks_remove import check_can_remove
+from zenit.addons.checks import check_can_remove
 from zenit.cli.prompt import prompt_single_addon
 from zenit.cli.ui import (
     DIM,

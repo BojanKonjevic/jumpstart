@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass, field
+from enum import StrEnum
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -44,6 +45,13 @@ class InjectionPoint:
     locator: LocatorSpec
 
 
+class EntrySource(StrEnum):
+    """Ownership source for manifest entries."""
+
+    TEMPLATE = "template"
+    ADDON = "addon"
+
+
 # ── Manifest data types (.zenit.toml [manifest] section) ─────────────────────
 
 
@@ -65,7 +73,7 @@ class EnvEntry:
     """Ownership record for a single environment variable."""
 
     key: str
-    source: str  # "template" | "addon"
+    source: EntrySource
     addon: str  # "" for template-owned
 
 
@@ -74,7 +82,7 @@ class OwnedEntry:
     """Ownership record for a compose service, volume, or just recipe."""
 
     name: str
-    source: str  # "template" | "addon"
+    source: EntrySource
     addon: str  # "" for template-owned
 
 
@@ -84,7 +92,7 @@ class DependencyEntry:
 
     package: str
     spec: str  # e.g. "redis>=5"
-    source: str  # "template" | "addon"
+    source: EntrySource
     addon: str  # "" for template-owned
     dev: bool
 

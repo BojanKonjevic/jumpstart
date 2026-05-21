@@ -24,6 +24,7 @@ from zenit.core.manifest import (
 )
 from zenit.schema.models import (
     DependencyEntry,
+    EntrySource,
     EnvEntry,
     LocatorSpec,
     Manifest,
@@ -53,28 +54,28 @@ def _full_manifest() -> Manifest:
     m = Manifest()
     m.python_blocks.append(_block("redis", "settings_fields"))
     m.python_blocks.append(_block("sentry", "lifespan_startup"))
-    m.env.append(EnvEntry(key="DATABASE_URL", source="template", addon=""))
-    m.env.append(EnvEntry(key="REDIS_URL", source="addon", addon="redis"))
-    m.compose_services.append(OwnedEntry(name="db", source="template", addon=""))
-    m.compose_services.append(OwnedEntry(name="redis", source="addon", addon="redis"))
+    m.env.append(EnvEntry(key="DATABASE_URL", source=EntrySource.TEMPLATE, addon=""))
+    m.env.append(EnvEntry(key="REDIS_URL", source=EntrySource.ADDON, addon="redis"))
+    m.compose_services.append(OwnedEntry(name="db", source=EntrySource.TEMPLATE, addon=""))
+    m.compose_services.append(OwnedEntry(name="redis", source=EntrySource.ADDON, addon="redis"))
     m.compose_volumes.append(
-        OwnedEntry(name="redis-data", source="addon", addon="redis")
+        OwnedEntry(name="redis-data", source=EntrySource.ADDON, addon="redis")
     )
     m.dependencies.append(
         DependencyEntry(
-            package="redis", spec="redis>=5", source="addon", addon="redis", dev=False
+            package="redis", spec="redis>=5", source=EntrySource.ADDON, addon="redis", dev=False
         )
     )
     m.dependencies.append(
         DependencyEntry(
             package="fakeredis",
             spec="fakeredis",
-            source="addon",
+            source=EntrySource.ADDON,
             addon="redis",
             dev=True,
         )
     )
-    m.just_recipes.append(OwnedEntry(name="redis-up", source="addon", addon="redis"))
+    m.just_recipes.append(OwnedEntry(name="redis-up", source=EntrySource.ADDON, addon="redis"))
     return m
 
 
@@ -108,8 +109,8 @@ def test_roundtrip_full_manifest(tmp_path: Path) -> None:
     assert result.python_blocks[1].addon == "sentry"
 
     assert len(result.env) == 2
-    assert result.env[0] == EnvEntry(key="DATABASE_URL", source="template", addon="")
-    assert result.env[1] == EnvEntry(key="REDIS_URL", source="addon", addon="redis")
+    assert result.env[0] == EnvEntry(key="DATABASE_URL", source=EntrySource.TEMPLATE, addon="")
+    assert result.env[1] == EnvEntry(key="REDIS_URL", source=EntrySource.ADDON, addon="redis")
 
     assert len(result.compose_services) == 2
     assert result.compose_services[1].name == "redis"
@@ -193,33 +194,33 @@ def test_remove_addon_preserves_others() -> None:
 
 def test_add_env_entry_deduplicates_by_key() -> None:
     m = Manifest()
-    add_env_entry(m, key="REDIS_URL", source="addon", addon="redis")
-    add_env_entry(m, key="REDIS_URL", source="addon", addon="redis")
+    add_env_entry(m, key="REDIS_URL", source=EntrySource.ADDON, addon="redis")
+    add_env_entry(m, key="REDIS_URL", source=EntrySource.ADDON, addon="redis")
     assert len(m.env) == 1
 
 
 def test_add_compose_service_deduplicates_by_name() -> None:
     m = Manifest()
-    add_compose_service(m, name="redis", source="addon", addon="redis")
-    add_compose_service(m, name="redis", source="addon", addon="redis")
+    add_compose_service(m, name="redis", source=EntrySource.ADDON, addon="redis")
+    add_compose_service(m, name="redis", source=EntrySource.ADDON, addon="redis")
     assert len(m.compose_services) == 1
 
 
 def test_add_dependency_deduplicates_by_package() -> None:
     m = Manifest()
     add_dependency(
-        m, package="redis", spec="redis>=5", source="addon", addon="redis", dev=False
+        m, package="redis", spec="redis>=5", source=EntrySource.ADDON, addon="redis", dev=False
     )
     add_dependency(
-        m, package="redis", spec="redis>=5", source="addon", addon="redis", dev=False
+        m, package="redis", spec="redis>=5", source=EntrySource.ADDON, addon="redis", dev=False
     )
     assert len(m.dependencies) == 1
 
 
 def test_add_just_recipe_deduplicates_by_name() -> None:
     m = Manifest()
-    add_just_recipe(m, name="redis-up", source="addon", addon="redis")
-    add_just_recipe(m, name="redis-up", source="addon", addon="redis")
+    add_just_recipe(m, name="redis-up", source=EntrySource.ADDON, addon="redis")
+    add_just_recipe(m, name="redis-up", source=EntrySource.ADDON, addon="redis")
     assert len(m.just_recipes) == 1
 
 

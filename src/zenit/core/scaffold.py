@@ -39,7 +39,7 @@ from zenit.core.validate import (
     validate_addon_deps,
     validate_name,
 )
-from zenit.schema.models import TemplateConfig
+from zenit.schema.models import EntrySource, TemplateConfig
 from zenit.templates._load_config import load_template_config
 
 
@@ -153,25 +153,25 @@ def _stamp_template_manifest(
     manifest = read_manifest(project_dir)
 
     for ev in template_config.env_vars:
-        add_env_entry(manifest, ev.key, source="template", addon="")
+        add_env_entry(manifest, ev.key, source=EntrySource.TEMPLATE, addon="")
 
     for svc in template_config.compose_services:
-        add_compose_service(manifest, svc.name, source="template", addon="")
+        add_compose_service(manifest, svc.name, source=EntrySource.TEMPLATE, addon="")
 
     for vol in template_config.compose_volumes:
-        add_compose_volume(manifest, vol, source="template", addon="")
+        add_compose_volume(manifest, vol, source=EntrySource.TEMPLATE, addon="")
 
     for dep in template_config.deps:
         pkg = _pkg_name(dep)
-        add_dependency(manifest, pkg, dep, source="template", addon="", dev=False)
+        add_dependency(manifest, pkg, dep, source=EntrySource.TEMPLATE, addon="", dev=False)
 
     for dep in template_config.dev_deps:
         pkg = _pkg_name(dep)
-        add_dependency(manifest, pkg, dep, source="template", addon="", dev=True)
+        add_dependency(manifest, pkg, dep, source=EntrySource.TEMPLATE, addon="", dev=True)
 
     for recipe_raw in template_config.just_recipes:
         m = _RECIPE_NAME_RE.search(recipe_raw)
         if m:
-            add_just_recipe(manifest, m.group(1), source="template", addon="")
+            add_just_recipe(manifest, m.group(1), source=EntrySource.TEMPLATE, addon="")
 
     write_manifest(project_dir, manifest)
