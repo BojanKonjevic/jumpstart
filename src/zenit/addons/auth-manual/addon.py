@@ -3,6 +3,7 @@ from pathlib import Path
 from zenit.cli.ui import info
 from zenit.core.context import Context
 from zenit.core.lockfile import ZenitLockfile
+from zenit.core.pkg_name import normalise_pkg_name
 from zenit.schema.models import (
     AddonConfig,
     EnvVar,
@@ -139,7 +140,7 @@ def can_apply(project_dir: Path, lockfile: ZenitLockfile) -> str | None:
     if lockfile.template != "fastapi":
         return "auth-manual only works with the fastapi template."
 
-    pkg_name = project_dir.name.replace("-", "_")
+    pkg_name = normalise_pkg_name(project_dir.name)
 
     security_file = project_dir / "src" / pkg_name / "core" / "security.py"
     if security_file.exists():

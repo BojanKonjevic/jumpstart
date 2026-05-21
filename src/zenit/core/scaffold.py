@@ -31,6 +31,7 @@ from zenit.core.manifest import (
     read_manifest,
     write_manifest,
 )
+from zenit.core.pkg_name import normalise_pkg_name
 from zenit.core.render import build_render_vars
 from zenit.core.rollback import scaffold_or_rollback
 from zenit.core.validate import (
@@ -46,7 +47,7 @@ def scaffold_project(name: str, dry_run: bool = False) -> None:
     """Core scaffold pipeline — called by the main CLI command."""
 
     zenit_root = get_zenit_root()
-    pkg_name = name.replace("-", "_")
+    pkg_name = normalise_pkg_name(name)
 
     validate_name(name, pkg_name)
 

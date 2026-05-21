@@ -32,6 +32,7 @@ from zenit.core.filesystem import RecordingFileSystem
 from zenit.core.generate import _recipe_name
 from zenit.core.justfile import inject_just_recipes
 from zenit.core.lockfile import read_lockfile, write_lockfile
+from zenit.core.pkg_name import normalise_pkg_name
 from zenit.core.render import build_recipe_render_vars, build_render_vars, make_env
 from zenit.core.rollback import addon_or_rollback
 from zenit.schema.exceptions import ZenitError
@@ -52,7 +53,7 @@ def add_addon(addon_id: str, dry_run: bool = False) -> None:
         raise typer.Exit(1) from exc
 
     template = lockfile.template
-    pkg_name = project_dir.name.replace("-", "_")
+    pkg_name = normalise_pkg_name(project_dir.name)
     zenit_root = get_zenit_root()
 
     ctx = Context(

@@ -18,6 +18,7 @@ from zenit.core._paths import get_zenit_root
 from zenit.core.collect import collect_all
 from zenit.core.lockfile import SCHEMA_VERSION, ZenitLockfile, read_lockfile
 from zenit.core.manifest import read_manifest
+from zenit.core.pkg_name import normalise_pkg_name
 from zenit.schema.models import (
     DependencyEntry,
     EnvEntry,
@@ -611,7 +612,7 @@ def _check_files(project_dir: Path, lockfile: ZenitLockfile) -> HealthResult:
     result = HealthResult("Generated files")
 
     zenit_root = get_zenit_root()
-    pkg_name = project_dir.name.replace("-", "_")
+    pkg_name = normalise_pkg_name(project_dir.name)
 
     try:
         template_config = load_template_config(zenit_root, lockfile.template)

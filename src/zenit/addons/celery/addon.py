@@ -1,6 +1,7 @@
 from pathlib import Path
 
 from zenit.core.lockfile import ZenitLockfile
+from zenit.core.pkg_name import normalise_pkg_name
 from zenit.doctor.doctor import HealthIssue, Severity
 from zenit.schema.models import AddonConfig, ComposeService, FileContribution
 
@@ -71,7 +72,7 @@ config = AddonConfig(
 
 
 def can_apply(project_dir: Path, lockfile: ZenitLockfile) -> str | None:
-    pkg_name = project_dir.name.replace("-", "_")
+    pkg_name = normalise_pkg_name(project_dir.name)
 
     if not (project_dir / "src").is_dir():
         return (
@@ -106,7 +107,7 @@ def can_apply(project_dir: Path, lockfile: ZenitLockfile) -> str | None:
 
 def health_check(project_dir: Path, lockfile: object) -> list[HealthIssue]:
 
-    pkg_name = project_dir.name.replace("-", "_")
+    pkg_name = normalise_pkg_name(project_dir.name)
     issues: list[HealthIssue] = []
 
     celery_app = project_dir / "src" / pkg_name / "tasks" / "celery_app.py"

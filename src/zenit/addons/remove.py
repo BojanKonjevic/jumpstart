@@ -38,6 +38,7 @@ from zenit.core.manifest import (
     remove_blocks_for_addon,
     write_manifest,
 )
+from zenit.core.pkg_name import normalise_pkg_name
 from zenit.core.render import build_render_vars, make_env
 from zenit.schema.exceptions import ZenitError
 from zenit.schema.models import AddonConfig
@@ -55,7 +56,7 @@ def remove_addon(
     lockfile = check_can_remove(project_dir, addon_id, available)
 
     template = lockfile.template
-    pkg_name = project_dir.name.replace("-", "_")
+    pkg_name = normalise_pkg_name(project_dir.name)
     addon_cfg = next(cfg for cfg in available if cfg.id == addon_id)
 
     if dry_run:
