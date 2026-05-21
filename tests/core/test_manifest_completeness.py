@@ -263,7 +263,7 @@ class TestPythonBlockCompleteness:
         m = read_manifest(project_dir)
 
         for block in m.python_blocks:
-            assert block.locator.get("name"), (
+            assert block.locator.name, (
                 f"Block {block.addon}/{block.point} has empty locator name"
             )
 

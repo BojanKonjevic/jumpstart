@@ -10,7 +10,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from zenit.core.handlers.justfile_handler import JustfileHandler
-from zenit.schema.models import ManifestBlock
+from zenit.schema.models import LocatorSpec, ManifestBlock
 
 # ── helpers ───────────────────────────────────────────────────────────────────
 
@@ -27,7 +27,7 @@ def _block(lines: str, file: Path) -> ManifestBlock:
         lines=lines,
         fingerprint="sha256:abc",
         fingerprint_normalised="sha256:def",
-        locator={"name": "at_file_end", "args": {}},
+        locator=LocatorSpec(name="at_file_end", args={}),
     )
 
 

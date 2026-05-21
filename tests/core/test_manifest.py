@@ -25,6 +25,7 @@ from zenit.core.manifest import (
 from zenit.schema.models import (
     DependencyEntry,
     EnvEntry,
+    LocatorSpec,
     Manifest,
     ManifestBlock,
     OwnedEntry,
@@ -41,10 +42,10 @@ def _block(addon: str = "redis", point: str = "settings_fields") -> ManifestBloc
         lines="15-16",
         fingerprint="sha256:aabbcc",
         fingerprint_normalised="sha256:ddeeff",
-        locator={
-            "name": "after_last_class_attribute",
-            "args": {"class_name": "Settings"},
-        },
+        locator=LocatorSpec(
+            name="after_last_class_attribute",
+            args={"class_name": "Settings"},
+        ),
     )
 
 
@@ -100,10 +101,10 @@ def test_roundtrip_full_manifest(tmp_path: Path) -> None:
     assert len(result.python_blocks) == 2
     assert result.python_blocks[0].addon == "redis"
     assert result.python_blocks[0].point == "settings_fields"
-    assert result.python_blocks[0].locator == {
-        "name": "after_last_class_attribute",
-        "args": {"class_name": "Settings"},
-    }
+    assert result.python_blocks[0].locator == LocatorSpec(
+        name="after_last_class_attribute",
+        args={"class_name": "Settings"},
+    )
     assert result.python_blocks[1].addon == "sentry"
 
     assert len(result.env) == 2

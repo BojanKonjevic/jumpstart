@@ -57,7 +57,7 @@ class ManifestBlock:
     lines: str  # "start-end", 1-based inclusive
     fingerprint: str  # sha256 of canonical libcst output
     fingerprint_normalised: str  # sha256 of normalised output (formatter-resilient)
-    locator: dict[str, Any]  # {"name": ..., "args": {...}}
+    locator: LocatorSpec
 
 
 @dataclass

@@ -38,6 +38,7 @@ import tomlkit.items
 from zenit.schema.models import (
     DependencyEntry,
     EnvEntry,
+    LocatorSpec,
     Manifest,
     ManifestBlock,
     OwnedEntry,
@@ -213,8 +214,8 @@ def _encode_manifest(m: Manifest) -> tomlkit.items.Table:
             item.add("fingerprint", b.fingerprint)
             item.add("fingerprint_normalised", b.fingerprint_normalised)
             loc = tomlkit.table()
-            loc.add("name", b.locator["name"])
-            loc.add("args", b.locator.get("args", {}))
+            loc.add("name", b.locator.name)
+            loc.add("args", b.locator.args)
             item.add("locator", loc)
             arr.append(item)
         tbl.add("python_blocks", arr)
@@ -287,10 +288,10 @@ def _decode_manifest(raw: dict[str, Any]) -> Manifest:
                 lines=b.get("lines", ""),
                 fingerprint=b.get("fingerprint", ""),
                 fingerprint_normalised=b.get("fingerprint_normalised", ""),
-                locator={
-                    "name": loc.get("name", ""),
-                    "args": dict(loc.get("args", {})),
-                },
+                locator=LocatorSpec(
+                    name=loc.get("name", ""),
+                    args=dict(loc.get("args", {})),
+                ),
             )
         )
 

@@ -25,7 +25,7 @@ from zenit.core.manifest import (
 from zenit.core.pkg_name import resolve_dest_placeholder
 from zenit.core.render import make_env
 from zenit.schema.exceptions import ZenitError
-from zenit.schema.models import Manifest, ManifestBlock
+from zenit.schema.models import LocatorSpec, Manifest, ManifestBlock
 
 if TYPE_CHECKING:
     from zenit.core.context import Context
@@ -158,10 +158,10 @@ def apply_contributions(
                 lines=f"{start_line}-{end_line}",
                 fingerprint=fp,
                 fingerprint_normalised=fp_norm,
-                locator={
-                    "name": point.locator.name,
-                    "args": dict(point.locator.args),
-                },
+                locator=LocatorSpec(
+                    name=point.locator.name,
+                    args=dict(point.locator.args),
+                ),
             )
             add_python_block(manifest, block)
 

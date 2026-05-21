@@ -11,7 +11,7 @@ from pathlib import Path
 import tomlkit
 
 from zenit.core.handlers.toml_handler import TomlHandler
-from zenit.schema.models import ManifestBlock
+from zenit.schema.models import LocatorSpec, ManifestBlock
 
 # ── helpers ───────────────────────────────────────────────────────────────────
 
@@ -28,7 +28,7 @@ def _block(lines: str, file: Path) -> ManifestBlock:
         lines=lines,
         fingerprint="sha256:abc",
         fingerprint_normalised="sha256:def",
-        locator={"name": "at_file_end", "args": {}},
+        locator=LocatorSpec(name="at_file_end", args={}),
     )
 
 

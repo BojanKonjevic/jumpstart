@@ -143,8 +143,8 @@ def test_apply_records_python_block_with_all_fields(tmp_path: Path) -> None:
     assert "-" in block.lines  # e.g. "3-3"
     assert block.fingerprint.startswith("sha256:")
     assert block.fingerprint_normalised.startswith("sha256:")
-    assert block.locator["name"] == "after_last_class_attribute"
-    assert block.locator["args"] == {"class_name": "Settings"}
+    assert block.locator.name == "after_last_class_attribute"
+    assert block.locator.args == {"class_name": "Settings"}
 
 
 def test_apply_fingerprint_matches_written_content(tmp_path: Path) -> None:

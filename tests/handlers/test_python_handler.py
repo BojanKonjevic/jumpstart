@@ -25,7 +25,7 @@ from zenit.core.handlers.python_handler import (
     remove,
 )
 from zenit.core.manifest import fingerprint as _fp
-from zenit.schema.models import ManifestBlock
+from zenit.schema.models import LocatorSpec, ManifestBlock
 
 # ── helpers ───────────────────────────────────────────────────────────────────
 
@@ -48,7 +48,7 @@ def _block(
         lines=lines,
         fingerprint=fp,
         fingerprint_normalised=fp_norm,
-        locator={"name": locator_name, "args": locator_args or {}},
+        locator=LocatorSpec(name=locator_name, args=locator_args or {}),
     )
 
 
@@ -317,10 +317,10 @@ def test_remove_stage_c_below_threshold_raises(tmp_path: Path) -> None:
         lines="50-50",
         fingerprint=fp,
         fingerprint_normalised=fp_norm,
-        locator={
-            "name": "after_last_class_attribute",
-            "args": {"class_name": "Settings"},
-        },
+        locator=LocatorSpec(
+            name="after_last_class_attribute",
+            args={"class_name": "Settings"},
+        ),
     )
     f.write_text(original, encoding="utf-8")
 

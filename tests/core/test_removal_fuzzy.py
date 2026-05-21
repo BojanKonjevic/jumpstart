@@ -23,7 +23,7 @@ from zenit.core.handlers.python_handler import (
     remove,
 )
 from zenit.core.manifest import fingerprint as _fp
-from zenit.schema.models import ManifestBlock
+from zenit.schema.models import LocatorSpec, ManifestBlock
 
 # ── helpers ───────────────────────────────────────────────────────────────────
 
@@ -56,7 +56,7 @@ def _inject(
         lines=f"{start_line}-{end_line}",
         fingerprint=fp,
         fingerprint_normalised=fp_norm,
-        locator={"name": locator_name, "args": resolved_args},
+        locator=LocatorSpec(name=locator_name, args=resolved_args),
     )
 
 
