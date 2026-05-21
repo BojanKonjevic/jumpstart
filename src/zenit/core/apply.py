@@ -166,13 +166,11 @@ def apply_contributions(
             add_python_block(manifest, block)
 
     if contributions.compose_services and (project_dir / "compose.yml").exists():
-        _merge_compose_services(project_dir, contributions.compose_services)
-        _merge_compose_volumes(project_dir, contributions.compose_volumes)
+        _merge_compose(ctx, contributions.compose_services, contributions.compose_volumes)
 
     for file_name in (".env", ".env.example"):
-        env_path = project_dir / file_name
-        if env_path.exists() and contributions.env_vars:
-            _merge_env_vars(env_path, contributions.env_vars)
+        if (project_dir / file_name).exists() and contributions.env_vars:
+            _merge_env_vars(ctx, file_name, contributions.env_vars)
 
     # ── Per-addon manifest recording ──────────────────────────────────────────
     #
@@ -255,14 +253,18 @@ def _record_addon_manifest_entries(
 # ── Internal helpers ──────────────────────────────────────────────────────────
 
 
-def _merge_compose_services(project_dir: Path, services: list[ComposeService]) -> None:
-    """Add *services* to ``compose.yml``, skipping any that already exist."""
-    compose_path = project_dir / "compose.yml"
+def _merge_compose(
+    ctx: Context,
+    services: list[ComposeService],
+    volumes: list[str],
+) -> None:
+    """Add *services* and *volumes* to ``compose.yml``, skipping duplicates."""
+    compose_path = ctx.project_dir / "compose.yml"
     data: dict[str, Any] = (
         yaml.safe_load(compose_path.read_text(encoding="utf-8")) or {}
     )
-    existing: dict[str, Any] = data.setdefault("services", {})
 
+    existing: dict[str, Any] = data.setdefault("services", {})
     for svc in services:
         if svc.name in existing:
             continue
@@ -291,34 +293,22 @@ def _merge_compose_services(project_dir: Path, services: list[ComposeService]) -
             block["healthcheck"] = svc.healthcheck
         existing[svc.name] = block
 
-    compose_path.write_text(
-        yaml.dump(data, default_flow_style=False, sort_keys=False),
-        encoding="utf-8",
-    )
-
-
-def _merge_compose_volumes(project_dir: Path, volumes: list[str]) -> None:
-    """Add named volumes to ``compose.yml``, skipping duplicates."""
-    compose_path = project_dir / "compose.yml"
-    data: dict[str, Any] = (
-        yaml.safe_load(compose_path.read_text(encoding="utf-8")) or {}
-    )
     vols_section: dict[str, Any] = data.setdefault("volumes", {})
     for vol_name in volumes:
         if vol_name not in vols_section:
             vols_section[vol_name] = None
-    compose_path.write_text(
+
+    ctx.write_file(
+        "compose.yml",
         yaml.dump(data, default_flow_style=False, sort_keys=False),
-        encoding="utf-8",
     )
 
 
-def _merge_env_vars(env_path: Path, env_vars: list[EnvVar]) -> None:
-    """Append missing env vars to the end of the file."""
+def _merge_env_vars(ctx: Context, file_name: str, env_vars: list[EnvVar]) -> None:
+    """Append missing env vars to the end of *file_name* via *ctx*."""
+    env_path = ctx.project_dir / file_name
     text = env_path.read_text(encoding="utf-8")
 
-    # Extract existing keys properly to avoid substring false-positives
-    # (e.g. "DB=" must not match inside "DB_HOST=")
     existing_keys = {
         line.split("=", 1)[0].strip()
         for line in text.splitlines()
@@ -335,4 +325,4 @@ def _merge_env_vars(env_path: Path, env_vars: list[EnvVar]) -> None:
 
     if new_lines:
         text = text.rstrip("\n") + "\n" + "\n".join(new_lines) + "\n"
-        env_path.write_text(text, encoding="utf-8")
+        ctx.write_file(file_name, text)

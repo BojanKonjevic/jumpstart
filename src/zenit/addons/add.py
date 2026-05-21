@@ -1,6 +1,9 @@
 """Add‑on pipeline — apply a single addon to an existing project."""
 
+from __future__ import annotations
+
 import sys
+from dataclasses import dataclass, field
 from pathlib import Path
 
 import typer
@@ -40,6 +43,94 @@ from zenit.schema.models import AddonConfig
 from zenit.templates._load_config import load_template_config
 
 
+@dataclass
+class _AddResult:
+    """Result of running the add-on pipeline."""
+    added_deps: list[str] = field(default_factory=list)
+    added_dev_deps: list[str] = field(default_factory=list)
+    added_recipes: list[str] = field(default_factory=list)
+    recorded_files: list[tuple[str, str, str]] = field(default_factory=list)
+
+
+def _run_add_pipeline(
+    ctx: Context,
+    addon_id: str,
+    available: list[AddonConfig],
+) -> _AddResult:
+    """Shared pipeline body for both real and dry-run add operations."""
+
+    zenit_root = ctx.zenit_root
+    template = ctx.template
+    pkg_name = ctx.pkg_name
+    project_dir = ctx.project_dir
+
+    template_config = load_template_config(zenit_root, template)
+    selected_addon_configs = [a for a in available if a.id == addon_id]
+    contributions = collect_addon_only(selected_addon_configs)
+
+    render_vars = build_render_vars(
+        name=ctx.name,
+        pkg_name=pkg_name,
+        template=template,
+        has_postgres=template == "fastapi",
+        has_redis="redis" in ctx.addons,
+    )
+
+    apply_contributions(
+        ctx,
+        contributions,
+        template_config.injection_points,
+        render_vars,
+    )
+
+    # ── Dependencies ──────────────────────────────────────────────────────────
+    if ctx.dry_run:
+        added_deps = list(contributions.deps)
+        added_dev_deps = list(contributions.dev_deps)
+    else:
+        try:
+            added_deps, added_dev_deps = inject_deps(
+                project_dir,
+                contributions.deps,
+                contributions.dev_deps,
+            )
+        except FileNotFoundError as exc:
+            warn(str(exc))
+            added_deps, added_dev_deps = [], []
+
+    # ── Just recipes ──────────────────────────────────────────────────────────
+    recipe_render_vars = build_recipe_render_vars(
+        name=ctx.name,
+        pkg_name=pkg_name,
+        template=template,
+        addons=ctx.addons,
+    )
+    string_env = make_env()
+    rendered_recipes = [
+        string_env.from_string(r).render(**recipe_render_vars)
+        for r in contributions.just_recipes
+    ]
+
+    if ctx.dry_run:
+        added_recipes = [n for r in rendered_recipes if (n := _recipe_name(r))]
+    else:
+        added_recipes = inject_just_recipes(project_dir, rendered_recipes)
+
+    # ── Lockfile ──────────────────────────────────────────────────────────────
+    if not ctx.dry_run:
+        write_lockfile(project_dir, template, ctx.addons)
+
+    # ── Recorded files (dry-run only) ─────────────────────────────────────────
+    recorded_files = list(ctx._fs.recorded_files) if ctx.dry_run else []  # type: ignore[union-attr]
+
+    return _AddResult(
+        added_deps=added_deps,
+        added_dev_deps=added_dev_deps,
+        added_recipes=added_recipes,
+        recorded_files=recorded_files,
+    )
+
+
 def add_addon(addon_id: str, dry_run: bool = False) -> None:
     """Apply a single addon to an existing zenit project."""
 
@@ -56,19 +147,50 @@ def add_addon(addon_id: str, dry_run: bool = False) -> None:
     pkg_name = normalise_pkg_name(project_dir.name)
     zenit_root = get_zenit_root()
 
-    ctx = Context(
-        name=project_dir.name,
-        pkg_name=pkg_name,
-        template=template,
-        addons=lockfile.addons + [addon_id],
-        zenit_root=zenit_root,
-        project_dir=project_dir,
-    )
-
+    # ── Dry-run path ──────────────────────────────────────────────────────────
     if dry_run:
-        _dry_add(ctx, addon_id, available, template)
+        fs = RecordingFileSystem(project_dir)
+        ctx = Context(
+            name=project_dir.name,
+            pkg_name=pkg_name,
+            template=template,
+            addons=lockfile.addons + [addon_id],
+            zenit_root=zenit_root,
+            project_dir=project_dir,
+            _fs=fs,
+        )
+        result = _run_add_pipeline(ctx, addon_id, available)
+
+        print(
+            f"\n  {BOLD}{MAGENTA}Dry run:{RESET} zenit add {addon_id}"
+            f"  {DIM}(nothing will be written){RESET}\n"
+        )
+
+        dry_header("Files that would be created or modified")
+        for action, path, details in result.recorded_files:
+            if action in ("create", "copy"):
+                print(f"  {GREEN}+{RESET} {path}")
+            elif action == "append":
+                print(f"  {GREEN}+{RESET} {path}  {DIM}(appended){RESET}")
+            elif action == "modify":
+                print(f"  {GREEN}△{RESET} {path}  {DIM}{details}{RESET}")
+
+        if result.added_deps or result.added_dev_deps:
+            dry_header("Dependencies that would be added to pyproject.toml")
+            for dep in result.added_deps:
+                dry_dep(dep)
+            for dep in result.added_dev_deps:
+                dry_dep(dep, "dev")
+
+        if result.added_recipes:
+            dry_header("Just recipes that would be added")
+            for name in result.added_recipes:
+                dry_dep(name)
+
+        print()
         return
 
+    # ── Real mode: prompt ─────────────────────────────────────────────────────
     print(f"\n  {BOLD}Ready to add addon:{RESET}")
     print(f"\n    {'addon':<12}  {BOLD}{addon_id}{RESET}")
     print(f"    {'project':<12}  {DIM}{project_dir}{RESET}")
@@ -78,7 +200,7 @@ def add_addon(addon_id: str, dry_run: bool = False) -> None:
     if sys.stdin.isatty():
         try:
             raw = input(f"  Proceed? {DIM}[Y/n]{RESET}  ").strip().lower()
-        except EOFError, KeyboardInterrupt:
+        except (EOFError, KeyboardInterrupt):
             print()
             raise typer.Exit(0) from None
         if raw not in ("", "y", "yes"):
@@ -88,150 +210,36 @@ def add_addon(addon_id: str, dry_run: bool = False) -> None:
         warn("Non‑interactive mode — proceeding automatically.")
 
     with addon_or_rollback(project_dir, addon_id):
-        template_config = load_template_config(zenit_root, template)
-        selected_addon_configs = [a for a in available if a.id == addon_id]
-
-        render_vars = build_render_vars(
+        ctx = Context(
             name=project_dir.name,
             pkg_name=pkg_name,
             template=template,
-            has_postgres=template == "fastapi",
-            has_redis="redis" in ctx.addons,
+            addons=lockfile.addons + [addon_id],
+            zenit_root=zenit_root,
+            project_dir=project_dir,
         )
+        result = _run_add_pipeline(ctx, addon_id, available)
 
-        contributions = collect_addon_only(selected_addon_configs)
-
-        apply_contributions(
-            ctx,
-            contributions,
-            template_config.injection_points,
-            render_vars,
-        )
-
-        try:
-            added_deps, added_dev_deps = inject_deps(
-                project_dir,
-                contributions.deps,
-                contributions.dev_deps,
-            )
-        except FileNotFoundError as exc:
-            warn(str(exc))
-            added_deps, added_dev_deps = [], []
-
-        recipe_render_vars = build_recipe_render_vars(
-            name=project_dir.name,
-            pkg_name=pkg_name,
-            template=template,
-            addons=ctx.addons,
-        )
-        string_env = make_env()
-        rendered_recipes = [
-            string_env.from_string(r).render(**recipe_render_vars)
-            for r in contributions.just_recipes
-        ]
-        added_recipes = inject_just_recipes(project_dir, rendered_recipes)
-
-        new_addons = lockfile.addons + [addon_id]
-        write_lockfile(project_dir, template, new_addons)
-
-    # ── output ────────────────────────────────────────────────────────────
+    # ── Output ────────────────────────────────────────────────────────────────
     print()
     success(f"Addon '{addon_id}' added to '{project_dir.name}'.")
 
-    if added_deps or added_dev_deps:
+    if result.added_deps or result.added_dev_deps:
         print()
         print(f"  {BOLD}Dependencies added to pyproject.toml:{RESET}")
-        for dep in added_deps:
+        for dep in result.added_deps:
             print(f"    {GREEN}+{RESET} {dep}")
-        for dep in added_dev_deps:
+        for dep in result.added_dev_deps:
             print(f"    {GREEN}+{RESET} {dep}  {DIM}(dev){RESET}")
         info("Run 'uv sync' to install them.")
     else:
         info("No new dependencies were needed.")
 
-    if added_recipes:
+    if result.added_recipes:
         print()
         print(f"  {BOLD}Just recipes added:{RESET}")
-        for name in added_recipes:
+        for name in result.added_recipes:
             print(f"    {GREEN}+{RESET} {name}")
-
-    print()
-
-
-def _dry_add(
-    ctx: Context,
-    addon_id: str,
-    available: list[AddonConfig],
-    template: str,
-) -> None:
-    """Print what `zenit add` would do without writing anything."""
-
-    zenit_root = ctx.zenit_root
-    fs = RecordingFileSystem(ctx.project_dir)
-    dry_ctx = Context(
-        name=ctx.name,
-        pkg_name=ctx.pkg_name,
-        template=template,
-        addons=ctx.addons,
-        zenit_root=zenit_root,
-        project_dir=ctx.project_dir,
-        _fs=fs,
-    )
-
-    template_config = load_template_config(zenit_root, template)
-    selected_addon_configs = [a for a in available if a.id == addon_id]
-    contributions = collect_addon_only(selected_addon_configs)
-
-    render_vars = build_render_vars(
-        name=ctx.name,
-        pkg_name=ctx.pkg_name,
-        template=template,
-        has_postgres=template == "fastapi",
-        has_redis="redis" in ctx.addons,
-    )
-
-    apply_contributions(
-        dry_ctx,
-        contributions,
-        template_config.injection_points,
-        render_vars,
-    )
-
-    print(
-        f"\n  {BOLD}{MAGENTA}Dry run:{RESET} zenit add {addon_id}"
-        f"  {DIM}(nothing will be written){RESET}\n"
-    )
-
-    dry_header("Files that would be created or modified")
-    for action, path, details in fs.recorded_files:
-        if action in ("create", "copy"):
-            print(f"  {GREEN}+{RESET} {path}")
-        elif action == "append":
-            print(f"  {GREEN}+{RESET} {path}  {DIM}(appended){RESET}")
-        elif action == "modify":
-            print(f"  {GREEN}△{RESET} {path}  {DIM}{details}{RESET}")
-
-    if contributions.deps or contributions.dev_deps:
-        dry_header("Dependencies that would be added to pyproject.toml")
-        for dep in contributions.deps:
-            dry_dep(dep)
-        for dep in contributions.dev_deps:
-            dry_dep(dep, "dev")
-
-    if contributions.just_recipes:
-        dry_header("Just recipes that would be added")
-        recipe_render_vars = build_recipe_render_vars(
-            name=ctx.name,
-            pkg_name=ctx.pkg_name,
-            template=template,
-            addons=ctx.addons,
-        )
-        string_env = make_env()
-        for recipe in contributions.just_recipes:
-            rendered = string_env.from_string(recipe).render(**recipe_render_vars)
-            name = _recipe_name(rendered)
-            if name:
-                dry_dep(name)
 
     print()
 
