@@ -1,6 +1,8 @@
 """Addon registry — discovers ``addon.py`` files and returns ``AddonConfig`` objects."""
 
 import importlib.util
+import os
+import sys
 from pathlib import Path
 
 from zenit.schema.models import AddonConfig, AddonHooks
@@ -32,6 +34,16 @@ def get_available_addons() -> list[AddonConfig]:
             )
             cfg._module = hooks
             addons.append(cfg)
-        except FileNotFoundError, AttributeError:
+        except (FileNotFoundError, AttributeError) as exc:
+            msg = f"zenit: skipping addon {addon_dir.name!r} — {exc}"
+            if os.environ.get("ZENIT_DEBUG"):
+                raise
+            print(msg, file=sys.stderr)
+            continue
+        except Exception as exc:
+            msg = f"zenit: skipping addon {addon_dir.name!r} — unexpected error: {exc}"
+            if os.environ.get("ZENIT_DEBUG"):
+                raise
+            print(msg, file=sys.stderr)
             continue
     return addons
