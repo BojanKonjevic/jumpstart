@@ -105,7 +105,9 @@ def dry_run_banner(action: str, addon_id: str) -> None:
     )
 
 
-def bullet_list(title: str, items: list[str], *, bullet: str, bullet_color: str, suffix: str = "") -> None:
+def bullet_list(
+    title: str, items: list[str], *, bullet: str, bullet_color: str, suffix: str = ""
+) -> None:
     print()
     print(f"  {BOLD}{title}{RESET}")
     for item in items:

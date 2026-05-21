@@ -60,7 +60,7 @@ def test_create_with_invalid_addon() -> None:
 
 
 def test_create_with_all_flags(tmp_path: Path, monkeypatch) -> None:
-    """All flags together (template + addons + yes + dry-run)."""
+    """All flags together (template + addons + dry-run)."""
     monkeypatch.chdir(tmp_path)
     result = runner.invoke(
         app,
@@ -71,7 +71,6 @@ def test_create_with_all_flags(tmp_path: Path, monkeypatch) -> None:
             "fastapi",
             "--addons",
             "docker,redis",
-            "--yes",
             "--dry-run",
         ],
     )
@@ -79,17 +78,6 @@ def test_create_with_all_flags(tmp_path: Path, monkeypatch) -> None:
     assert "fastapi" in result.output
     assert "docker" in result.output
     assert "redis" in result.output
-
-
-def test_create_with_yes_alone(tmp_path: Path, monkeypatch) -> None:
-    """--yes alone skips confirmation (template/addon use fallback prompts)."""
-    monkeypatch.chdir(tmp_path)
-    result = runner.invoke(
-        app,
-        ["create", "myproj", "--template", "blank", "--yes", "--dry-run"],
-        input="\n",
-    )
-    assert result.exit_code == 0
 
 
 def test_create_with_dry_run_and_flags(tmp_path: Path, monkeypatch) -> None:

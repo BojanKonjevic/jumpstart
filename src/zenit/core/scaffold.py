@@ -72,7 +72,6 @@ def scaffold_project(
     dry_run: bool = False,
     template: str | None = None,
     addons: list[str] | None = None,
-    yes: bool = False,
 ) -> None:
     """Core scaffold pipeline — called by the main CLI command."""
 
@@ -117,7 +116,7 @@ def scaffold_project(
         run_dry(ctx)
         return
 
-    if not yes and not confirm(ctx):
+    if not confirm(ctx):
         print("\n  \033[0;33mAborted.\033[0m\n")
         raise typer.Exit(0)
 

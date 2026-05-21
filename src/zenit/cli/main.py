@@ -21,12 +21,17 @@ from zenit.doctor.doctor import print_results, run_doctor
 from zenit.schema.models import AddonConfig
 
 
-def _parse_addon_list(raw: str | None) -> list[str] | None:
-    """Parse comma-separated addon list from CLI arg."""
+def _parse_addon_list(raw: list[str] | None) -> list[str] | None:
+    """Parse addon list from CLI arg — handles repeated ``-a`` and comma-separated values.
+
+    Each argument is split by commas, then flattened and stripped.
+    """
     if raw is None:
         return None
-    parts = [p.strip() for p in raw.split(",") if p.strip()]
-    return parts if parts else None
+    result: list[str] = []
+    for item in raw:
+        result.extend(p.strip() for p in item.split(",") if p.strip())
+    return result if result else None
 
 
 app = typer.Typer(
@@ -62,26 +67,20 @@ def cmd_create(
         ),
     ] = None,
     addons: Annotated[
-        str | None,
+        list[str] | None,
         typer.Option(
             "--addons",
             "-a",
-            help="Comma-separated addon(s) to include (skip interactive picker)",
+            help="Addon(s) to include (repeat flag or comma-separated, e.g. -a redis,celery)",
         ),
     ] = None,
-    yes: Annotated[
-        bool,
-        typer.Option("--yes", "-y", help="Skip confirmation prompt"),
-    ] = False,
     dry_run: Annotated[
         bool, typer.Option("--dry-run", help="Preview without writing anything")
     ] = False,
 ) -> None:
     """Create a new project from a template."""
     parsed_addons = _parse_addon_list(addons)
-    scaffold_project(
-        name, dry_run=dry_run, template=template, addons=parsed_addons, yes=yes
-    )
+    scaffold_project(name, dry_run=dry_run, template=template, addons=parsed_addons)
 
 
 @app.command("list")
