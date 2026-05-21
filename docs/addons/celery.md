@@ -1,6 +1,8 @@
 # celery
 
-The `celery` addon adds a Celery worker and beat scheduler to a FastAPI project, backed by Redis. It provides the infrastructure for background tasks, periodic jobs, and distributed task queues.
+> **Requires:** `redis` addon
+
+The `celery` addon adds a Celery worker and beat scheduler to a project, backed by Redis. It provides the infrastructure for background tasks, periodic jobs, and distributed task queues.
 
 ---
 
@@ -12,8 +14,6 @@ Choose `celery` when your project needs:
 - Periodic scheduled tasks via the beat scheduler
 - Distributed task queues across multiple workers
 - Flower monitoring UI for task inspection
-
-This addon **requires the `redis` addon** because Celery uses Redis as both broker and result backend.
 
 ---
 
@@ -69,10 +69,6 @@ Both services:
 | `just celery-down` | Stop celery worker and beat |
 | `just celery-flower` | Open Flower monitoring UI on port 5555 |
 | `just celery-logs` | Tail celery worker logs |
-
-### Environment variables
-
-Uses `REDIS_URL` from the `redis` addon. No additional env vars are required.
 
 ---
 
@@ -142,21 +138,3 @@ just celery-flower # Open monitoring UI at http://localhost:5555
 - Remove all celery just recipes
 
 Any custom tasks you wrote in `tasks/` will be deleted. Back them up before removing if you want to keep them.
-
----
-
-## Compatibility
-
-| Template | Compatible |
-|---|---|
-| `fastapi` | Yes |
-| `blank` | Yes (if `redis` is also added) |
-
-| Addon | Relationship |
-|---|---|
-| `redis` | **Required** — provides broker and backend |
-| `docker` | Recommended — services run in containers |
-| `github-actions` | Independent |
-| `sentry` | Independent |
-| `auth-manual` | Independent |
-

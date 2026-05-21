@@ -62,7 +62,6 @@ locator=LocatorSpec(
 ```
 
 ```python
-# Result: new field added after the last existing one
 class Settings(BaseSettings):
     database_url: str = "..."
     redis_url: str = "..."     # ← injected here
@@ -82,7 +81,6 @@ locator=LocatorSpec(
 ```
 
 ```python
-# Result: startup code added before yield
 async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     redis_pool = await create_redis_pool(...)  # ← injected here
     yield
@@ -103,7 +101,6 @@ locator=LocatorSpec(
 ```
 
 ```python
-# Result: shutdown code added after yield
 async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     yield
     await redis_pool.aclose()  # ← injected here
@@ -118,7 +115,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
 # Use for: inserting router includes after the router is instantiated
 locator=LocatorSpec(
     name="after_statement_matching",
-    args={"pattern": "api_router = APIRouter()"},
+    args={"pattern": r"router\.include_router\("},
 )
 ```
 
@@ -155,15 +152,129 @@ locator=LocatorSpec(name="at_module_end", args={})
 
 ### Choosing a locator
 
-| What you want to inject | Locator |
-|---|---|
-| A field into a settings or config class | `after_last_class_attribute` + `class_name` |
-| Startup code (before app starts) | `before_yield_in_function` + `function="lifespan"` |
-| Shutdown code (after yield) | `in_function_body` + `position="after"`, `anchor_pattern="yield"` |
-| A router include | `after_statement_matching` + pattern of the router variable |
-| An import statement | `after_last_import` |
-| Code in `main()` for blank template | `before_return_in_function` + `function="main"` |
-| A top-level definition | `at_module_end` |
+| What you want to inject | Locator | Args |
+|---|---|---|
+| A field into a settings or model class | `after_last_class_attribute` | `{class_name: "ClassName"}` |
+| Startup code (before app serves) | `before_yield_in_function` | `{function: "lifespan"}` |
+| Shutdown code (after yield) | `in_function_body` | `{function: "lifespan", anchor_pattern: "yield", position: "after"}` |
+| An import statement | `after_last_import` | _(none)_ |
+| A router `include_router(...)` call | `after_statement_matching` | `{pattern: r"include_router\("}` |
+| A top-level definition or class | `at_module_end` | _(none)_ |
+| Code inside `main()` (blank template) | `before_return_in_function` | `{function: "main"}` |
+| Code before/after an anchor in any function | `in_function_body` | `{function: "...", anchor_pattern: "...", position: "before"\|"after"}` |
+
+---
+
+### Locator cookbook
+
+Real patterns from the built-in addons, showing the full `Injection` + `InjectionPoint` pair:
+
+#### Inject a settings field (redis addon)
+
+```python
+# In addon.py:
+Injection(
+    point="settings_fields",
+    content='    redis_url: str = "redis://localhost:6379/0"',
+)
+
+# In template.py:
+"settings_fields": InjectionPoint(
+    file="src/{{pkg_name}}/settings.py",
+    locator=LocatorSpec(
+        name="after_last_class_attribute",
+        args={"class_name": "Settings"},
+    ),
+),
+```
+
+#### Register a router (auth-manual addon)
+
+```python
+# Two injections: the import, then the include_router call.
+Injection(
+    point="router_imports",
+    content="from .routes.auth import router as auth_router",
+),
+Injection(
+    point="router_includes",
+    content='api_router.include_router(auth_router, prefix="/auth", tags=["auth"])',
+),
+
+# In template.py:
+"router_imports": InjectionPoint(
+    file="src/{{pkg_name}}/api/router.py",
+    locator=LocatorSpec(name="after_last_import", args={}),
+),
+"router_includes": InjectionPoint(
+    file="src/{{pkg_name}}/api/router.py",
+    locator=LocatorSpec(
+        name="after_statement_matching",
+        args={"pattern": r"router\.include_router\("},
+    ),
+),
+```
+
+#### Inject a lifespan startup hook (sentry addon)
+
+```python
+# In addon.py:
+Injection(
+    point="lifespan_startup",
+    content="    from .integrations.sentry import init_sentry\n    init_sentry()",
+),
+
+# In template.py:
+"lifespan_startup": InjectionPoint(
+    file="src/{{pkg_name}}/lifecycle.py",
+    locator=LocatorSpec(
+        name="before_yield_in_function",
+        args={"function": "lifespan"},
+    ),
+),
+```
+
+#### Add a pytest fixture (auth-manual addon)
+
+```python
+# In addon.py:
+Injection(
+    point="test_fixtures",
+    content="""
+@pytest.fixture
+async def test_user(session: AsyncSession) -> User:
+    user = User(email="test@example.com", hashed_password=hash_password("testpassword123"))
+    session.add(user)
+    await session.commit()
+    await session.refresh(user)
+    return user""",
+),
+
+# In template.py:
+"test_fixtures": InjectionPoint(
+    file="tests/conftest.py",
+    locator=LocatorSpec(name="at_module_end", args={}),
+),
+```
+
+#### Inject startup code on the blank template (sentry addon)
+
+```python
+# In addon.py:
+Injection(
+    point="main_startup",
+    content="    from .integrations.sentry import init_sentry\n    init_sentry()",
+),
+
+# In template.py:
+"main_startup": InjectionPoint(
+    file="src/{{pkg_name}}/main.py",
+    locator=LocatorSpec(
+        name="before_return_in_function",
+        args={"function": "main"},
+    ),
+),
+```
 
 ---
 
@@ -183,9 +294,9 @@ When `zenit remove` processes an addon, it reverses each injection using a three
 
 **Stage B — normalised fingerprint.** SHA-256 after stripping trailing whitespace and collapsing blank lines. Matches when a formatter has run over the file. Silent.
 
-**Stage C — fuzzy match.** SequenceMatcher similarity ≥ 85% within a 20-line window around the recorded position. Used when the block has been lightly edited. Zenit warns and asks for confirmation.
+**Stage C — fuzzy match.** SequenceMatcher similarity ≥ 85% within a 20-line window around the recorded position. Used when the block has been lightly edited. Zenit warns before removing.
 
-If none succeed, Zenit prints the recorded block content, the file path, and asks you to remove it manually. It never silently corrupts a file.
+If none succeed, Zenit prints the recorded block content, the file path, and instructs manual removal. It never silently corrupts a file.
 
 After excising, the result is parsed to confirm it's still valid Python. If not, the operation aborts without writing.
 
@@ -193,15 +304,85 @@ After excising, the result is parsed to confirm it's still valid Python. If not,
 
 ## Debugging injection failures
 
-**Use `--dry-run` first.** `zenit add <addon> --dry-run` shows exactly what would be injected and where, without writing anything.
+### Preview with `--dry-run`
 
-**When `zenit doctor` shows a fingerprint mismatch:**
+Before adding an addon, always preview with `--dry-run`:
+
+```bash
+zenit add redis --dry-run
 ```
-⚠ my_project/settings.py  injection: settings_fields — exact mismatch
+
+This runs the entire injection pipeline — locator resolution, content rendering, insertion — but writes nothing to disk. You see exactly which lines would be inserted and where. If the locator fails, the error is printed at dry-run time, not after half the files have been written.
+
+### Reading injection error messages
+
+When injection fails, Zenit prints:
+
 ```
-This means the injected block has been modified since it was written. `zenit remove` will still work — it will use fuzzy matching and ask for confirmation.
+Error: Cannot inject at 'settings_fields' in src/my_project/settings.py.
+  Reason: Could not find class 'Settings' in the module.
+  Has the class been removed or renamed?
+```
 
-**When `zenit remove` fails to locate a block:**
-Zenit prints the original block content and the file it expected to find it in. Open the file, find the code manually (it will be similar to what was printed), remove it, then run `zenit doctor` to clear the error.
+The message names the injection point, the file, and the exact reason the locator failed. Common causes:
 
-**Use `zenit doctor --thorough`** after running a formatter. It runs all three fingerprint strategies and reports which one matches, giving you confidence before running `zenit remove`.
+| Error | Likely cause | Fix |
+|---|---|---|
+| `Could not find class 'X'` | Class was renamed or removed | Restore the class or declare a new injection point targeting the new name |
+| `Could not find function 'X'` | Function was renamed or removed | Same as above |
+| `No statement matches pattern 'X'` | The anchor statement was edited | Update the `anchor_pattern` in the injection point declaration |
+| `Result is not valid Python` | Injected content has a syntax error | Check indentation in your `Injection.content` string |
+
+### Indentation is your responsibility
+
+The `content` field in `Injection` is inserted verbatim. If the target scope is indented (inside a class or function body), your content must include the correct leading whitespace:
+
+```python
+# WRONG — missing indentation for class body
+Injection(
+    point="settings_fields",
+    content='redis_url: str = "redis://localhost:6379/0"',
+)
+
+# RIGHT
+Injection(
+    point="settings_fields",
+    content='    redis_url: str = "redis://localhost:6379/0"',
+)
+```
+
+If the injected result fails to parse as valid Python, Zenit aborts before writing. The error message shows the injection point and file — open the file, look at the surrounding code, and match the indentation of adjacent statements.
+
+### Debugging a locator that finds the wrong place
+
+If your code is injected but in the wrong location:
+
+1. Add a print to your locator call (temporarily) or use `--dry-run` to see the line number
+2. Cross-check the line number against the actual file
+3. Verify your locator args — e.g., `after_statement_matching` matches the *first* statement that satisfies the regex, not the last
+
+### After running a formatter
+
+Formatters can change whitespace inside injected blocks enough to invalidate the exact fingerprint. Run `zenit doctor --thorough` to check:
+
+```bash
+zenit doctor --thorough
+```
+
+If the normalised fingerprint matches, removal will still work silently. If only the fuzzy match succeeds, Zenit will warn before removing. Either way, `zenit remove` will not lose your code.
+
+### When `zenit remove` cannot locate a block
+
+If all three fingerprint strategies fail, Zenit exits with:
+
+```
+Error: Could not remove 'settings_fields' injection for addon 'redis'.
+  File: src/my_project/settings.py
+  Expected block at lines 14-14 (fingerprint sha256:abc123...)
+  Manual steps:
+    - Open src/my_project/settings.py
+    - Find the code added by the 'redis' addon for point 'settings_fields'
+    - Remove it, then run: zenit doctor
+```
+
+The message prints the recorded fingerprint so you can identify the original content in `.zenit.toml` if the file has changed significantly. After manual removal, `zenit doctor` verifies the project is clean.

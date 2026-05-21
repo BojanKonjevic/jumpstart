@@ -31,8 +31,6 @@ my-project/
     └── test_main.py             # Smoke test for main()
 ```
 
-The `_common/` files (`.gitignore`, `.gitattributes`, `.envrc`, `.pre-commit-config.yaml`, `shell.nix`) are applied to every project regardless of template. They are documented here for completeness but are not unique to `blank`.
-
 ---
 
 ## Entry point
@@ -59,14 +57,14 @@ just run
 
 ## Injection points
 
-The `blank` template exposes two injection points that addons can target:
+The `blank` template is intentionally minimal. It exposes two injection points:
 
 | Point | File | Locator | What goes here |
 |---|---|---|---|
-| `main_startup` | `src/{{pkg_name}}/main.py` | `before_return_in_function` (`main`) | Startup logic that runs before `main()` returns, e.g. `init_sentry()` |
+| `main_startup` | `src/{{pkg_name}}/main.py` | `before_return_in_function` (`main`) | Startup calls — e.g. `init_sentry()` |
 | `env_vars` | `.env` | `at_file_end` | Key=value pairs appended to the env file |
 
-The `sentry` addon is the only built-in addon that currently uses `main_startup`. All other addons that declare injections require the `fastapi` template.
+If you need richer hooks (lifespan, router registration, settings fields, test fixtures), use the `fastapi` template — it exposes nine distinct injection points. If you want a new hook added to `blank`, open an issue or see [Contributing](../contributing.md).
 
 ---
 
@@ -94,28 +92,14 @@ Dev tooling (`pytest`, `mypy`, `ruff`, `pytest-cov`) is added under `[dependency
 | `just fix` | `ruff check --fix` + `ruff format` |
 | `just check` | `uv run mypy src/` |
 
-The base recipes (`test`, `lint`, `fmt`, `fix`, `check`) are generated for all templates. `run` is template-specific and calls `python -m <pkg_name>` for `blank`.
-
----
-
-## Compatible addons
-
-| Addon | Compatible | Notes |
-|---|---|---|
-| `docker` | Yes | Generates a `Dockerfile` and `compose.yml` for the package |
-| `sentry` | Yes | Injects `init_sentry()` into `main()` |
-| `github-actions` | Yes | CI workflow: lint, type-check, test |
-| `redis` | Yes | Adds connection helper and compose service |
-| `celery` | Yes | Requires `redis` |
-| `auth-manual` | No | Requires the `fastapi` template |
-
 ---
 
 ## Compatibility and constraints
 
-**`requires_addons`** is empty — no addon is mandatory for `blank`. The `docker` addon is optional and not auto-selected.
+> [!NOTE]
+> `auth-manual` is the only addon that does not work with `blank` — it requires the `fastapi` template. All other addons are optional and compatible.
+
 
 **NixOS:** `shell.nix` is written alongside `.envrc` to provide `libstdc++.so.6`. The `.envrc` is prefixed with `use nix shell.nix`. On non-NixOS systems `shell.nix` is not written.
 
 **Windows:** `.envrc` and `shell.nix` are not written. The environment is managed entirely by `uv` and every recipe runs through `uv run`.
-

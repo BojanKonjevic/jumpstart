@@ -1,6 +1,8 @@
 # docker
 
-The `docker` addon adds containerisation support to any Zenit project. It generates a multi-stage Dockerfile, a Docker Compose configuration, and a `.dockerignore` file. This addon is **required by the `fastapi` template** and auto-selected for all `fastapi` projects.
+> **Required by:** `fastapi` template (auto-selected and locked). Optional for `blank`.
+
+The `docker` addon adds containerisation support to any Zenit project. It generates a multi-stage Dockerfile, a Docker Compose configuration, and a `.dockerignore` file.
 
 ---
 
@@ -49,16 +51,11 @@ For `fastapi` projects, the default CMD runs uvicorn. For `blank` projects, it r
 | `app` | Build from Dockerfile | The FastAPI application with hot-reload |
 | `db` | `postgres:16` | PostgreSQL database with persistent volume |
 
-The `app` service:
-- Mounts `.env` for configuration
-- Uses Docker Compose watch mode to sync `./src` to `/app/src`
-- Runs uvicorn with `--reload` for development
+The `app` service mounts `.env` for configuration, uses Docker Compose watch mode to sync `./src`, and runs uvicorn with `--reload`.
 
-The `db` service:
-- Persists data in `./.pgdata` (gitignored)
-- Exposes port 5432
+The `db` service persists data in `./.pgdata` (gitignored) and exposes port 5432.
 
-**Blank projects** get only the `app` service (no database).
+**Blank projects** get only the `app` service.
 
 ### Just recipes
 
@@ -78,7 +75,7 @@ just docker-up    # Build and start app + db
 just docker-down  # Stop everything
 ```
 
-The app service runs with `--reload`, so code changes in `src/` are reflected immediately.
+Code changes in `src/` are reflected immediately via watch mode.
 
 ### Production builds
 
@@ -87,36 +84,13 @@ docker build -t my-project .
 docker run -p 8000:8000 --env-file .env my-project
 ```
 
-The production image:
-- Has no dev dependencies installed
-- Runs as the non-root `app` user
-- Uses the frozen `uv.lock` for reproducible builds
+The production image has no dev dependencies and runs as the non-root `app` user.
 
 ---
 
 ## Removing the addon
 
-`zenit remove docker` will:
+`zenit remove docker` will delete `Dockerfile`, `compose.yml`, and `.dockerignore`, and remove the docker recipes from the justfile.
 
-- Delete `Dockerfile`, `compose.yml`, and `.dockerignore`
-- Remove `docker-up` and `docker-down` recipes from the justfile
-
-**Note:** For `fastapi` projects, the `docker` addon is required by the template. You cannot remove it without first switching to the `blank` template (which requires re-scaffolding).
-
----
-
-## Compatibility
-
-| Template | Compatible |
-|---|---|
-| `fastapi` | **Required** — auto-selected, locked |
-| `blank` | Yes — optional |
-
-| Addon | Relationship |
-|---|---|
-| `redis` | Independent (adds its own compose service) |
-| `celery` | Independent (adds worker/beat services) |
-| `github-actions` | Independent |
-| `sentry` | Independent |
-| `auth-manual` | Independent |
-
+> [!NOTE]
+> For `fastapi` projects, `docker` is required by the template and cannot be removed.

@@ -1,5 +1,7 @@
 # auth-manual
 
+> **Template:** `fastapi` only
+
 The `auth-manual` addon adds complete JWT-based authentication to a FastAPI project: registration, login, token refresh, logout, and a current-user endpoint. It is designed for projects that need authentication without relying on external identity providers.
 
 ---
@@ -144,21 +146,3 @@ The `users` and `refresh_tokens` tables will remain in your database. Drop them 
 ```bash
 just migrate "drop auth tables"   # Or use a manual Alembic revision
 ```
-
----
-
-## Compatibility
-
-| Template | Compatible |
-|---|---|
-| `fastapi` | **Yes** (required) |
-| `blank` | No |
-
-| Addon | Relationship |
-|---|---|
-| `docker` | Required by `fastapi` template |
-| `redis` | Independent |
-| `celery` | Independent |
-| `sentry` | Independent |
-| `github-actions` | Independent |
-

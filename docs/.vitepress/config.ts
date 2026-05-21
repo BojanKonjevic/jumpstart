@@ -19,6 +19,7 @@ export default defineConfig({
         text: 'Getting Started',
         items: [
           { text: 'Introduction', link: '/getting-started' },
+          { text: 'Configuration', link: '/configuration' },
         ],
       },
       {
@@ -50,6 +51,7 @@ export default defineConfig({
           { text: 'Overview', link: '/templates/' },
           { text: 'blank', link: '/templates/blank' },
           { text: 'fastapi', link: '/templates/fastapi' },
+          { text: 'Writing Your Own', link: '/templates/writing-templates' },
         ],
       },
       {
@@ -63,6 +65,7 @@ export default defineConfig({
           { text: 'github-actions', link: '/addons/github-actions' },
           { text: 'redis', link: '/addons/redis' },
           { text: 'sentry', link: '/addons/sentry' },
+          { text: 'Writing Your Own', link: '/addons/writing-addons' },
         ],
       },
       {
@@ -88,19 +91,14 @@ export default defineConfig({
     },
   },
 
-    markdown: {
-      // Force dark Shiki theme in both light & dark site modes so
-      // inline syntax colors are always light-on-dark, matching the
-      // CSS code-block surface that stays near-black in both themes.
-      theme: {
-        light: 'github-light',
-        dark: 'github-dark',
-      },
+  markdown: {
+    theme: {
+      light: 'github-light',
+      dark: 'github-dark',
     },
+  },
 
   vite: {
-    build: {
-      // Treat dead links as errors during build
-    },
+    build: {},
   },
 })

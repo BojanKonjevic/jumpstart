@@ -1,6 +1,6 @@
 # sentry
 
-The `sentry` addon adds Sentry error tracking and performance monitoring to any Zenit project. It initialises the Sentry SDK on application startup and captures exceptions, performance traces, and error context automatically.
+The `sentry` addon adds Sentry error tracking and performance monitoring. Works with both templates. Initialises the Sentry SDK on application startup and captures exceptions, performance traces, and error context automatically.
 
 ---
 
@@ -28,15 +28,11 @@ Choose `sentry` when you want:
 
 The generated `sentry.py`:
 
-- Reads `SENTRY_DSN` from environment
-- No-ops when `SENTRY_DSN` is empty (safe for local development)
-- Configures environment, traces sample rate, and profiles sample rate
+- Reads `SENTRY_DSN` from environment — no-ops when empty (safe for local dev)
 - For `fastapi` projects: includes `FastApiIntegration` and `SqlalchemyIntegration`
 - For `blank` projects: basic Sentry SDK init
 
 ### Settings fields
-
-Injects into `settings_fields`:
 
 ```python
 sentry_dsn: str = ""
@@ -48,7 +44,7 @@ sentry_environment: str = "development"
 | Key | Default | Description |
 |---|---|---|
 | `SENTRY_DSN` | `""` | Sentry project DSN (empty = disabled) |
-| `SENTRY_ENVIRONMENT` | `development` | Environment tag (production, staging, etc.) |
+| `SENTRY_ENVIRONMENT` | `development` | Environment tag |
 
 ### Dependencies
 
@@ -61,7 +57,7 @@ sentry_environment: str = "development"
 | `just sentry-check` | Print installed sentry-sdk version |
 | `just sentry-test` | Test Sentry initialisation and DSN configuration |
 
-### Lifespan integration
+### Startup wiring
 
 - **FastAPI:** Injects `init_sentry()` into `lifespan_startup` in `lifecycle.py`
 - **Blank:** Injects `init_sentry()` into `main()` before the return statement
@@ -74,42 +70,26 @@ sentry_environment: str = "development"
 
 1. Create a project at [sentry.io](https://sentry.io)
 2. Go to Settings → Projects → [your project] → Client Keys (DSN)
-3. Copy the DSN and add it to `.env`:
+3. Add to `.env`:
 
 ```bash
 SENTRY_DSN=https://xxx@yyy.ingest.sentry.io/zzz
 SENTRY_ENVIRONMENT=production
 ```
 
-### Local development
-
-Leave `SENTRY_DSN` empty in `.env` during local development. Sentry will be silently disabled and no errors are sent.
+Leave `SENTRY_DSN` empty during local development. Sentry will be silently disabled.
 
 ### Performance monitoring
 
-The default configuration samples 100% of traces and profiles. Adjust in production:
-
-```python
-# In sentry.py, modify init_sentry():
-sentry_sdk.init(
-    dsn=dsn,
-    traces_sample_rate=0.1,      # 10% of requests
-    profiles_sample_rate=0.1,    # 10% of traced requests
-    # ...
-)
-```
+The default configuration samples 100% of traces and profiles. Adjust in production by editing `traces_sample_rate` and `profiles_sample_rate` in `sentry.py`.
 
 ---
 
 ## Post-installation
 
-After adding the addon:
-
 ```bash
 just sentry-test   # Verify Sentry is configured correctly
 ```
-
-For `fastapi` projects, the SDK is initialised automatically on startup. For `blank` projects, it runs on every `main()` invocation.
 
 ---
 
@@ -123,21 +103,3 @@ For `fastapi` projects, the SDK is initialised automatically on startup. For `bl
 - Remove `SENTRY_DSN` and `SENTRY_ENVIRONMENT` from `.env` and `.env.example`
 - Remove `sentry-sdk[fastapi]` from `pyproject.toml`
 - Remove sentry just recipes
-
----
-
-## Compatibility
-
-| Template | Compatible |
-|---|---|
-| `fastapi` | Yes |
-| `blank` | Yes |
-
-| Addon | Relationship |
-|---|---|
-| `docker` | Independent |
-| `redis` | Independent |
-| `celery` | Independent |
-| `github-actions` | Independent |
-| `auth-manual` | Independent |
-

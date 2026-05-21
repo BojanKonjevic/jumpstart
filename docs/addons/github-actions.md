@@ -1,6 +1,6 @@
 # github-actions
 
-The `github-actions` addon adds a continuous integration workflow that runs lint, type-check, and test on every push and pull request to the `main` branch.
+The `github-actions` addon adds a CI workflow that runs lint, type-check, and test on every push and pull request to `main`. Works with both templates.
 
 ---
 
@@ -25,9 +25,7 @@ Choose `github-actions` when you want:
 
 ### Workflow triggers
 
-The workflow runs on:
-- Push to `main`
-- Pull requests targeting `main`
+The workflow runs on push to `main` and on pull requests targeting `main`.
 
 ### Job steps
 
@@ -35,7 +33,7 @@ The workflow runs on:
 2. **Install uv** — `astral-sh/setup-uv@v4` with caching
 3. **Set up Python** — `uv python install 3.14`
 4. **Install dependencies** — `uv sync --all-extras`
-5. **Run migrations** (fastapi with postgres only) — `uv run alembic upgrade head`
+5. **Run migrations** (fastapi + postgres only) — `uv run alembic upgrade head`
 6. **Lint** — `uv run ruff check .`
 7. **Format check** — `uv run ruff format --check .`
 8. **Type check** — `uv run mypy src/`
@@ -45,28 +43,20 @@ The workflow runs on:
 
 The workflow automatically provisions service containers based on installed addons:
 
-**PostgreSQL** (fastapi template):
-- Image: `postgres:16`
-- Database: `<pkg_name>_test`
-- Health checks configured
+**PostgreSQL** (fastapi template) — `postgres:16`, port 5432, health checks configured.
 
-**Redis** (if `redis` addon installed):
-- Image: `redis:7-alpine`
-- Port 6379 exposed
-- Health checks configured
+**Redis** (if `redis` addon installed) — `redis:7-alpine`, port 6379, health checks configured.
 
 ### Environment variables in CI
 
-The workflow sets the correct environment variables for test execution:
-
-- `DATABASE_URL` — points to the service container
-- `REDIS_URL` — points to the service container
+- `DATABASE_URL` — points to the PostgreSQL service container
+- `REDIS_URL` — points to the Redis service container
 
 ---
 
 ## Post-installation
 
-After adding the addon, push to GitHub:
+Push to GitHub after adding the addon:
 
 ```bash
 git add .github/workflows/ci.yml
@@ -74,45 +64,16 @@ git commit -m "Add CI workflow"
 git push
 ```
 
-The workflow will run automatically on the next push or PR.
+The workflow runs automatically on the next push or PR.
 
 ---
 
 ## Customisation
 
-The generated workflow is a solid starting point. You can customise it by editing `.github/workflows/ci.yml` directly:
-
-- Add deployment steps
-- Add matrix builds across Python versions
-- Add security scanning (bandit, safety)
-- Adjust branch triggers
-
-Zenit will not overwrite your changes on subsequent `zenit add` operations.
+The generated workflow is a solid starting point. Edit `.github/workflows/ci.yml` directly to add deployment steps, matrix builds, security scanning, or adjusted branch triggers. Zenit will not overwrite your changes.
 
 ---
 
 ## Removing the addon
 
-`zenit remove github-actions` will:
-
-- Delete `.github/workflows/ci.yml`
-
-If you customised the workflow and want to keep it, back it up before removing.
-
----
-
-## Compatibility
-
-| Template | Compatible |
-|---|---|
-| `fastapi` | Yes |
-| `blank` | Yes |
-
-| Addon | Relationship |
-|---|---|
-| `docker` | Independent |
-| `redis` | Independent (adds Redis service container) |
-| `celery` | Independent |
-| `sentry` | Independent |
-| `auth-manual` | Independent |
-
+`zenit remove github-actions` deletes `.github/workflows/ci.yml`. Back up the file first if you've customised it and want to keep those changes.

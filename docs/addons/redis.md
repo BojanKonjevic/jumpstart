@@ -1,6 +1,6 @@
 # redis
 
-The `redis` addon adds an async Redis connection helper with connection pooling to any Zenit project. It provides a FastAPI-compatible dependency for injecting Redis clients into route handlers.
+The `redis` addon adds an async Redis connection helper with connection pooling. Works with both templates. Required by the `celery` addon.
 
 ---
 
@@ -27,13 +27,9 @@ Choose `redis` when your project needs:
 
 ### Redis helper API
 
-The generated `redis.py` provides:
-
 ```python
 async def get_redis() -> AsyncGenerator[Redis]:
     """FastAPI dependency that yields a Redis client from the shared pool."""
-    async with aioredis.Redis(connection_pool=_get_pool()) as client:
-        yield client
 
 async def close_redis() -> None:
     """Call from lifespan shutdown to cleanly drain the pool."""
@@ -57,8 +53,7 @@ Adds a `redis` service to `compose.yml`:
 
 - Image: `redis:7-alpine`
 - Port: `6379:6379`
-- Volume: `redis-data:/data` (persistent)
-- Command: `redis-server --appendonly yes` (AOF persistence)
+- Volume: `redis-data:/data` (persistent, AOF enabled)
 - Health check: `redis-cli ping`
 
 ### Settings field
@@ -71,9 +66,9 @@ redis_url: str = "redis://localhost:6379/0"
 
 ### Environment variables
 
-| Key | Default | Description |
-|---|---|---|
-| `REDIS_URL` | `redis://localhost:6379/0` | Redis connection string |
+| Key | Default |
+|---|---|
+| `REDIS_URL` | `redis://localhost:6379/0` |
 
 ### Dependencies
 
@@ -92,27 +87,19 @@ redis_url: str = "redis://localhost:6379/0"
 | `just redis-down` | Stop Redis container |
 | `just redis-cli` | Open redis-cli |
 
-### Lifespan integration
-
-For `fastapi` projects, the addon injects into `lifespan_startup` and `lifespan_shutdown` to create and close the connection pool automatically. For `blank` projects, you must call `close_redis()` manually on shutdown.
-
 ---
 
 ## Post-installation
-
-After adding the addon:
 
 ```bash
 just redis-up   # Start the Redis container
 ```
 
-For `fastapi` projects, the connection pool is managed automatically via lifespan hooks. For `blank` projects, integrate `close_redis()` into your shutdown logic.
+For `fastapi` projects, the connection pool is managed automatically via lifespan hooks. For `blank` projects, integrate `close_redis()` into your shutdown logic manually.
 
 ---
 
 ## Testing with fakeredis
-
-The `fakeredis` dev dependency allows testing without a running Redis server:
 
 ```python
 import fakeredis.aioredis
@@ -129,30 +116,11 @@ def fake_redis():
 `zenit remove redis` will:
 
 - Delete `src/{{pkg_name}}/integrations/redis.py` (and `__init__.py` if empty)
-- Remove the `redis` service from `compose.yml`
-- Remove the `redis-data` volume from `compose.yml`
+- Remove the `redis` service and `redis-data` volume from `compose.yml`
 - Remove `redis_url` from settings
 - Remove `REDIS_URL` from `.env` and `.env.example`
-- Remove `redis>=5` and `hiredis` from `pyproject.toml`
-- Remove `fakeredis` from dev dependencies
+- Remove `redis>=5`, `hiredis`, and `fakeredis` from `pyproject.toml`
 - Remove redis just recipes
 
-**Warning:** If the `celery` addon is installed, it depends on `redis`. Remove `celery` first.
-
----
-
-## Compatibility
-
-| Template | Compatible |
-|---|---|
-| `fastapi` | Yes |
-| `blank` | Yes |
-
-| Addon | Relationship |
-|---|---|
-| `celery` | **Required by** — Celery uses Redis as broker/backend |
-| `docker` | Recommended — Redis runs in a container |
-| `github-actions` | Independent (adds Redis service to CI) |
-| `sentry` | Independent |
-| `auth-manual` | Independent |
-
+> [!NOTE]
+> If the `celery` addon is installed, it depends on `redis`. Remove `celery` first.
