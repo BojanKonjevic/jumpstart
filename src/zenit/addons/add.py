@@ -12,15 +12,15 @@ from zenit.addons._registry import get_available_addons
 from zenit.addons.checks import check_can_add
 from zenit.cli.prompt import prompt_single_addon
 from zenit.cli.ui import (
-    BOLD,
-    CYAN,
     DIM,
     GREEN,
-    MAGENTA,
     RESET,
-    YELLOW,
+    addon_summary,
+    bullet_list,
     dry_dep,
+    dry_file,
     dry_header,
+    dry_run_banner,
     error,
     info,
     success,
@@ -161,19 +161,11 @@ def add_addon(addon_id: str, dry_run: bool = False) -> None:
         )
         result = _run_add_pipeline(ctx, addon_id, available)
 
-        print(
-            f"\n  {BOLD}{MAGENTA}Dry run:{RESET} zenit add {addon_id}"
-            f"  {DIM}(nothing will be written){RESET}\n"
-        )
+        dry_run_banner("add", addon_id)
 
         dry_header("Files that would be created or modified")
         for action, path, details in result.recorded_files:
-            if action in ("create", "copy"):
-                print(f"  {GREEN}+{RESET} {path}")
-            elif action == "append":
-                print(f"  {GREEN}+{RESET} {path}  {DIM}(appended){RESET}")
-            elif action == "modify":
-                print(f"  {GREEN}△{RESET} {path}  {DIM}{details}{RESET}")
+            dry_file(path, note=details, action=action)
 
         if result.added_deps or result.added_dev_deps:
             dry_header("Dependencies that would be added to pyproject.toml")
@@ -191,11 +183,7 @@ def add_addon(addon_id: str, dry_run: bool = False) -> None:
         return
 
     # ── Real mode: prompt ─────────────────────────────────────────────────────
-    print(f"\n  {BOLD}Ready to add addon:{RESET}")
-    print(f"\n    {'addon':<12}  {BOLD}{addon_id}{RESET}")
-    print(f"    {'project':<12}  {DIM}{project_dir}{RESET}")
-    print(f"    {'template':<12}  {CYAN}{template}{RESET}")
-    print()
+    addon_summary("add", addon_id, project_dir, template)
 
     if sys.stdin.isatty():
         try:
@@ -204,7 +192,7 @@ def add_addon(addon_id: str, dry_run: bool = False) -> None:
             print()
             raise typer.Exit(0) from None
         if raw not in ("", "y", "yes"):
-            print(f"\n  {YELLOW}Aborted.{RESET}\n")
+            warn("Aborted.")
             raise typer.Exit(0)
     else:
         warn("Non‑interactive mode — proceeding automatically.")
@@ -225,21 +213,15 @@ def add_addon(addon_id: str, dry_run: bool = False) -> None:
     success(f"Addon '{addon_id}' added to '{project_dir.name}'.")
 
     if result.added_deps or result.added_dev_deps:
-        print()
-        print(f"  {BOLD}Dependencies added to pyproject.toml:{RESET}")
-        for dep in result.added_deps:
-            print(f"    {GREEN}+{RESET} {dep}")
-        for dep in result.added_dev_deps:
-            print(f"    {GREEN}+{RESET} {dep}  {DIM}(dev){RESET}")
+        bullet_list("Dependencies added to pyproject.toml:", result.added_deps, bullet="+", bullet_color=GREEN)
+        if result.added_dev_deps:
+            bullet_list("", result.added_dev_deps, bullet="+", bullet_color=GREEN, suffix="(dev)")
         info("Run 'uv sync' to install them.")
     else:
         info("No new dependencies were needed.")
 
     if result.added_recipes:
-        print()
-        print(f"  {BOLD}Just recipes added:{RESET}")
-        for name in result.added_recipes:
-            print(f"    {GREEN}+{RESET} {name}")
+        bullet_list("Just recipes added:", result.added_recipes, bullet="+", bullet_color=GREEN)
 
     print()
 

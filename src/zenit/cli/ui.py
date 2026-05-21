@@ -65,9 +65,16 @@ def dry_header(msg: str) -> None:
     print(f"\n{BOLD}{BLUE}❯ {msg}{RESET}")
 
 
-def dry_file(path: str, note: str = "") -> None:
+def dry_file(path: str, note: str = "", action: str = "create") -> None:
+    if action in ("create", "copy"):
+        symbol = f"{GREEN}+{RESET}"
+    elif action == "append":
+        symbol = f"{GREEN}+{RESET}"
+        note = note or "(appended)"
+    elif action == "modify":
+        symbol = f"{GREEN}△{RESET}"
     suffix = f"  {DIM}{note}{RESET}" if note else ""
-    print(f"  {GREEN}+{RESET} {path}{suffix}")
+    print(f"  {symbol} {path}{suffix}")
 
 
 def dry_cmd(cmd: str) -> None:
@@ -81,6 +88,29 @@ def dry_dep(dep: str, group: str = "") -> None:
 
 def dry_section(title: str) -> None:
     print(f"\n  {BOLD}{DIM}{title}{RESET}")
+
+
+def addon_summary(action: str, addon_id: str, project_dir: Path, template: str) -> None:
+    print(f"\n  {BOLD}Ready to {action} addon:{RESET}")
+    print(f"\n    {'addon':<12}  {BOLD}{addon_id}{RESET}")
+    print(f"    {'project':<12}  {DIM}{project_dir}{RESET}")
+    print(f"    {'template':<12}  {CYAN}{template}{RESET}")
+    print()
+
+
+def dry_run_banner(action: str, addon_id: str) -> None:
+    print(
+        f"\n  {BOLD}{MAGENTA}Dry run:{RESET} zenit {action} {addon_id}"
+        f"  {DIM}(nothing will be written){RESET}\n"
+    )
+
+
+def bullet_list(title: str, items: list[str], *, bullet: str, bullet_color: str, suffix: str = "") -> None:
+    print()
+    print(f"  {BOLD}{title}{RESET}")
+    for item in items:
+        suffix_text = f"  {DIM}{suffix}{RESET}" if suffix else ""
+        print(f"    {bullet_color}{bullet}{RESET} {item}{suffix_text}")
 
 
 # ── Confirm prompt ────────────────────────────────────────────────────────────
