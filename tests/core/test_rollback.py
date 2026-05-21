@@ -236,3 +236,67 @@ def test_addon_no_new_files_on_failure_leaves_project_intact(tmp_path):
         raise RuntimeError("boom")
     assert (project_dir / "main.py").exists()
     assert project_dir.exists()
+
+
+# ── addon_or_rollback — content restoration ──────────────────────────────────
+
+
+def test_addon_failure_restores_modified_existing_file(tmp_path):
+    project_dir = tmp_path / "myapp"
+    project_dir.mkdir()
+    existing = project_dir / "pyproject.toml"
+    existing.write_text("[project]\nname = \"myapp\"\n")
+    with pytest.raises(SystemExit), addon_or_rollback(project_dir, "redis"):
+        existing.write_text("[project]\nname = \"myapp\"\ndependencies = [\"redis\"]\n")
+        raise RuntimeError("boom")
+    assert existing.read_text() == "[project]\nname = \"myapp\"\n"
+
+
+def test_addon_failure_restores_multiple_modified_files(tmp_path):
+    project_dir = tmp_path / "myapp"
+    project_dir.mkdir()
+    f1 = project_dir / "main.py"
+    f2 = project_dir / "settings.py"
+    f1.write_text("# original main")
+    f2.write_text("# original settings")
+    with pytest.raises(SystemExit), addon_or_rollback(project_dir, "redis"):
+        f1.write_text("# modified main")
+        f2.write_text("# modified settings")
+        raise RuntimeError("boom")
+    assert f1.read_text() == "# original main"
+    assert f2.read_text() == "# original settings"
+
+
+def test_addon_mixed_new_and_modified(tmp_path):
+    project_dir = tmp_path / "myapp"
+    project_dir.mkdir()
+    existing = project_dir / "main.py"
+    existing.write_text("# original")
+    with pytest.raises(SystemExit), addon_or_rollback(project_dir, "redis"):
+        existing.write_text("# modified")
+        (project_dir / "new_file.py").write_text("# new")
+        raise RuntimeError("boom")
+    assert existing.read_text() == "# original"
+    assert not (project_dir / "new_file.py").exists()
+
+
+def test_addon_success_preserves_modifications(tmp_path):
+    project_dir = tmp_path / "myapp"
+    project_dir.mkdir()
+    existing = project_dir / "main.py"
+    existing.write_text("# original")
+    with addon_or_rollback(project_dir, "redis"):
+        existing.write_text("# modified and kept")
+    assert existing.read_text() == "# modified and kept"
+
+
+def test_addon_content_restored_when_file_deleted(tmp_path):
+    project_dir = tmp_path / "myapp"
+    project_dir.mkdir()
+    existing = project_dir / "main.py"
+    existing.write_text("# content to restore")
+    with pytest.raises(SystemExit), addon_or_rollback(project_dir, "redis"):
+        existing.unlink()
+        raise RuntimeError("boom")
+    assert existing.exists()
+    assert existing.read_text() == "# content to restore"
