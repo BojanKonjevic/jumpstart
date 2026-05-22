@@ -230,33 +230,32 @@ def _remove_files(
 ) -> list[str]:
     """Delete files that were created by this addon. Returns list of removed paths."""
 
-    all_dests = {resolve_dest_placeholder(fc.dest, pkg_name) for fc in addon_cfg.files}
-
     removed: list[str] = []
 
+    # Phase 1 — delete all contributed files except empty __init__.py
     for fc in addon_cfg.files:
         dest = resolve_dest_placeholder(fc.dest, pkg_name)
-        full = project_dir / dest
-
         if dest.endswith("__init__.py") and fc.content == "":
-            parent = full.parent
-            siblings_on_disk = (
-                {
-                    p.relative_to(project_dir).as_posix()
-                    for p in parent.iterdir()
-                    if p.is_file() and p != full
-                }
-                if parent.exists()
-                else set()
-            )
-            surviving_siblings = siblings_on_disk - all_dests
-            if surviving_siblings:
-                continue
-
+            continue
+        full = project_dir / dest
         if full.exists():
             full.unlink()
             removed.append(dest)
             _prune_empty_parents(full.parent, project_dir)
+
+    # Phase 2 — delete empty __init__.py only in truly empty directories
+    for fc in addon_cfg.files:
+        dest = resolve_dest_placeholder(fc.dest, pkg_name)
+        if not (dest.endswith("__init__.py") and fc.content == ""):
+            continue
+        full = project_dir / dest
+        if not full.exists():
+            continue
+        parent = full.parent
+        if parent.exists() and not any(p for p in parent.iterdir() if p != full):
+            full.unlink()
+            removed.append(dest)
+            _prune_empty_parents(parent, project_dir)
 
     return removed
 
@@ -515,23 +514,32 @@ def _dry_remove(
     dry_run_banner("remove", addon_id)
 
     dry_header("Files that would be removed")
-    all_dests = {resolve_dest_placeholder(fc.dest, pkg_name) for fc in addon_cfg.files}
+    # Phase 1 — show all non-empty-init files
     for fc in addon_cfg.files:
         dest = resolve_dest_placeholder(fc.dest, pkg_name)
-        full = project_dir / dest
         if dest.endswith("__init__.py") and fc.content == "":
-            parent = full.parent
-            siblings_on_disk = (
-                {
-                    p.relative_to(project_dir).as_posix()
-                    for p in parent.iterdir()
-                    if p.is_file() and p != full
-                }
-                if parent.exists()
-                else set()
-            )
-            if siblings_on_disk - all_dests:
-                continue
+            continue
+        full = project_dir / dest
+        if full.exists():
+            print(f"  {RED}-{RESET} {dest}")
+        else:
+            print(f"  {DIM}  {dest}  (already missing){RESET}")
+    # Phase 2 — show empty __init__.py only if parent would be truly empty
+    all_this_addon_dests = {
+        resolve_dest_placeholder(fc.dest, pkg_name) for fc in addon_cfg.files
+    }
+    all_this_addon_paths = {project_dir / d for d in all_this_addon_dests}
+    for fc in addon_cfg.files:
+        dest = resolve_dest_placeholder(fc.dest, pkg_name)
+        if not (dest.endswith("__init__.py") and fc.content == ""):
+            continue
+        full = project_dir / dest
+        parent = full.parent
+        if not parent.exists():
+            continue
+        surviving_children = set(parent.iterdir()) - all_this_addon_paths
+        if surviving_children:
+            continue
         if full.exists():
             print(f"  {RED}-{RESET} {dest}")
         else:

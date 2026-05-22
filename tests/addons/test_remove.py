@@ -14,7 +14,7 @@ import yaml
 from conftest import ZENIT_ROOT, write_test_manifest
 
 from zenit.addons._registry import get_available_addons
-from zenit.addons.remove import remove_addon
+from zenit.addons.remove import _remove_files, remove_addon
 from zenit.core._apply_loader import load_apply
 from zenit.core.apply import apply_contributions
 from zenit.core.collect import collect_all
@@ -26,6 +26,7 @@ from zenit.core.lockfile import read_lockfile, write_lockfile
 from zenit.core.manifest import read_manifest, write_manifest
 from zenit.core.render import build_render_vars
 from zenit.schema.exceptions import ZenitError
+from zenit.schema.models import AddonConfig, FileContribution
 from zenit.templates._load_config import load_template_config
 
 
@@ -218,6 +219,88 @@ class TestRemoveAddonUnit:
             remove_addon("sentry", project_dir=project_dir)
 
         assert not integrations_dir.exists()
+
+    def test_empty_init_py_kept_when_other_addon_has_same_dir_files(self, tmp_path):
+        project_dir = tmp_path / "myapp"
+        project_dir.mkdir()
+        pkg_dir = project_dir / "src" / "myapp" / "pkg"
+        pkg_dir.mkdir(parents=True)
+
+        # Addon A's files
+        (pkg_dir / "__init__.py").write_text("")  # empty init
+        (pkg_dir / "a.py").write_text("# addon A")
+        # Addon B's file (same dir, different file)
+        (pkg_dir / "b.py").write_text("# addon B")
+
+        addon_a = AddonConfig(
+            id="addon_a",
+            description="",
+            files=[
+                FileContribution(dest="src/{{pkg_name}}/pkg/__init__.py", content=""),
+                FileContribution(dest="src/{{pkg_name}}/pkg/a.py", content="# addon A"),
+            ],
+        )
+
+        removed = _remove_files(project_dir, addon_a, "myapp")
+
+        assert (project_dir / "src" / "myapp" / "pkg" / "__init__.py").exists()
+        assert not (project_dir / "src" / "myapp" / "pkg" / "a.py").exists()
+        assert (project_dir / "src" / "myapp" / "pkg" / "b.py").exists()
+        assert "src/myapp/pkg/__init__.py" not in removed
+
+    def test_empty_init_py_kept_when_other_addon_has_subdirectory(self, tmp_path):
+        project_dir = tmp_path / "myapp"
+        project_dir.mkdir()
+        pkg_dir = project_dir / "src" / "myapp" / "pkg"
+        pkg_dir.mkdir(parents=True)
+        sub_dir = pkg_dir / "sub"
+        sub_dir.mkdir()
+
+        # Addon A's file (empty init in pkg/)
+        (pkg_dir / "__init__.py").write_text("")
+        # Addon B's files (subdirectory with its own init + module)
+        (sub_dir / "__init__.py").write_text("")
+        (sub_dir / "mod.py").write_text("# addon B")
+
+        addon_a = AddonConfig(
+            id="addon_a",
+            description="",
+            files=[
+                FileContribution(dest="src/{{pkg_name}}/pkg/__init__.py", content=""),
+            ],
+        )
+
+        removed = _remove_files(project_dir, addon_a, "myapp")
+
+        assert (project_dir / "src" / "myapp" / "pkg" / "__init__.py").exists()
+        assert "src/myapp/pkg/__init__.py" not in removed
+
+    def test_empty_init_py_deleted_when_directory_truly_empty(self, tmp_path):
+        project_dir = tmp_path / "myapp"
+        project_dir.mkdir()
+        pkg_dir = project_dir / "src" / "myapp" / "pkg"
+        pkg_dir.mkdir(parents=True)
+
+        (pkg_dir / "__init__.py").write_text("")
+        (pkg_dir / "mod.py").write_text("# addon A")
+
+        addon_a = AddonConfig(
+            id="addon_a",
+            description="",
+            files=[
+                FileContribution(dest="src/{{pkg_name}}/pkg/__init__.py", content=""),
+                FileContribution(
+                    dest="src/{{pkg_name}}/pkg/mod.py", content="# addon A"
+                ),
+            ],
+        )
+
+        removed = _remove_files(project_dir, addon_a, "myapp")
+
+        assert not (project_dir / "src" / "myapp" / "pkg" / "__init__.py").exists()
+        assert not (project_dir / "src" / "myapp" / "pkg" / "mod.py").exists()
+        assert not (project_dir / "src" / "myapp" / "pkg").exists()
+        assert "src/myapp/pkg/__init__.py" in removed
 
     def test_cannot_remove_unknown_addon(self):
         with suppress_stdin(), pytest.raises(ZenitError):
