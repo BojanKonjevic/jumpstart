@@ -34,6 +34,9 @@ from zenit.core.handlers import HandlerDispatcher
 from zenit.core.handlers.justfile_handler import _RECIPE_NAME_RE
 from zenit.core.lockfile import ZenitLockfile, read_lockfile, write_lockfile
 from zenit.core.manifest import (
+    fingerprint as _fingerprint,
+)
+from zenit.core.manifest import (
     read_manifest,
     remove_blocks_for_addon,
     write_manifest,
@@ -42,6 +45,45 @@ from zenit.core.pkg_name import normalise_pkg_name, resolve_dest_placeholder
 from zenit.schema.exceptions import ZenitError
 from zenit.schema.models import AddonConfig, Manifest
 from zenit.templates._load_config import load_template_config
+
+
+def _check_fuzzy_blocks(
+    manifest: Manifest,
+    addon_id: str,
+    project_dir: Path,
+) -> list[tuple[str, str, str]]:
+    """Return list of ``(file, point, lines)`` for blocks that would hit fuzzy removal.
+
+    For each Python block belonging to *addon_id*, reads the current file at
+    the recorded line range and compares fingerprints.  Blocks where neither
+    the exact fingerprint (Stage A) nor the normalised fingerprint (Stage B)
+    match are returned — these would fall through to Stage C (fuzzy) removal.
+    """
+    result: list[tuple[str, str, str]] = []
+    for block in manifest.python_blocks:
+        if block.addon != addon_id:
+            continue
+        file_path = project_dir / block.file
+        if not file_path.exists():
+            continue
+        source = file_path.read_text(encoding="utf-8")
+        lines = source.splitlines(keepends=True)
+
+        start_str, end_str = block.lines.split("-")
+        rec_start = int(start_str) - 1
+        rec_end = int(end_str) - 1
+
+        if rec_start < 0 or rec_end >= len(lines):
+            continue
+
+        candidate = "".join(lines[rec_start : rec_end + 1])
+        fp, fp_norm = _fingerprint(candidate)
+
+        if fp == block.fingerprint or fp_norm == block.fingerprint_normalised:
+            continue
+
+        result.append((block.file, block.point, block.lines))
+    return result
 
 
 def remove_addon(
@@ -68,6 +110,40 @@ def remove_addon(
 
     addon_summary("remove", addon_id, project_dir, template)
 
+    # ── read manifest once, before any prompts or removals ──────────────────
+    manifest = read_manifest(project_dir)
+
+    # ── fuzzy-block check ─────────────────────────────────────────────────
+    fuzzy_blocks = _check_fuzzy_blocks(manifest, addon_id, project_dir)
+    if fuzzy_blocks:
+        warn("Some injected code has been modified since it was added:")
+        for file, point, lines in fuzzy_blocks:
+            warn(f"  {file}:{point}  (lines {lines})")
+        print()
+
+        if yes:
+            error(
+                "Re-run without --yes to interactively confirm fuzzy removal, "
+                "or inspect the modified files and remove the injected code manually."
+            )
+            raise typer.Exit(1)
+
+        if sys.stdin.isatty():
+            try:
+                raw = (
+                    input(f"  Use fuzzy matching to remove it? {DIM}[y/N]{RESET}  ")
+                    .strip()
+                    .lower()
+                )
+            except EOFError, KeyboardInterrupt:
+                print()
+                raise typer.Exit(0) from None
+            if raw not in ("y", "yes"):
+                warn("Aborted.")
+                raise typer.Exit(0)
+        else:
+            warn("Non-interactive mode — proceeding automatically.")
+
     if sys.stdin.isatty() and not yes:
         try:
             raw = input(f"  Proceed? {DIM}[Y/n]{RESET}  ").strip().lower()
@@ -82,9 +158,6 @@ def remove_addon(
             pass
         else:
             warn("Non-interactive mode — proceeding automatically.")
-
-    # ── read manifest once, before any physical removals ─────────────────────
-    manifest = read_manifest(project_dir)
 
     # ── files ──────────────────────────────────────────────────────────────
     removed_files = _remove_files(project_dir, addon_cfg, pkg_name)

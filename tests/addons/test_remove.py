@@ -6,8 +6,10 @@ import os
 import subprocess
 from contextlib import contextmanager
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
+import typer
 import yaml
 from conftest import ZENIT_ROOT, write_test_manifest
 
@@ -228,6 +230,59 @@ class TestRemoveAddonUnit:
 
         with suppress_stdin(), pytest.raises(ZenitError):
             remove_addon("docker", project_dir=project_dir)
+
+    def test_remove_fuzzy_blocks_requires_confirmation(self, tmp_path, monkeypatch):
+        """When injected code has been modified, the user must explicitly consent
+        to fuzzy removal before it proceeds. Answering "n" aborts; answering "y"
+        proceeds with fuzzy matching.
+        """
+        project_dir = _scaffold(tmp_path, "myapi", "fastapi", ["sentry"])
+        settings = project_dir / "src" / "myapi" / "settings.py"
+        original = settings.read_text()
+        assert "sentry_dsn" in original
+
+        # Modify injected code enough to break Stage A/B fingerprints.
+        modified = original.replace("sentry_dsn", "sentry_dsn_val")
+        settings.write_text(modified)
+
+        # ── Answer "n" → abort, block stays ────────────────────────────────
+        with (
+            patch("sys.stdin.isatty", return_value=True),
+            patch("builtins.input", return_value="n"),
+            pytest.raises(typer.Exit) as exc,
+        ):
+            remove_addon("sentry", project_dir=project_dir)
+        assert exc.value.exit_code == 0
+        assert "sentry_dsn_val" in settings.read_text()
+
+        # ── Answer "y" → fuzzy removal succeeds, block gone ────────────────
+        with (
+            patch("sys.stdin.isatty", return_value=True),
+            patch("builtins.input", side_effect=["y", ""]),
+        ):
+            remove_addon("sentry", project_dir=project_dir)
+
+        remaining = settings.read_text()
+        assert "sentry_dsn_val" not in remaining
+        assert "sentry_environment" not in remaining
+
+    def test_remove_fuzzy_blocks_fails_with_yes_flag(self, tmp_path):
+        """When --yes is passed and fuzzy blocks are detected, removal must
+        error out telling the user to re-run interactively."""
+        project_dir = _scaffold(tmp_path, "myapi", "fastapi", ["sentry"])
+        settings = project_dir / "src" / "myapi" / "settings.py"
+        original = settings.read_text()
+        assert "sentry_dsn" in original
+
+        modified = original.replace("sentry_dsn", "sentry_dsn_val")
+        settings.write_text(modified)
+
+        with pytest.raises(typer.Exit) as exc:
+            remove_addon("sentry", project_dir=project_dir, yes=True)
+        assert exc.value.exit_code == 1
+
+        # Block must NOT have been removed
+        assert "sentry_dsn_val" in settings.read_text()
 
 
 # ── Integration tests ─────────────────────────────────────────────────────────
