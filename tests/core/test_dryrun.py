@@ -43,7 +43,7 @@ def _dry_ctx(
         addons=[],
         zenit_root=ZENIT_ROOT,
         project_dir=tmp_path / name,
-        _fs=fs,
+        dry_run=True,
     )
     return ctx, fs
 
@@ -66,14 +66,14 @@ def test_real_context_dry_run_is_false(tmp_path):
 
 def test_write_file_is_recorded_not_written(tmp_path):
     ctx, fs = _dry_ctx(tmp_path)
-    ctx.write_file("src/myapp/main.py", "# content")
+    fs.write_file("src/myapp/main.py", "# content")
     assert not (tmp_path / "myapp" / "src" / "myapp" / "main.py").exists()
     assert any(path == "src/myapp/main.py" for (action, path, _) in fs.recorded_files)
 
 
 def test_create_dir_is_recorded_not_created(tmp_path):
     ctx, fs = _dry_ctx(tmp_path)
-    ctx.create_dir("src/myapp")
+    fs.create_dir("src/myapp")
     assert not (tmp_path / "myapp" / "src" / "myapp").exists()
     assert any(action == "mkdir" for (action, _, __) in fs.recorded_files)
 
@@ -82,20 +82,20 @@ def test_copy_file_is_recorded_not_copied(tmp_path):
     src = tmp_path / "source.txt"
     src.write_text("data")
     ctx, fs = _dry_ctx(tmp_path)
-    ctx.copy_file(src, "dest.txt")
+    fs.copy_file(src, "dest.txt")
     assert not (tmp_path / "myapp" / "dest.txt").exists()
     assert any(action == "copy" for (action, _, __) in fs.recorded_files)
 
 
 def test_append_to_file_is_recorded(tmp_path):
     ctx, fs = _dry_ctx(tmp_path)
-    ctx.append_to_file("somefile.py", "# appended")
+    fs.append_to_file("somefile.py", "# appended")
     assert any(action == "append" for (action, _, __) in fs.recorded_files)
 
 
 def test_record_modification_is_recorded(tmp_path):
     ctx, fs = _dry_ctx(tmp_path)
-    ctx.record_modification("settings.py", "injected redis_url field")
+    fs.record_modification("settings.py", "injected redis_url field")
     assert any(action == "modify" for (action, _, __) in fs.recorded_files)
 
 
@@ -232,8 +232,8 @@ def test_run_dry_all_fastapi_addons(tmp_path, capsys):
 
 def test_recorded_files_is_list_of_tuples(tmp_path):
     ctx, fs = _dry_ctx(tmp_path)
-    ctx.write_file("a.py", "x")
-    ctx.create_dir("mydir")
+    fs.write_file("a.py", "x")
+    fs.create_dir("mydir")
     for entry in fs.recorded_files:
         assert isinstance(entry, tuple)
         assert len(entry) == 3

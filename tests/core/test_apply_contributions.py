@@ -16,8 +16,10 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from zenit.core._paths import get_zenit_root
 from zenit.core.apply import apply_contributions
 from zenit.core.context import Context
+from zenit.core.filesystem import RealFileSystem
 from zenit.core.manifest import fingerprint as _fp
 from zenit.core.manifest import read_manifest
 from zenit.core.render import build_render_vars
@@ -33,13 +35,13 @@ from zenit.schema.models import (
 
 # ── helpers ───────────────────────────────────────────────────────────────────
 
-_ZENIT_ROOT = Path(__file__).parent.parent.parent / "src" / "zenit"
+_ZENIT_ROOT = get_zenit_root()
 
 
-def _ctx(tmp_path: Path, name: str = "myapp") -> Context:
+def _ctx(tmp_path: Path, name: str = "myapp") -> tuple[Context, RealFileSystem]:
     project_dir = tmp_path / name
     project_dir.mkdir()
-    return Context(
+    ctx = Context(
         name=name,
         pkg_name=name.replace("-", "_"),
         template="blank",
@@ -47,6 +49,8 @@ def _ctx(tmp_path: Path, name: str = "myapp") -> Context:
         zenit_root=_ZENIT_ROOT,
         project_dir=project_dir,
     )
+    fs = RealFileSystem(project_dir)
+    return ctx, fs
 
 
 def _render_vars(ctx: Context) -> dict[str, object]:
@@ -103,7 +107,7 @@ def _addon(
 
 
 def test_apply_records_python_block_with_all_fields(tmp_path: Path) -> None:
-    ctx = _ctx(tmp_path)
+    ctx, fs = _ctx(tmp_path)
     # Create a Python file for injection to land in
     target = ctx.project_dir / "src" / "myapp" / "settings.py"
     target.parent.mkdir(parents=True)
@@ -132,7 +136,7 @@ def test_apply_records_python_block_with_all_fields(tmp_path: Path) -> None:
         ),
     )
 
-    apply_contributions(ctx, contributions, injection_points, _render_vars(ctx))
+    apply_contributions(ctx, fs, contributions, injection_points, _render_vars(ctx))
 
     manifest = read_manifest(ctx.project_dir)
     assert len(manifest.python_blocks) == 1
@@ -149,7 +153,7 @@ def test_apply_records_python_block_with_all_fields(tmp_path: Path) -> None:
 
 
 def test_apply_fingerprint_matches_written_content(tmp_path: Path) -> None:
-    ctx = _ctx(tmp_path)
+    ctx, fs = _ctx(tmp_path)
     target = ctx.project_dir / "src" / "myapp" / "settings.py"
     target.parent.mkdir(parents=True)
     target.write_text(
@@ -174,7 +178,7 @@ def test_apply_fingerprint_matches_written_content(tmp_path: Path) -> None:
         ),
     )
 
-    apply_contributions(ctx, contributions, injection_points, _render_vars(ctx))
+    apply_contributions(ctx, fs, contributions, injection_points, _render_vars(ctx))
 
     manifest = read_manifest(ctx.project_dir)
     block = manifest.python_blocks[0]
@@ -189,7 +193,7 @@ def test_apply_fingerprint_matches_written_content(tmp_path: Path) -> None:
 
 
 def test_apply_skips_python_block_for_missing_file(tmp_path: Path) -> None:
-    ctx = _ctx(tmp_path)
+    ctx, fs = _ctx(tmp_path)
     # Target file deliberately not created
     addon = _addon(
         "redis",
@@ -211,7 +215,7 @@ def test_apply_skips_python_block_for_missing_file(tmp_path: Path) -> None:
         ),
     )
 
-    apply_contributions(ctx, contributions, injection_points, _render_vars(ctx))
+    apply_contributions(ctx, fs, contributions, injection_points, _render_vars(ctx))
 
     manifest = read_manifest(ctx.project_dir)
     assert manifest.python_blocks == []

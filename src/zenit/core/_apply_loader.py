@@ -5,9 +5,10 @@ from collections.abc import Callable
 from pathlib import Path
 
 from zenit.core.context import Context
+from zenit.core.filesystem import FileSystem
 
 
-def load_apply(path: Path) -> Callable[[Context], None]:
+def load_apply(path: Path) -> Callable[[Context, FileSystem], None]:
     spec = importlib.util.spec_from_file_location("apply", path)
     assert spec is not None and spec.loader is not None
     mod = importlib.util.module_from_spec(spec)

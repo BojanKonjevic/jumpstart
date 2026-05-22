@@ -19,6 +19,7 @@ from zenit.core.apply import apply_contributions
 from zenit.core.collect import collect_all
 from zenit.core.context import Context
 from zenit.core.dryrun import run_dry
+from zenit.core.filesystem import RealFileSystem
 from zenit.core.generate import generate_all
 from zenit.core.git import init
 from zenit.core.handlers.justfile_handler import _RECIPE_NAME_RE
@@ -123,10 +124,11 @@ def scaffold_project(
         raise typer.Exit(0)
 
     project_dir = ctx.project_dir
+    fs = RealFileSystem(project_dir)
     with scaffold_or_rollback(project_dir):
         project_dir.mkdir()
 
-        load_apply(zenit_root / "templates" / "_common" / "apply.py")(ctx)
+        load_apply(zenit_root / "templates" / "_common" / "apply.py")(ctx, fs)
 
         template_config = load_template_config(zenit_root, tpl)
         selected_addon_configs = [a for a in available if a.id in adns]
@@ -144,11 +146,12 @@ def scaffold_project(
 
         apply_contributions(
             ctx,
+            fs,
             contributions,
             template_config.injection_points,
             render_vars,
         )
-        generate_all(ctx, contributions)
+        generate_all(ctx, fs, contributions)
         init(project_dir)
 
         manifest = read_manifest(project_dir)

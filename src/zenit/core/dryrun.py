@@ -35,11 +35,11 @@ def run_dry(ctx: Context) -> None:
         addons=ctx.addons,
         zenit_root=ctx.zenit_root,
         project_dir=ctx.project_dir,
-        _fs=fs,
+        dry_run=True,
     )
 
     sr = dry_ctx.zenit_root
-    load_apply(sr / "templates" / "_common" / "apply.py")(dry_ctx)
+    load_apply(sr / "templates" / "_common" / "apply.py")(dry_ctx, fs)
 
     available = get_available_addons()
     template_config = load_template_config(sr, dry_ctx.template)
@@ -56,12 +56,13 @@ def run_dry(ctx: Context) -> None:
 
     apply_contributions(
         dry_ctx,
+        fs,
         contributions,
         template_config.injection_points,
         render_vars,
     )
 
-    generate_all(dry_ctx, contributions)
+    generate_all(dry_ctx, fs, contributions)
 
     label = dry_ctx.template
     if dry_ctx.addons:

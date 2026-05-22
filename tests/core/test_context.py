@@ -13,7 +13,7 @@ import pytest
 from conftest import ZENIT_ROOT
 
 from zenit.core.context import Context
-from zenit.core.filesystem import RecordingFileSystem
+from zenit.core.filesystem import RealFileSystem, RecordingFileSystem
 
 # ── helpers ───────────────────────────────────────────────────────────────────
 
@@ -38,7 +38,7 @@ def _dry(tmp_path: Path, name: str = "myapp") -> tuple[Context, RecordingFileSys
         addons=[],
         zenit_root=ZENIT_ROOT,
         project_dir=tmp_path / name,
-        _fs=fs,
+        dry_run=True,
     )
     return ctx, fs
 
@@ -52,7 +52,6 @@ def test_context_dry_run_is_false(tmp_path):
 
 
 def test_dryrun_context_dry_run_is_true(tmp_path):
-    fs = RecordingFileSystem(tmp_path / "myapp")
     ctx = Context(
         name="myapp",
         pkg_name="myapp",
@@ -60,7 +59,7 @@ def test_dryrun_context_dry_run_is_true(tmp_path):
         addons=[],
         zenit_root=ZENIT_ROOT,
         project_dir=tmp_path / "myapp",
-        _fs=fs,
+        dry_run=True,
     )
     assert ctx.dry_run is True
 
@@ -98,64 +97,60 @@ def test_has_returns_false_when_addons_empty(tmp_path):
     assert ctx.has("docker") is False
 
 
-# ── Context.write_file ────────────────────────────────────────────────────────
+# ── RealFileSystem — I/O tests ────────────────────────────────────────────────
 
 
 def test_write_file_creates_file(tmp_path):
     ctx = _ctx(tmp_path)
     ctx.project_dir.mkdir()
-    ctx.write_file("hello.txt", "hello world\n")
+    RealFileSystem(ctx.project_dir).write_file("hello.txt", "hello world\n")
     assert (ctx.project_dir / "hello.txt").read_text() == "hello world\n"
 
 
 def test_write_file_creates_parent_dirs(tmp_path):
     ctx = _ctx(tmp_path)
     ctx.project_dir.mkdir()
-    ctx.write_file("src/myapp/main.py", "# main\n")
+    RealFileSystem(ctx.project_dir).write_file("src/myapp/main.py", "# main\n")
     assert (ctx.project_dir / "src" / "myapp" / "main.py").exists()
 
 
 def test_write_file_overwrites_existing(tmp_path):
     ctx = _ctx(tmp_path)
     ctx.project_dir.mkdir()
-    ctx.write_file("file.txt", "original")
-    ctx.write_file("file.txt", "updated")
+    fs = RealFileSystem(ctx.project_dir)
+    fs.write_file("file.txt", "original")
+    fs.write_file("file.txt", "updated")
     assert (ctx.project_dir / "file.txt").read_text() == "updated"
 
 
 def test_write_file_empty_content(tmp_path):
     ctx = _ctx(tmp_path)
     ctx.project_dir.mkdir()
-    ctx.write_file("empty.py", "")
+    RealFileSystem(ctx.project_dir).write_file("empty.py", "")
     assert (ctx.project_dir / "empty.py").read_text() == ""
-
-
-# ── Context.create_dir ────────────────────────────────────────────────────────
 
 
 def test_create_dir_creates_directory(tmp_path):
     ctx = _ctx(tmp_path)
     ctx.project_dir.mkdir()
-    ctx.create_dir("src/myapp")
+    RealFileSystem(ctx.project_dir).create_dir("src/myapp")
     assert (ctx.project_dir / "src" / "myapp").is_dir()
 
 
 def test_create_dir_idempotent(tmp_path):
     ctx = _ctx(tmp_path)
     ctx.project_dir.mkdir()
-    ctx.create_dir("src/myapp")
-    ctx.create_dir("src/myapp")
+    fs = RealFileSystem(ctx.project_dir)
+    fs.create_dir("src/myapp")
+    fs.create_dir("src/myapp")
     assert (ctx.project_dir / "src" / "myapp").is_dir()
 
 
 def test_create_dir_nested(tmp_path):
     ctx = _ctx(tmp_path)
     ctx.project_dir.mkdir()
-    ctx.create_dir("a/b/c/d")
+    RealFileSystem(ctx.project_dir).create_dir("a/b/c/d")
     assert (ctx.project_dir / "a" / "b" / "c" / "d").is_dir()
-
-
-# ── Context.copy_file ─────────────────────────────────────────────────────────
 
 
 def test_copy_file_copies_content(tmp_path):
@@ -163,7 +158,7 @@ def test_copy_file_copies_content(tmp_path):
     ctx.project_dir.mkdir()
     src = tmp_path / "source.txt"
     src.write_text("source content")
-    ctx.copy_file(src, "dest.txt")
+    RealFileSystem(ctx.project_dir).copy_file(src, "dest.txt")
     assert (ctx.project_dir / "dest.txt").read_text() == "source content"
 
 
@@ -172,7 +167,7 @@ def test_copy_file_creates_parent_dirs(tmp_path):
     ctx.project_dir.mkdir()
     src = tmp_path / "template.yaml"
     src.write_text("key: value\n")
-    ctx.copy_file(src, "config/template.yaml")
+    RealFileSystem(ctx.project_dir).copy_file(src, "config/template.yaml")
     assert (ctx.project_dir / "config" / "template.yaml").exists()
 
 
@@ -181,11 +176,8 @@ def test_copy_file_does_not_modify_source(tmp_path):
     ctx.project_dir.mkdir()
     src = tmp_path / "source.txt"
     src.write_text("original")
-    ctx.copy_file(src, "dest.txt")
+    RealFileSystem(ctx.project_dir).copy_file(src, "dest.txt")
     assert src.read_text() == "original"
-
-
-# ── Context.append_to_file ────────────────────────────────────────────────────
 
 
 def test_append_to_file_appends_content(tmp_path):
@@ -193,7 +185,7 @@ def test_append_to_file_appends_content(tmp_path):
     ctx.project_dir.mkdir()
     f = ctx.project_dir / "file.txt"
     f.write_text("line1\n")
-    ctx.append_to_file("file.txt", "line2\n")
+    RealFileSystem(ctx.project_dir).append_to_file("file.txt", "line2\n")
     assert f.read_text() == "line1\nline2\n"
 
 
@@ -202,147 +194,144 @@ def test_append_to_file_multiple_times(tmp_path):
     ctx.project_dir.mkdir()
     f = ctx.project_dir / "file.txt"
     f.write_text("a\n")
-    ctx.append_to_file("file.txt", "b\n")
-    ctx.append_to_file("file.txt", "c\n")
+    fs = RealFileSystem(ctx.project_dir)
+    fs.append_to_file("file.txt", "b\n")
+    fs.append_to_file("file.txt", "c\n")
     assert f.read_text() == "a\nb\nc\n"
 
 
-# ── Context.record_modification ───────────────────────────────────────────────
-
-
-def test_record_modification_noop_on_real_context(tmp_path):
+def test_record_modification_noop_on_real_fs(tmp_path):
     ctx = _ctx(tmp_path)
     ctx.project_dir.mkdir()
-    ctx.record_modification("settings.py", "injected redis_url")
+    RealFileSystem(ctx.project_dir).record_modification(
+        "settings.py", "injected redis_url"
+    )
     assert list(ctx.project_dir.iterdir()) == []
-
-
-# ── Context.execute_command ───────────────────────────────────────────────────
 
 
 def test_execute_command_runs_command(tmp_path):
     ctx = _ctx(tmp_path)
     ctx.project_dir.mkdir()
-    ctx.execute_command(["true"])
+    RealFileSystem(ctx.project_dir).execute_command(["true"])
 
 
 def test_execute_command_raises_on_failure(tmp_path):
     ctx = _ctx(tmp_path)
     ctx.project_dir.mkdir()
     with pytest.raises(subprocess.CalledProcessError):
-        ctx.execute_command(["false"], check=True)
+        RealFileSystem(ctx.project_dir).execute_command(["false"], check=True)
 
 
 def test_execute_command_no_raise_when_check_false(tmp_path):
     ctx = _ctx(tmp_path)
     ctx.project_dir.mkdir()
-    ctx.execute_command(["false"], check=False)
+    RealFileSystem(ctx.project_dir).execute_command(["false"], check=False)
 
 
 # ── RecordingFileSystem — no I/O ──────────────────────────────────────────────
 
 
 def test_dry_write_file_does_not_create_file(tmp_path):
-    ctx, _fs = _dry(tmp_path)
-    ctx.write_file("hello.txt", "hello")
-    assert not (ctx.project_dir / "hello.txt").exists()
+    _, fs = _dry(tmp_path)
+    fs.write_file("hello.txt", "hello")
+    assert not (tmp_path / "myapp" / "hello.txt").exists()
 
 
 def test_dry_create_dir_does_not_create_dir(tmp_path):
-    ctx, _fs = _dry(tmp_path)
-    ctx.create_dir("src/myapp")
-    assert not (ctx.project_dir / "src").exists()
+    _, fs = _dry(tmp_path)
+    fs.create_dir("src/myapp")
+    assert not (tmp_path / "myapp" / "src").exists()
 
 
 def test_dry_copy_file_does_not_create_file(tmp_path):
-    ctx, _fs = _dry(tmp_path)
+    _, fs = _dry(tmp_path)
     src = tmp_path / "source.txt"
     src.write_text("data")
-    ctx.copy_file(src, "dest.txt")
-    assert not (ctx.project_dir / "dest.txt").exists()
+    fs.copy_file(src, "dest.txt")
+    assert not (tmp_path / "myapp" / "dest.txt").exists()
 
 
 def test_dry_append_to_file_does_not_write(tmp_path):
-    ctx, _fs = _dry(tmp_path)
-    ctx.append_to_file("file.txt", "content")
-    assert not ctx.project_dir.exists()
+    _, fs = _dry(tmp_path)
+    fs.append_to_file("file.txt", "content")
+    assert not (tmp_path / "myapp").exists()
 
 
 def test_dry_execute_command_does_nothing(tmp_path):
-    ctx, _fs = _dry(tmp_path)
-    ctx.execute_command(["false"], check=True)
+    _, fs = _dry(tmp_path)
+    fs.execute_command(["false"], check=True)
 
 
 # ── RecordingFileSystem — recording ───────────────────────────────────────────
 
 
 def test_dry_write_file_recorded_as_create(tmp_path):
-    ctx, fs = _dry(tmp_path)
-    ctx.write_file("src/main.py", "# code")
+    _, fs = _dry(tmp_path)
+    fs.write_file("src/main.py", "# code")
     actions = [a for a, _, _ in fs.recorded_files]
     assert "create" in actions
 
 
 def test_dry_write_file_records_path(tmp_path):
-    ctx, fs = _dry(tmp_path)
-    ctx.write_file("src/main.py", "# code")
+    _, fs = _dry(tmp_path)
+    fs.write_file("src/main.py", "# code")
     paths = [p for _, p, _ in fs.recorded_files]
     assert "src/main.py" in paths
 
 
 def test_dry_create_dir_recorded_as_mkdir(tmp_path):
-    ctx, fs = _dry(tmp_path)
-    ctx.create_dir("src/myapp")
+    _, fs = _dry(tmp_path)
+    fs.create_dir("src/myapp")
     actions = [a for a, _, _ in fs.recorded_files]
     assert "mkdir" in actions
 
 
 def test_dry_copy_file_recorded_as_copy(tmp_path):
-    ctx, fs = _dry(tmp_path)
+    _, fs = _dry(tmp_path)
     src = tmp_path / "source.txt"
     src.write_text("data")
-    ctx.copy_file(src, "dest.txt")
+    fs.copy_file(src, "dest.txt")
     actions = [a for a, _, _ in fs.recorded_files]
     assert "copy" in actions
 
 
 def test_dry_append_recorded_as_append(tmp_path):
-    ctx, fs = _dry(tmp_path)
-    ctx.append_to_file("file.txt", "content")
+    _, fs = _dry(tmp_path)
+    fs.append_to_file("file.txt", "content")
     actions = [a for a, _, _ in fs.recorded_files]
     assert "append" in actions
 
 
 def test_dry_record_modification_recorded_as_modify(tmp_path):
-    ctx, fs = _dry(tmp_path)
-    ctx.record_modification("settings.py", "injected redis_url field")
+    _, fs = _dry(tmp_path)
+    fs.record_modification("settings.py", "injected redis_url field")
     actions = [a for a, _, _ in fs.recorded_files]
     assert "modify" in actions
 
 
 def test_dry_record_modification_records_description(tmp_path):
-    ctx, fs = _dry(tmp_path)
-    ctx.record_modification("settings.py", "injected redis_url field")
+    _, fs = _dry(tmp_path)
+    fs.record_modification("settings.py", "injected redis_url field")
     descriptions = [d for _, _, d in fs.recorded_files]
     assert "injected redis_url field" in descriptions
 
 
 def test_dry_multiple_operations_all_recorded(tmp_path):
-    ctx, fs = _dry(tmp_path)
+    _, fs = _dry(tmp_path)
     src = tmp_path / "s.txt"
     src.write_text("x")
-    ctx.create_dir("mydir")
-    ctx.write_file("a.py", "")
-    ctx.copy_file(src, "b.txt")
-    ctx.append_to_file("c.txt", "line")
-    ctx.record_modification("d.py", "changed")
+    fs.create_dir("mydir")
+    fs.write_file("a.py", "")
+    fs.copy_file(src, "b.txt")
+    fs.append_to_file("c.txt", "line")
+    fs.record_modification("d.py", "changed")
     assert len(fs.recorded_files) == 5
 
 
 def test_dry_recorded_files_is_list_of_three_tuples(tmp_path):
-    ctx, fs = _dry(tmp_path)
-    ctx.write_file("a.py", "x")
-    ctx.create_dir("mydir")
+    _, fs = _dry(tmp_path)
+    fs.write_file("a.py", "x")
+    fs.create_dir("mydir")
     for entry in fs.recorded_files:
         assert isinstance(entry, tuple)
         assert len(entry) == 3

@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from zenit.cli.ui import step, success
+from zenit.core.filesystem import FileSystem
 from zenit.core.recipes import _recipe_name
 from zenit.core.render import build_recipe_render_vars, make_env
 
@@ -15,6 +16,7 @@ if TYPE_CHECKING:
 
 def generate_all(
     ctx: Context,
+    fs: FileSystem,
     contributions: Contributions,
 ) -> None:
     """Render ``pyproject.toml`` and ``justfile`` and write them to the project."""
@@ -66,6 +68,6 @@ def generate_all(
         ("justfile.j2", "justfile"),
     ]:
         content = env.get_template(template_name).render(**template_vars)
-        ctx.write_file(dest_rel, content)
+        fs.write_file(dest_rel, content)
         if not ctx.dry_run:
             success(dest_rel)

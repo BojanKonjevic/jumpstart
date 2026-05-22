@@ -17,6 +17,7 @@ from zenit.core._apply_loader import load_apply
 from zenit.core.apply import apply_contributions
 from zenit.core.collect import collect_all
 from zenit.core.context import Context
+from zenit.core.filesystem import RealFileSystem
 from zenit.core.generate import generate_all
 from zenit.core.git import init
 from zenit.core.lockfile import read_lockfile, write_lockfile
@@ -57,10 +58,11 @@ def _scaffold(tmp_path: Path, name: str, template: str, addons: list[str]) -> Pa
         zenit_root=ZENIT_ROOT,
         project_dir=project_dir,
     )
+    fs = RealFileSystem(project_dir)
 
     # Common files
 
-    load_apply(ZENIT_ROOT / "templates" / "_common" / "apply.py")(ctx)
+    load_apply(ZENIT_ROOT / "templates" / "_common" / "apply.py")(ctx, fs)
 
     # Template + addon contributions
     available = get_available_addons()
@@ -76,9 +78,9 @@ def _scaffold(tmp_path: Path, name: str, template: str, addons: list[str]) -> Pa
 
     contributions = collect_all(template_config, selected_addon_configs)
     apply_contributions(
-        ctx, contributions, template_config.injection_points, render_vars
+        ctx, fs, contributions, template_config.injection_points, render_vars
     )
-    generate_all(ctx, contributions)
+    generate_all(ctx, fs, contributions)
 
     # Initialize git repo
 

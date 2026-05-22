@@ -2,6 +2,7 @@ from pathlib import Path
 
 from zenit.cli.ui import info
 from zenit.core.context import Context
+from zenit.core.filesystem import FileSystem
 from zenit.core.lockfile import ZenitLockfile
 from zenit.core.pkg_name import normalise_pkg_name
 from zenit.schema.models import (
@@ -169,7 +170,7 @@ def can_apply(project_dir: Path, lockfile: ZenitLockfile) -> str | None:
     return None
 
 
-def post_apply(ctx: Context) -> None:
+def post_apply(ctx: Context, fs: FileSystem) -> None:  # noqa: ARG001
 
     info("Run 'just migrate \"add users\"' then 'just upgrade' to create auth tables.")
     info("Run 'just gen-secret' to generate a SECRET_KEY and add it to .env.")

@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, Any
 
 import yaml
 
+from zenit.core.filesystem import FileSystem
 from zenit.core.handlers.base import HandlerDispatcher
 from zenit.core.manifest import (
     add_python_block,
@@ -31,6 +32,7 @@ if TYPE_CHECKING:
 
 def apply_contributions(
     ctx: Context,
+    fs: FileSystem,
     contributions: Contributions,
     injection_points: dict[str, InjectionPoint],
     render_vars: dict[str, object],
@@ -59,7 +61,7 @@ def apply_contributions(
     pkg_name = str(render_vars["pkg_name"])
 
     for d in contributions.dirs:
-        ctx.create_dir(resolve_dest_placeholder(d, pkg_name))
+        fs.create_dir(resolve_dest_placeholder(d, pkg_name))
 
     # Pre-render {{pkg_name}} placeholders in compose service fields
     for svc in contributions.compose_services:
@@ -81,9 +83,9 @@ def apply_contributions(
             if fc.template:
                 string_env = make_env()
                 rendered = string_env.from_string(fc.content).render(**render_vars)
-                ctx.write_file(dest, rendered)
+                fs.write_file(dest, rendered)
             else:
-                ctx.write_file(dest, fc.content)
+                fs.write_file(dest, fc.content)
         elif fc.source is not None:
             src_path = Path(fc.source)
             if not src_path.is_absolute():
@@ -95,9 +97,9 @@ def apply_contributions(
             if fc.template:
                 env = make_env(src_path.parent)
                 content = env.get_template(src_path.name).render(**render_vars)
-                ctx.write_file(dest, content)
+                fs.write_file(dest, content)
             else:
-                ctx.copy_file(src_path, dest)
+                fs.copy_file(src_path, dest)
 
     manifest = read_manifest(project_dir)
     dispatcher = HandlerDispatcher()
@@ -148,17 +150,17 @@ def apply_contributions(
 
     if contributions.compose_services and (project_dir / "compose.yml").exists():
         _merge_compose(
-            ctx, contributions.compose_services, contributions.compose_volumes
+            ctx, fs, contributions.compose_services, contributions.compose_volumes
         )
 
     for file_name in (".env", ".env.example"):
         if (project_dir / file_name).exists() and contributions.env_vars:
-            _merge_env_vars(ctx, file_name, contributions.env_vars)
+            _merge_env_vars(ctx, fs, file_name, contributions.env_vars)
 
     for addon_cfg in contributions._addon_configs:
         hooks = addon_cfg._module
         if hooks is not None and hooks.post_apply is not None:
-            hooks.post_apply(ctx)
+            hooks.post_apply(ctx, fs)
 
     if not ctx.dry_run:
         write_manifest(project_dir, manifest)
@@ -169,6 +171,7 @@ def apply_contributions(
 
 def _merge_compose(
     ctx: Context,
+    fs: FileSystem,
     services: list[ComposeService],
     volumes: list[str],
 ) -> None:
@@ -212,14 +215,16 @@ def _merge_compose(
         if vol_name not in vols_section:
             vols_section[vol_name] = None
 
-    ctx.write_file(
+    fs.write_file(
         "compose.yml",
         yaml.dump(data, default_flow_style=False, sort_keys=False),
     )
 
 
-def _merge_env_vars(ctx: Context, file_name: str, env_vars: list[EnvVar]) -> None:
-    """Append missing env vars to the end of *file_name* via *ctx*."""
+def _merge_env_vars(
+    ctx: Context, fs: FileSystem, file_name: str, env_vars: list[EnvVar]
+) -> None:
+    """Append missing env vars to the end of *file_name* via *fs*."""
     env_path = ctx.project_dir / file_name
     text = env_path.read_text(encoding="utf-8")
 
@@ -239,4 +244,4 @@ def _merge_env_vars(ctx: Context, file_name: str, env_vars: list[EnvVar]) -> Non
 
     if new_lines:
         text = text.rstrip("\n") + "\n" + "\n".join(new_lines) + "\n"
-        ctx.write_file(file_name, text)
+        fs.write_file(file_name, text)

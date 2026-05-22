@@ -31,7 +31,7 @@ from zenit.core.apply import apply_contributions
 from zenit.core.collect import collect_addon_only
 from zenit.core.context import Context
 from zenit.core.deps import inject_deps
-from zenit.core.filesystem import RecordingFileSystem
+from zenit.core.filesystem import FileSystem, RealFileSystem, RecordingFileSystem
 from zenit.core.justfile import inject_just_recipes
 from zenit.core.lockfile import read_lockfile, write_lockfile
 from zenit.core.manifest import (
@@ -60,6 +60,7 @@ class _AddResult:
 
 def _run_add_pipeline(
     ctx: Context,
+    fs: FileSystem,
     addon_id: str,
     available: list[AddonConfig],
 ) -> _AddResult:
@@ -83,6 +84,7 @@ def _run_add_pipeline(
 
     apply_contributions(
         ctx,
+        fs,
         contributions,
         template_config.injection_points,
         render_vars,
@@ -133,7 +135,7 @@ def _run_add_pipeline(
         write_lockfile(project_dir, template, ctx.addons)
 
     # ── Recorded files (dry-run only) ─────────────────────────────────────────
-    recorded_files = list(ctx._fs.recorded_files) if ctx.dry_run else []  # type: ignore[union-attr]
+    recorded_files = list(fs.recorded_files) if ctx.dry_run else []  # type: ignore[attr-defined]
 
     return _AddResult(
         added_deps=added_deps,
@@ -160,6 +162,7 @@ def add_addon(addon_id: str, dry_run: bool = False, yes: bool = False) -> None:
     zenit_root = get_zenit_root()
 
     # ── Dry-run path ──────────────────────────────────────────────────────────
+    fs: FileSystem
     if dry_run:
         fs = RecordingFileSystem(project_dir)
         ctx = Context(
@@ -169,9 +172,9 @@ def add_addon(addon_id: str, dry_run: bool = False, yes: bool = False) -> None:
             addons=lockfile.addons + [addon_id],
             zenit_root=zenit_root,
             project_dir=project_dir,
-            _fs=fs,
+            dry_run=True,
         )
-        result = _run_add_pipeline(ctx, addon_id, available)
+        result = _run_add_pipeline(ctx, fs, addon_id, available)
 
         dry_run_banner("add", addon_id)
 
@@ -221,7 +224,8 @@ def add_addon(addon_id: str, dry_run: bool = False, yes: bool = False) -> None:
             zenit_root=zenit_root,
             project_dir=project_dir,
         )
-        result = _run_add_pipeline(ctx, addon_id, available)
+        fs = RealFileSystem(project_dir)
+        result = _run_add_pipeline(ctx, fs, addon_id, available)
 
     # ── Output ────────────────────────────────────────────────────────────────
     print()

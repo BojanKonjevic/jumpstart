@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from zenit.core.context import Context
+    from zenit.core.filesystem import FileSystem
     from zenit.core.lockfile import ZenitLockfile
     from zenit.doctor.doctor import HealthIssue
 
@@ -172,7 +173,7 @@ class Injection:
 class AddonHooks:
     """Typed container for optional addon module callbacks."""
 
-    post_apply: Callable[[Context], None] | None = None
+    post_apply: Callable[[Context, FileSystem], None] | None = None
     health_check: Callable[[Path, ZenitLockfile], list[HealthIssue]] | None = None
     can_apply: Callable[[Path, ZenitLockfile], str | None] | None = None
     can_remove: Callable[[Path, ZenitLockfile], str | None] | None = None
