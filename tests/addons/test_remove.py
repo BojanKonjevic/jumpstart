@@ -536,6 +536,52 @@ class TestRemoveAddonIntegration:
         with suppress_stdin(), pytest.raises(ZenitError):
             remove_addon("redis", project_dir=project_dir)  # celery depends on redis
 
+    def test_remove_interactive_multi(self, tmp_path, monkeypatch):
+        """Multi-remove via interactive: select 2, verify both removed."""
+        project_dir = _scaffold(
+            tmp_path, "myapp", "blank", ["docker", "redis", "sentry"]
+        )
+        monkeypatch.chdir(project_dir)
+
+        with (
+            patch(
+                "zenit.addons.remove.prompt_multi_addon",
+                return_value=["redis", "sentry"],
+            ),
+            patch("builtins.input", return_value=""),
+        ):
+            from zenit.addons.remove import remove_addon_interactive
+
+            remove_addon_interactive()
+
+        lockfile = read_lockfile(project_dir)
+        assert "redis" not in lockfile.addons
+        assert "sentry" not in lockfile.addons
+        assert "docker" in lockfile.addons
+
+    def test_remove_interactive_keeps_deps_satisfied(self, tmp_path, monkeypatch):
+        """Removing celery then redis keeps docker (which has no deps)."""
+        project_dir = _scaffold(
+            tmp_path, "myapp", "blank", ["docker", "redis", "celery"]
+        )
+        monkeypatch.chdir(project_dir)
+
+        with (
+            patch(
+                "zenit.addons.remove.prompt_multi_addon",
+                return_value=["celery", "redis"],
+            ),
+            patch("builtins.input", return_value=""),
+        ):
+            from zenit.addons.remove import remove_addon_interactive
+
+            remove_addon_interactive()
+
+        lockfile = read_lockfile(project_dir)
+        assert "celery" not in lockfile.addons
+        assert "redis" not in lockfile.addons
+        assert "docker" in lockfile.addons
+
     def test_remove_sentry_from_fastapi_removes_settings_fields(
         self, tmp_path, monkeypatch
     ):

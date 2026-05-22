@@ -261,9 +261,9 @@ def cmd_config() -> None:
 @app.command("add")
 def cmd_add(
     addon: Annotated[
-        str | None,
+        list[str] | None,
         typer.Argument(
-            help="Addon to add to the current project (omit for interactive selection)"
+            help="Addon(s) to add to the current project (omit for interactive selection)"
         ),
     ] = None,
     yes: Annotated[
@@ -274,24 +274,25 @@ def cmd_add(
         bool, typer.Option("--dry-run", help="Preview without writing anything")
     ] = False,
 ) -> None:
-    """Add an addon to an existing zenit project in the current directory.
+    """Add addon(s) to an existing zenit project in the current directory.
 
     Run without arguments to select addons interactively.
     """
     if addon is None:
         from zenit.addons.add import add_addon_interactive
 
-        add_addon_interactive(dry_run=dry_run)
+        add_addon_interactive(dry_run=dry_run, yes=yes)
     else:
-        add_addon(addon, dry_run=dry_run, yes=yes)
+        for a in addon:
+            add_addon(a, dry_run=dry_run, yes=yes)
 
 
 @app.command("remove")
 def cmd_remove(
     addon: Annotated[
-        str | None,
+        list[str] | None,
         typer.Argument(
-            help="Addon to remove from the current project (omit for interactive selection)"
+            help="Addon(s) to remove from the current project (omit for interactive selection)"
         ),
     ] = None,
     yes: Annotated[
@@ -302,25 +303,26 @@ def cmd_remove(
         bool, typer.Option("--dry-run", help="Preview without writing anything")
     ] = False,
 ) -> None:
-    """Remove an addon from an existing zenit project in the current directory.
+    """Remove addon(s) from an existing zenit project in the current directory.
 
-    Run without arguments to select an addon interactively.
+    Run without arguments to select addons interactively.
     """
     if addon is None:
         from zenit.addons.remove import remove_addon_interactive
 
-        remove_addon_interactive(dry_run=dry_run)
+        remove_addon_interactive(dry_run=dry_run, yes=yes)
     else:
         from zenit.addons.remove import remove_addon
         from zenit.schema.exceptions import ZenitError
 
-        try:
-            remove_addon(addon, dry_run=dry_run, yes=yes)
-        except ZenitError as exc:
-            from zenit.cli.ui import error
+        for a in addon:
+            try:
+                remove_addon(a, dry_run=dry_run, yes=yes)
+            except ZenitError as exc:
+                from zenit.cli.ui import error
 
-            error(str(exc))
-            raise typer.Exit(1) from exc
+                error(str(exc))
+                raise typer.Exit(1) from exc
 
 
 @app.command("doctor")

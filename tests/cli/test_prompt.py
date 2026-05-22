@@ -39,13 +39,16 @@ import pytest
 from zenit.cli.prompt._keys import read_key, tty_available
 from zenit.cli.prompt._multi import (
     _fallback_multi,
+    _fallback_multi_addon,
     _render_multi,
     _tui_multi,
     prompt_addons,
+    prompt_multi_addon,
 )
 from zenit.cli.prompt._render import (
     _DONE,
     clear_lines,
+    filter_indices,
     hide_cursor,
     render_single,
     reserve_lines,
@@ -255,6 +258,62 @@ class TestRenderSingle:
         full = [("a", "A", []), ("b", "B", ["redis"])]
         render_single(items, cursor=0, unavailable={1}, full_items=full)
         assert "needs" in capsys.readouterr().out
+
+    def test_search_query_shows_footer(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        render_single(self.ITEMS, cursor=0, search_query="bla")
+        assert "esc clear" in capsys.readouterr().out
+
+    def test_search_shows_type_hint_by_default(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        render_single(self.ITEMS, cursor=0)
+        assert "type to search" in capsys.readouterr().out
+
+    def test_filtered_indices_shows_subset(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        render_single(self.ITEMS, cursor=0, filtered_indices=[1])
+        captured = capsys.readouterr()
+        assert "blank" not in captured.out
+        assert "fastapi" in captured.out
+
+    def test_filtered_indices_empty_shows_no_matches(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        render_single(self.ITEMS, cursor=0, filtered_indices=[])
+        assert "No matches" in capsys.readouterr().out
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# _render — filter_indices
+
+
+class TestFilterIndices:
+    ITEMS: list[tuple[str, str]] = [
+        ("docker", "Container support"),
+        ("redis", "Redis cache"),
+        ("celery", "Task queue"),
+    ]
+
+    def test_empty_query_returns_all(self) -> None:
+        assert filter_indices(self.ITEMS, "") == [0, 1, 2]
+
+    def test_matches_name(self) -> None:
+        assert filter_indices(self.ITEMS, "docker") == [0]
+
+    def test_matches_description(self) -> None:
+        assert filter_indices(self.ITEMS, "cache") == [1]
+
+    def test_case_insensitive(self) -> None:
+        assert filter_indices(self.ITEMS, "DOCKER") == [0]
+
+    def test_matches_multiple(self) -> None:
+        assert filter_indices(self.ITEMS, "e") == [0, 1, 2]
+
+    def test_no_match(self) -> None:
+        assert filter_indices(self.ITEMS, "zzzz") == []
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -489,19 +548,23 @@ class TestPromptTemplateTui:
         ):
             assert prompt_template() == "fastapi"
 
-    def test_vi_j_navigates_down(self) -> None:
+    def test_j_is_search_char(self) -> None:
+        """j is a search character, not navigation — filtering to nothing,
+        then escape to clear, enter to confirm default."""
         with (
-            patch("zenit.cli.prompt._render.read_key", side_effect=["j", "\r"]),
+            patch("zenit.cli.prompt._render.read_key", side_effect=["j", "\x1b", "\r"]),
             patch("zenit.cli.prompt._single.tty_available", return_value=True),
         ):
-            assert prompt_template() == "fastapi"
+            assert prompt_template() == "blank"
 
-    def test_vi_k_navigates_up(self) -> None:
+    def test_k_is_search_char(self) -> None:
+        """k is a search character, not navigation — filtering to nothing,
+        then escape to clear, enter to confirm default."""
         with (
-            patch("zenit.cli.prompt._render.read_key", side_effect=["k", "\r"]),
+            patch("zenit.cli.prompt._render.read_key", side_effect=["k", "\x1b", "\r"]),
             patch("zenit.cli.prompt._single.tty_available", return_value=True),
         ):
-            assert prompt_template() == "fastapi"
+            assert prompt_template() == "blank"
 
     def test_ctrl_c_exits(self) -> None:
         with (
@@ -517,6 +580,60 @@ class TestPromptTemplateTui:
             patch("zenit.cli.prompt._single.tty_available", return_value=True),
         ):
             assert prompt_template(default="fastapi") == "fastapi"
+
+    def test_search_filters_to_one(self) -> None:
+        with (
+            patch(
+                "zenit.cli.prompt._render.read_key",
+                side_effect=["f", "a", "\r"],
+            ),
+            patch("zenit.cli.prompt._single.tty_available", return_value=True),
+        ):
+            assert prompt_template() == "fastapi"
+
+    def test_search_escape_clears(self) -> None:
+        with (
+            patch(
+                "zenit.cli.prompt._render.read_key",
+                side_effect=["f", "\x1b", "\r"],
+            ),
+            patch("zenit.cli.prompt._single.tty_available", return_value=True),
+        ):
+            assert prompt_template() == "blank"
+
+    def test_search_backspace_edits(self) -> None:
+        with (
+            patch(
+                "zenit.cli.prompt._render.read_key",
+                side_effect=["x", "\x7f", "\r"],
+            ),
+            patch("zenit.cli.prompt._single.tty_available", return_value=True),
+        ):
+            assert prompt_template() == "blank"
+
+    def test_search_j_registered_as_search_when_active(self) -> None:
+        with (
+            patch(
+                "zenit.cli.prompt._render.read_key",
+                side_effect=["a", "j", "\x1b", "\r"],
+            ),
+            patch("zenit.cli.prompt._single.tty_available", return_value=True),
+        ):
+            # "a" starts search, "j" should add to query (not navigate down),
+            # then escape clears, enter confirms default
+            assert prompt_template() == "blank"
+
+    def test_search_k_registered_as_search_when_active(self) -> None:
+        with (
+            patch(
+                "zenit.cli.prompt._render.read_key",
+                side_effect=["a", "k", "\x1b", "\r"],
+            ),
+            patch("zenit.cli.prompt._single.tty_available", return_value=True),
+        ):
+            # "a" starts search, "k" should add to query (not navigate up),
+            # then escape clears, enter confirms default
+            assert prompt_template() == "blank"
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -577,6 +694,35 @@ class TestPromptSingleAddonTui:
             pytest.raises(SystemExit),
         ):
             prompt_single_addon(self.ITEMS)
+
+    def test_search_filters_selection(self) -> None:
+        with (
+            patch("zenit.cli.prompt._render.read_key", side_effect=["c", "e", "\r"]),
+            patch("zenit.cli.prompt._single.tty_available", return_value=True),
+        ):
+            assert prompt_single_addon(self.ITEMS) == "celery"
+
+    def test_search_escape_then_navigate(self) -> None:
+        keys = iter(["c", "\x1b", "\x1b[B", "\r"])
+        with (
+            patch("zenit.cli.prompt._render.read_key", side_effect=keys),
+            patch("zenit.cli.prompt._single.tty_available", return_value=True),
+        ):
+            assert prompt_single_addon(self.ITEMS) == "redis"
+
+    def test_search_j_registered_as_search_when_active(self) -> None:
+        items = [
+            ("docker", "Docker support", []),
+            ("redis", "Redis cache", []),
+        ]
+        keys = iter(["a", "j", "\x1b", "\r"])
+        with (
+            patch("zenit.cli.prompt._render.read_key", side_effect=keys),
+            patch("zenit.cli.prompt._single.tty_available", return_value=True),
+        ):
+            # "a" starts search, "j" adds to query (not navigate),
+            # escape clears, enter confirms first item
+            assert prompt_single_addon(items) == "docker"
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -704,6 +850,55 @@ class TestRenderMulti:
         captured = capsys.readouterr()
         assert "only" in captured.out
 
+    def test_search_query_shows_esc_footer(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        _render_multi(
+            self.ITEMS,
+            cursor=0,
+            selected=set(),
+            requires_map={},
+            search_query="red",
+        )
+        assert "esc clear" in capsys.readouterr().out
+
+    def test_search_empty_shows_type_hint(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        _render_multi(
+            self.ITEMS,
+            cursor=0,
+            selected=set(),
+            requires_map={},
+        )
+        assert "type to search" in capsys.readouterr().out
+
+    def test_filtered_indices_shows_subset(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        _render_multi(
+            self.ITEMS,
+            cursor=0,
+            selected=set(),
+            requires_map={},
+            filtered_indices=[1],
+        )
+        captured = capsys.readouterr()
+        assert "docker" not in captured.out
+        assert "redis" in captured.out
+
+    def test_filtered_empty_shows_no_matches(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        _render_multi(
+            self.ITEMS,
+            cursor=0,
+            selected=set(),
+            requires_map={},
+            filtered_indices=[],
+        )
+        assert "No matches" in capsys.readouterr().out
+
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # _multi — _tui_multi state machine
@@ -819,6 +1014,51 @@ class TestTuiMulti:
         ):
             _tui_multi("test", self.ITEMS, {}, set())
 
+    def test_search_filters_and_selects(self) -> None:
+        with patch(
+            "zenit.cli.prompt._render.read_key",
+            side_effect=["r", "e", " ", "\r"],
+        ):
+            result = _tui_multi("test", self.ITEMS, {}, set())
+        assert "docker" not in result
+        assert "redis" in result
+
+    def test_search_escape_clears_then_select_all(self) -> None:
+        with patch(
+            "zenit.cli.prompt._render.read_key",
+            side_effect=["r", "\x1b", " ", "\x1b[B", " ", "\x1b[B", " ", "\r"],
+        ):
+            result = _tui_multi("test", self.ITEMS, {}, set())
+        assert len(result) == 3
+
+    def test_search_backspace_restores_items(self) -> None:
+        with patch(
+            "zenit.cli.prompt._render.read_key",
+            side_effect=["r", "e", "\x7f", " ", "\r"],
+        ):
+            result = _tui_multi("test", self.ITEMS, {}, set())
+        # After typing "re" → matches redis; backspace → "r" → matches redis, docker
+        # " " toggles first match (docker after backspace, since filtered list is [docker, redis], cursor=0)
+        assert "docker" in result
+
+    def test_search_no_match_then_escape(self) -> None:
+        with patch(
+            "zenit.cli.prompt._render.read_key",
+            side_effect=["z", "z", "\x1b", " ", "\r"],
+        ):
+            result = _tui_multi("test", self.ITEMS, {}, set())
+        assert "docker" in result
+
+    def test_search_j_registered_as_search_when_active(self) -> None:
+        with patch(
+            "zenit.cli.prompt._render.read_key",
+            side_effect=["a", "j", "\x1b", " ", "\r"],
+        ):
+            # "a" starts search, "j" adds to query (not navigate down),
+            # escape clears, space selects first, enter confirms
+            result = _tui_multi("test", self.ITEMS, {}, set())
+        assert "docker" in result
+
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # _multi — prompt_addons entry point
@@ -880,6 +1120,142 @@ class TestPromptAddons:
             result = prompt_addons(addons, template="blank", default_addons=["celery"])
         assert "celery" in result
         assert "redis" in result
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# _multi — prompt_multi_addon
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+class TestPromptMultiAddon:
+    """prompt_multi_addon() — multi-select for add/remove context."""
+
+    ITEMS: list[tuple[str, str, list[str]]] = [
+        ("docker", "Docker support", []),
+        ("redis", "Redis cache", []),
+        ("celery", "Task queue", ["redis"]),
+    ]
+
+    def test_select_none_returns_empty(self) -> None:
+        with (
+            patch("zenit.cli.prompt._render.read_key", return_value="\r"),
+            patch("zenit.cli.prompt._multi.tty_available", return_value=True),
+        ):
+            assert prompt_multi_addon(self.ITEMS) == []
+
+    def test_select_one(self) -> None:
+        with (
+            patch("zenit.cli.prompt._render.read_key", side_effect=[" ", "\r"]),
+            patch("zenit.cli.prompt._multi.tty_available", return_value=True),
+        ):
+            assert prompt_multi_addon(self.ITEMS) == ["docker"]
+
+    def test_select_multiple(self) -> None:
+        with (
+            patch(
+                "zenit.cli.prompt._render.read_key",
+                side_effect=[" ", "\x1b[B", " ", "\r"],
+            ),
+            patch("zenit.cli.prompt._multi.tty_available", return_value=True),
+        ):
+            result = prompt_multi_addon(self.ITEMS)
+        assert "docker" in result
+        assert "redis" in result
+
+    def test_cannot_select_unavailable(self) -> None:
+        keys = iter(["\x1b[B", "\x1b[B", " ", "\r"])
+        with (
+            patch("zenit.cli.prompt._render.read_key", side_effect=keys),
+            patch("zenit.cli.prompt._multi.tty_available", return_value=True),
+        ):
+            result = prompt_multi_addon(self.ITEMS, unavailable_indices={2})
+        assert "celery" not in result
+
+    def test_fallback_path(self) -> None:
+        with (
+            patch("builtins.input", return_value="1 2"),
+            patch("zenit.cli.prompt._multi.tty_available", return_value=False),
+        ):
+            result = prompt_multi_addon(self.ITEMS)
+        assert "docker" in result
+        assert "redis" in result
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# _multi — _fallback_multi_addon
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+class TestFallbackMultiAddon:
+    """_fallback_multi_addon() — non-TTY multi-addon picker."""
+
+    ITEMS: list[tuple[str, str, list[str]]] = [
+        ("docker", "Docker support", []),
+        ("redis", "Redis cache", []),
+        ("celery", "Task queue", ["redis"]),
+    ]
+
+    def test_empty_input_returns_empty(self) -> None:
+        with patch("builtins.input", return_value=""):
+            assert _fallback_multi_addon(self.ITEMS, set()) == []
+
+    def test_select_by_number(self) -> None:
+        with patch("builtins.input", return_value="2"):
+            assert _fallback_multi_addon(self.ITEMS, set()) == ["redis"]
+
+    def test_select_by_name(self) -> None:
+        with patch("builtins.input", return_value="celery"):
+            assert _fallback_multi_addon(self.ITEMS, set()) == ["celery"]
+
+    def test_select_multiple(self) -> None:
+        with patch("builtins.input", return_value="1 2"):
+            result = _fallback_multi_addon(self.ITEMS, set())
+        assert "docker" in result
+        assert "redis" in result
+
+    def test_unavailable_refused_by_number(self) -> None:
+        with (
+            patch("builtins.input", side_effect=["3", ""]),
+        ):
+            assert _fallback_multi_addon(self.ITEMS, {2}) == []
+
+    def test_out_of_range_retries(self) -> None:
+        with (
+            patch("builtins.input", side_effect=["5", "1"]),
+        ):
+            assert _fallback_multi_addon(self.ITEMS, set()) == ["docker"]
+
+    def test_unknown_name_retries(self) -> None:
+        with (
+            patch("builtins.input", side_effect=["zzz", "1"]),
+        ):
+            assert _fallback_multi_addon(self.ITEMS, set()) == ["docker"]
+
+    def test_context_remove_label(self, capsys: pytest.CaptureFixture[str]) -> None:
+        items = [
+            ("redis", "Redis", []),
+            ("celery", "Celery", ["redis"]),
+        ]
+        with (
+            patch("builtins.input", return_value=""),
+            patch("zenit.cli.prompt._multi.tty_available", return_value=False),
+        ):
+            prompt_multi_addon(items, unavailable_indices={1}, context="remove")
+        captured = capsys.readouterr()
+        assert "required by" in captured.out
+
+    def test_context_add_label(self, capsys: pytest.CaptureFixture[str]) -> None:
+        items = [
+            ("celery", "Celery", ["redis"]),
+            ("redis", "Redis", []),
+        ]
+        with (
+            patch("builtins.input", return_value=""),
+            patch("zenit.cli.prompt._multi.tty_available", return_value=False),
+        ):
+            prompt_multi_addon(items, unavailable_indices={0}, context="add")
+        captured = capsys.readouterr()
+        assert "needs" in captured.out
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

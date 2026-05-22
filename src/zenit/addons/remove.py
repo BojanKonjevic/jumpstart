@@ -15,7 +15,7 @@ from tomlkit.items import Array
 
 from zenit.addons._registry import get_available_addons
 from zenit.addons.checks import check_can_remove
-from zenit.cli.prompt import prompt_single_addon
+from zenit.cli.prompt import prompt_multi_addon
 from zenit.cli.ui import (
     DIM,
     RED,
@@ -584,7 +584,7 @@ def _dry_remove(
     print()
 
 
-def remove_addon_interactive(dry_run: bool = False) -> None:
+def remove_addon_interactive(dry_run: bool = False, yes: bool = False) -> None:
     """Interactive TUI for removing a single addon from an existing project."""
 
     project_dir = Path.cwd()
@@ -633,16 +633,24 @@ def remove_addon_interactive(dry_run: bool = False) -> None:
         if reasons:
             unavailable_indices.add(i)
 
-    addon_id = prompt_single_addon(
+    selected = prompt_multi_addon(
         items,
         unavailable_indices=unavailable_indices,
         context="remove",
+        prompt="Select addon(s) to remove:",
     )
-    if addon_id is None:
+
+    if not selected:
         raise typer.Exit(0)
 
-    try:
-        remove_addon(addon_id, dry_run=dry_run, project_dir=project_dir)
-    except ZenitError as exc:
-        error(str(exc))
-        raise typer.Exit(1) from exc
+    # Process dependents before their dependencies (leaves first).
+    def _dep_order(a: str) -> int:
+        deps = requires_map.get(a, [])
+        return -len(deps)
+
+    for addon_id in sorted(selected, key=_dep_order):
+        try:
+            remove_addon(addon_id, dry_run=dry_run, yes=yes, project_dir=project_dir)
+        except ZenitError as exc:
+            error(str(exc))
+            raise typer.Exit(1) from exc

@@ -10,7 +10,7 @@ import typer
 
 from zenit.addons._registry import get_available_addons
 from zenit.addons.checks import check_can_add
-from zenit.cli.prompt import prompt_single_addon
+from zenit.cli.prompt import prompt_multi_addon
 from zenit.cli.ui import (
     DIM,
     GREEN,
@@ -273,7 +273,7 @@ def add_addon(addon_id: str, dry_run: bool = False, yes: bool = False) -> None:
     print()
 
 
-def add_addon_interactive(dry_run: bool = False) -> None:
+def add_addon_interactive(dry_run: bool = False, yes: bool = False) -> None:
     """Interactive TUI for adding a single addon to an existing project."""
 
     project_dir = Path.cwd()
@@ -315,9 +315,11 @@ def add_addon_interactive(dry_run: bool = False) -> None:
         print()
         return
 
-    selected = prompt_single_addon(
+    selected = prompt_multi_addon(
         items,
         unavailable_indices=unavailable_indices,
+        context="add",
+        prompt="Select addon(s) to add:",
     )
 
     if not selected:
@@ -325,7 +327,8 @@ def add_addon_interactive(dry_run: bool = False) -> None:
         print()
         return
 
-    add_addon(selected, dry_run=dry_run)
+    for addon_id in selected:
+        add_addon(addon_id, dry_run=dry_run, yes=yes)
 
 
 def _backfill_compose_on_docker_add(

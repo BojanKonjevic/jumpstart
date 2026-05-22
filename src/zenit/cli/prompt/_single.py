@@ -11,6 +11,7 @@ from ._render import (
     _DONE,
     TEMPLATES,
     clear_lines,
+    filter_indices,
     render_single,
     reserve_lines,
     run_fallback,
@@ -23,6 +24,8 @@ def prompt_template(default: str | None = None) -> str:
         return _fallback_template(default)
 
     cursor = 0
+    search_query = ""
+    filtered = list(range(len(TEMPLATES)))
     if default is not None:
         for i, (name, _) in enumerate(TEMPLATES):
             if name == default:
@@ -34,25 +37,58 @@ def prompt_template(default: str | None = None) -> str:
     clear_lines(len(TEMPLATES) + 2)
 
     def render() -> int:
-        return render_single(TEMPLATES, cursor, default_name=default)
+        return render_single(
+            TEMPLATES,
+            cursor,
+            default_name=default,
+            filtered_indices=filtered,
+            search_query=search_query,
+        )
 
     def on_key(key: str) -> object:
-        nonlocal cursor
-        if key in ("\x1b[A", "k"):
-            cursor = (cursor - 1) % len(TEMPLATES)
-        elif key in ("\x1b[B", "j"):
-            cursor = (cursor + 1) % len(TEMPLATES)
+        nonlocal cursor, search_query, filtered
+        if key == "\x1b[A":
+            if filtered:
+                cursor = (cursor - 1) % len(filtered)
+        elif key == "\x1b[B":
+            if filtered:
+                cursor = (cursor + 1) % len(filtered)
         elif key in ("\r", "\n", " "):
             return _DONE
+        elif key == "\x1b":
+            search_query = ""
+            filtered = list(range(len(TEMPLATES)))
+            cursor = 0
+        elif key in ("\x7f", "\b"):
+            search_query = search_query[:-1]
+            filtered = filter_indices(TEMPLATES, search_query)
+            cursor = 0
         elif key == "\x03":
             print()
             sys.exit(0)
+        elif len(key) == 1 and key.isprintable():
+            search_query += key
+            filtered = filter_indices(TEMPLATES, search_query)
+            cursor = 0
         return None
 
     run_tui(render, on_key)
 
-    name, desc = TEMPLATES[cursor]
-    clear_lines(render_single(TEMPLATES, cursor, default_name=default))
+    if filtered:
+        orig_i = filtered[cursor]
+        name, desc = TEMPLATES[orig_i]
+        clear_lines(
+            render_single(
+                TEMPLATES,
+                cursor,
+                default_name=default,
+                filtered_indices=filtered,
+                search_query=search_query,
+            )
+        )
+    else:
+        name, desc = TEMPLATES[0]
+        clear_lines(1)
     print(f"  {GREEN}✓{RESET}  {BOLD}{name}{RESET}  {DIM}{desc}{RESET}\n")
     return name
 
@@ -77,6 +113,8 @@ def prompt_single_addon(
 
     cursor = 0
     flash = ""
+    search_query = ""
+    filtered = list(range(len(display_items)))
 
     def render() -> int:
         return render_single(
@@ -86,18 +124,25 @@ def prompt_single_addon(
             full_items=items,
             flash=flash,
             context=context,
+            filtered_indices=filtered,
+            search_query=search_query,
         )
 
     def on_key(key: str) -> object:
-        nonlocal cursor, flash
+        nonlocal cursor, flash, search_query, filtered
         flash = ""
-        if key in ("\x1b[A", "k"):
-            cursor = (cursor - 1) % len(display_items)
-        elif key in ("\x1b[B", "j"):
-            cursor = (cursor + 1) % len(display_items)
+        if key == "\x1b[A":
+            if filtered:
+                cursor = (cursor - 1) % len(filtered)
+        elif key == "\x1b[B":
+            if filtered:
+                cursor = (cursor + 1) % len(filtered)
         elif key in ("\r", "\n", " "):
-            if cursor in unavailable_indices:
-                addon_id, _, reqs = items[cursor]
+            if not filtered:
+                return None
+            orig_i = filtered[cursor]
+            if orig_i in unavailable_indices:
+                addon_id, _, reqs = items[orig_i]
                 template_blocks = [r for r in reqs if r.startswith("__template__")]
                 addon_deps = [r for r in reqs if not r.startswith("__template__")]
                 if template_blocks:
@@ -108,19 +153,37 @@ def prompt_single_addon(
                     flash = f"{addon_id} {label}: {', '.join(addon_deps)}"
                 return None
             return _DONE
+        elif key == "\x1b":
+            search_query = ""
+            filtered = list(range(len(display_items)))
+            cursor = 0
+        elif key in ("\x7f", "\b"):
+            search_query = search_query[:-1]
+            filtered = filter_indices(display_items, search_query)
+            cursor = 0
         elif key == "\x03":
             print()
             sys.exit(0)
+        elif len(key) == 1 and key.isprintable():
+            search_query += key
+            filtered = filter_indices(display_items, search_query)
+            cursor = 0
         return None
 
     run_tui(render, on_key)
 
-    if cursor in unavailable_indices:
+    if not filtered:
         clear_lines(render())
         print(f"  {DIM}No addon selected.{RESET}\n")
         return None
 
-    name, desc = display_items[cursor]
+    orig_i = filtered[cursor]
+    if orig_i in unavailable_indices:
+        clear_lines(render())
+        print(f"  {DIM}No addon selected.{RESET}\n")
+        return None
+
+    name, desc = display_items[orig_i]
     clear_lines(render())
     print(f"  {GREEN}✓{RESET}  {BOLD}{name}{RESET}  {DIM}{desc}{RESET}\n")
     return name

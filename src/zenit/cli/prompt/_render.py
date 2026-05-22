@@ -60,6 +60,39 @@ TEMPLATES: list[tuple[str, str]] = [
 TEMPLATE_REQUIRES: dict[str, list[str]] = {}
 
 
+# ── Search ─────────────────────────────────────────────────────────────────────
+
+
+def filter_indices(
+    items: list[tuple[str, str]],
+    query: str,
+) -> list[int]:
+    """Return indices of *items* whose name or description matches *query* (case‑insensitive).
+
+    Returns all indices when query is empty.
+    """
+    if not query:
+        return list(range(len(items)))
+    q = query.lower()
+    return [
+        i
+        for i, (name, desc) in enumerate(items)
+        if q in name.lower() or q in desc.lower()
+    ]
+
+
+# ── Footer lines ──────────────────────────────────────────────────────────────
+
+_FOOTER_SINGLE = f"  {DIM}↑↓ navigate · enter select · type to search{RESET}"
+_FOOTER_SINGLE_SEARCH = f"  {DIM}↑↓ navigate · enter confirm · esc clear{RESET}"
+_FOOTER_MULTI = (
+    f"  {DIM}↑↓ navigate · space toggle · enter confirm · type to search{RESET}"
+)
+_FOOTER_MULTI_SEARCH = (
+    f"  {DIM}↑↓ navigate · space toggle · enter confirm · esc clear{RESET}"
+)
+
+
 # ── Renderers ─────────────────────────────────────────────────────────────────
 
 
@@ -72,14 +105,20 @@ def render_single(
     full_items: list[tuple[str, str, list[str]]] | None = None,
     flash: str = "",
     context: str = "add",
+    filtered_indices: list[int] | None = None,
+    search_query: str = "",
 ) -> int:
     """Render a single-select TUI list. Returns the number of lines written."""
     unavailable = unavailable or set()
+    filtered = (
+        filtered_indices if filtered_indices is not None else list(range(len(items)))
+    )
     lines = 0
 
-    for i, (name, desc) in enumerate(items):
-        is_unavailable = i in unavailable
-        is_cursor = i == cursor
+    for idx, orig_i in enumerate(filtered):
+        name, desc = items[orig_i]
+        is_unavailable = orig_i in unavailable
+        is_cursor = idx == cursor
 
         prefix = f"  {ARROW} " if is_cursor else "     "
 
@@ -103,8 +142,8 @@ def render_single(
         extra = ""
         if not is_cursor and name == default_name:
             extra = f"  {DIM}(default){RESET}"
-        elif is_unavailable and full_items and i < len(full_items):
-            reqs = full_items[i][2]
+        elif is_unavailable and full_items and orig_i < len(full_items):
+            reqs = full_items[orig_i][2]
             if reqs:
                 template_blocks = [r for r in reqs if r.startswith("__template__")]
                 addon_deps = [r for r in reqs if not r.startswith("__template__")]
@@ -123,11 +162,20 @@ def render_single(
         )
         lines += 1
 
+    if not filtered:
+        sys.stdout.write(f"  {DIM}No matches{RESET}\n")
+        lines += 1
+
     if flash:
         sys.stdout.write(f"\n  {YELLOW}⚠  {flash}{RESET}\n")
+        lines += 2
+    elif search_query:
+        sys.stdout.write(f"\n  {DIM}Search: {search_query}{RESET}\n")
+        sys.stdout.write(f"  {_FOOTER_SINGLE_SEARCH}\n")
+        lines += 3
     else:
-        sys.stdout.write(f"\n  {DIM}↑↓ navigate · enter select{RESET}\n")
-    lines += 2
+        sys.stdout.write(f"\n  {_FOOTER_SINGLE}\n")
+        lines += 2
     sys.stdout.flush()
     return lines
 

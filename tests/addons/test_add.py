@@ -476,3 +476,47 @@ class TestAlreadyInstalledMessage:
             add_addon_interactive()
         out = capsys.readouterr().out
         assert out.count("Already installed") == 1
+
+
+# ── Multi-addon interactive ──────────────────────────────────────────────────
+
+
+class TestAddInteractiveMulti:
+    """Tests for add_addon_interactive with multi-select support."""
+
+    def test_interactive_select_two_addons(self, tmp_path, monkeypatch):
+        project_dir = _scaffold(tmp_path, "myapp", "blank", ["docker"])
+        monkeypatch.chdir(project_dir)
+        with (
+            patch(
+                "zenit.addons.add.prompt_multi_addon", return_value=["redis", "sentry"]
+            ),
+            patch("builtins.input", return_value=""),
+        ):
+            add_addon_interactive()
+        lockfile = read_lockfile(project_dir)
+        assert "redis" in lockfile.addons
+        assert "sentry" in lockfile.addons
+        assert "docker" in lockfile.addons
+
+    def test_interactive_select_one_addon(self, tmp_path, monkeypatch):
+        project_dir = _scaffold(tmp_path, "myapp", "blank", ["docker"])
+        monkeypatch.chdir(project_dir)
+        with (
+            patch("zenit.addons.add.prompt_multi_addon", return_value=["redis"]),
+            patch("builtins.input", return_value=""),
+        ):
+            add_addon_interactive()
+        lockfile = read_lockfile(project_dir)
+        assert "redis" in lockfile.addons
+        assert "docker" in lockfile.addons
+
+    def test_interactive_select_none(self, tmp_path, monkeypatch, capsys):
+        project_dir = _scaffold(tmp_path, "myapp", "blank", ["docker"])
+        monkeypatch.chdir(project_dir)
+        with (
+            patch("zenit.addons.add.prompt_multi_addon", return_value=[]),
+        ):
+            add_addon_interactive()
+        lockfile = read_lockfile(project_dir)
+        assert lockfile.addons == ["docker"]
