@@ -78,7 +78,7 @@ def _scaffold(tmp_path: Path, name: str, template: str, addons: list[str]) -> Pa
     apply_contributions(
         ctx, contributions, template_config.injection_points, render_vars
     )
-    generate_all(ctx, template_config, contributions)
+    generate_all(ctx, contributions)
 
     # Initialize git repo
 
@@ -407,9 +407,7 @@ class TestRemoveAddonIntegration:
         assert "sentry_dsn" not in settings
         assert "sentry_environment" not in settings
 
-    def test_remove_docker_from_fastapi_succeeds(
-        self, tmp_path, monkeypatch
-    ):
+    def test_remove_docker_from_fastapi_succeeds(self, tmp_path, monkeypatch):
         """Docker is no longer required by fastapi — removing it should succeed."""
         project_dir = _scaffold(tmp_path, "myapi", "fastapi", ["docker", "sentry"])
         monkeypatch.chdir(project_dir)

@@ -76,7 +76,8 @@ def test_collect_all_empty():
     assert result.deps == []
     assert result.dev_deps == []
     assert result.files == []
-    assert result.just_recipes == []
+    assert result.recipes.template == []
+    assert result.recipes.addon == []
     assert result.injections == []
 
 
@@ -139,20 +140,18 @@ def test_collect_all_files_from_multiple_addons():
 # ── just_recipes ──────────────────────────────────────────────────────────────
 
 
-def test_collect_all_template_just_recipes_not_in_contributions():
-    # Template just_recipes are NOT put into contributions.just_recipes —
-    # generate_all reads them directly from template_cfg to avoid
-    # double-rendering during deduplication.
+def test_collect_all_template_just_recipes_in_recipes_template():
     result = collect_all(_template(just_recipes=["run:\n    python -m app"]), [])
-    assert result.just_recipes == []
+    assert result.recipes.template == ["run:\n    python -m app"]
+    assert result.recipes.addon == []
 
 
-def test_collect_all_addon_just_recipes_in_contributions():
+def test_collect_all_addon_just_recipes_in_recipes_addon():
     result = collect_all(
         _template(),
         [_addon(just_recipes=["redis-up:\n    docker compose up -d redis"])],
     )
-    assert "redis-up:\n    docker compose up -d redis" in result.just_recipes
+    assert "redis-up:\n    docker compose up -d redis" in result.recipes.addon
 
 
 def test_collect_all_just_recipes_from_multiple_addons():
@@ -167,7 +166,7 @@ def test_collect_all_just_recipes_from_multiple_addons():
             ),
         ],
     )
-    assert len(result.just_recipes) == 2
+    assert len(result.recipes.addon) == 2
 
 
 # ── injections ────────────────────────────────────────────────────────────────

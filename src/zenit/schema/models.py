@@ -13,6 +13,7 @@ if TYPE_CHECKING:
     from zenit.core.lockfile import ZenitLockfile
     from zenit.doctor.doctor import HealthIssue
 
+from zenit.core.recipes import RecipeCollection
 
 # ── Injection point declaration (template side) ───────────────────────────────
 
@@ -228,6 +229,7 @@ class Contributions:
     env_vars: list[EnvVar] = field(default_factory=list)
     deps: list[str] = field(default_factory=list)
     dev_deps: list[str] = field(default_factory=list)
-    just_recipes: list[str] = field(default_factory=list)
+    template_dev_deps: list[str] = field(default_factory=list)
+    recipes: RecipeCollection = field(default_factory=RecipeCollection)
     injections: list[Injection] = field(default_factory=list)
     _addon_configs: list[AddonConfig] = field(default_factory=list)

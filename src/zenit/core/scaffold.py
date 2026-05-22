@@ -146,7 +146,7 @@ def scaffold_project(
             template_config.injection_points,
             render_vars,
         )
-        generate_all(ctx, template_config, contributions)
+        generate_all(ctx, contributions)
         init(project_dir)
 
         _stamp_template_manifest(project_dir, template_config)

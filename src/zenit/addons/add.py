@@ -32,10 +32,10 @@ from zenit.core.collect import collect_addon_only
 from zenit.core.context import Context
 from zenit.core.deps import inject_deps
 from zenit.core.filesystem import RecordingFileSystem
-from zenit.core.generate import _recipe_name
 from zenit.core.justfile import inject_just_recipes
 from zenit.core.lockfile import read_lockfile, write_lockfile
 from zenit.core.pkg_name import normalise_pkg_name
+from zenit.core.recipes import _recipe_name
 from zenit.core.render import build_recipe_render_vars, build_render_vars, make_env
 from zenit.core.rollback import addon_or_rollback
 from zenit.schema.exceptions import ZenitError
@@ -108,7 +108,7 @@ def _run_add_pipeline(
     string_env = make_env()
     rendered_recipes = [
         string_env.from_string(r).render(**recipe_render_vars)
-        for r in contributions.just_recipes
+        for r in contributions.recipes.addon
     ]
 
     if ctx.dry_run:

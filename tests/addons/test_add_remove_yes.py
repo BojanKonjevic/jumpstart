@@ -55,7 +55,7 @@ def _scaffold(tmp_path: Path, name: str, template: str, addons: list[str]) -> Pa
     apply_contributions(
         ctx, contributions, template_config.injection_points, render_vars
     )
-    generate_all(ctx, template_config, contributions)
+    generate_all(ctx, contributions)
     init(project_dir)
     write_lockfile(project_dir, template, addons)
     return project_dir

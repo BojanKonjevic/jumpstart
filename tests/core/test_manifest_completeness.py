@@ -55,11 +55,21 @@ def _stamp_template_manifest(project_dir: Path, template_config: object) -> None
         add_compose_volume(manifest, vol, source=EntrySource.TEMPLATE, addon="")
     for dep in template_config.deps:
         add_dependency(
-            manifest, _pkg_name(dep), dep, source=EntrySource.TEMPLATE, addon="", dev=False
+            manifest,
+            _pkg_name(dep),
+            dep,
+            source=EntrySource.TEMPLATE,
+            addon="",
+            dev=False,
         )
     for dep in template_config.dev_deps:
         add_dependency(
-            manifest, _pkg_name(dep), dep, source=EntrySource.TEMPLATE, addon="", dev=True
+            manifest,
+            _pkg_name(dep),
+            dep,
+            source=EntrySource.TEMPLATE,
+            addon="",
+            dev=True,
         )
     for recipe in template_config.just_recipes:
         name = ""
@@ -107,7 +117,7 @@ def _scaffold(tmp_path: Path, name: str, template: str, addons: list[str]) -> Pa
     apply_contributions(
         ctx, contributions, template_config.injection_points, render_vars
     )
-    generate_all(ctx, template_config, contributions)
+    generate_all(ctx, contributions)
     init(project_dir)
     write_lockfile(project_dir, template, addons)
     _stamp_template_manifest(project_dir, template_config)

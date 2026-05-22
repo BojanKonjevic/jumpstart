@@ -265,7 +265,9 @@ def test_contributions_all_defaults_empty():
     assert c.env_vars == []
     assert c.deps == []
     assert c.dev_deps == []
-    assert c.just_recipes == []
+    assert c.template_dev_deps == []
+    assert c.recipes.template == []
+    assert c.recipes.addon == []
     assert c.injections == []
     assert c._addon_configs == []
 

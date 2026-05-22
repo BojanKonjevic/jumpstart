@@ -18,12 +18,7 @@ def collect_all(
     template_config: TemplateConfig,
     addon_configs: list[AddonConfig],
 ) -> Contributions:
-    """Merge contributions from the template and all selected addons.
-
-    Note: template ``just_recipes`` are intentionally *not* collected here.
-    ``generate_all`` reads them directly from ``template_cfg`` to avoid
-    double‑rendering during deduplication.
-    """
+    """Merge contributions from the template and all selected addons."""
     c = Contributions()
 
     c.dirs.extend(template_config.dirs)
@@ -32,7 +27,8 @@ def collect_all(
     c.compose_volumes.extend(template_config.compose_volumes)
     c.env_vars.extend(template_config.env_vars)
     c.deps.extend(template_config.deps)
-    c.dev_deps.extend(template_config.dev_deps)
+    c.template_dev_deps.extend(template_config.dev_deps)
+    c.recipes.template.extend(template_config.just_recipes)
 
     for inj in template_config.injections:
         inj.addon_id = "template"
@@ -46,7 +42,7 @@ def collect_all(
         c.env_vars.extend(addon.env_vars)
         c.deps.extend(addon.deps)
         c.dev_deps.extend(addon.dev_deps)
-        c.just_recipes.extend(addon.just_recipes)
+        c.recipes.addon.extend(addon.just_recipes)
         for inj in addon.injections:
             inj.addon_id = addon.id
             c.injections.append(inj)
@@ -97,7 +93,7 @@ def collect_addon_only(addon_configs: list[AddonConfig]) -> Contributions:
         c.env_vars.extend(addon.env_vars)
         c.deps.extend(addon.deps)
         c.dev_deps.extend(addon.dev_deps)
-        c.just_recipes.extend(addon.just_recipes)
+        c.recipes.addon.extend(addon.just_recipes)
         for inj in addon.injections:
             inj.addon_id = addon.id
             c.injections.append(inj)

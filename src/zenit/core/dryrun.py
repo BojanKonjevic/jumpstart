@@ -61,7 +61,7 @@ def run_dry(ctx: Context) -> None:
         render_vars,
     )
 
-    generate_all(dry_ctx, template_config, contributions)
+    generate_all(dry_ctx, contributions)
 
     label = dry_ctx.template
     if dry_ctx.addons:

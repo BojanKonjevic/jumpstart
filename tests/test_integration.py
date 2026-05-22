@@ -53,7 +53,7 @@ def _scaffold(tmp_path: Path, name: str, template: str, addons: list[str]) -> Pa
     apply_contributions(
         ctx, contributions, template_config.injection_points, render_vars
     )
-    generate_all(ctx, template_config, contributions)
+    generate_all(ctx, contributions)
     init(project_dir)
 
     return project_dir
@@ -250,7 +250,15 @@ class TestFastapiTemplate:
 
 
 class TestFastapiAllAddons:
-    ADDONS = ["docker", "postgres", "sqlalchemy", "redis", "celery", "sentry", "github-actions"]
+    ADDONS = [
+        "docker",
+        "postgres",
+        "sqlalchemy",
+        "redis",
+        "celery",
+        "sentry",
+        "github-actions",
+    ]
 
     def test_scaffolds_successfully(self, tmp_path):
         project_dir = _scaffold(tmp_path, "myapi", "fastapi", self.ADDONS)
