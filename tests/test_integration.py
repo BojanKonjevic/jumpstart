@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-from conftest import ZENIT_ROOT
+from conftest import ZENIT_ROOT, write_test_manifest
 
 from zenit.addons._registry import get_available_addons
 from zenit.core._apply_loader import load_apply
@@ -56,6 +56,7 @@ def _scaffold(tmp_path: Path, name: str, template: str, addons: list[str]) -> Pa
         ctx, fs, contributions, template_config.injection_points, render_vars
     )
     generate_all(ctx, fs, contributions)
+    write_test_manifest(project_dir, addons, render_vars)
     init(project_dir)
 
     return project_dir

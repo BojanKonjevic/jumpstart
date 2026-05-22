@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pytest
 import yaml
-from conftest import ZENIT_ROOT
+from conftest import ZENIT_ROOT, write_test_manifest
 
 from zenit.addons._registry import get_available_addons
 from zenit.addons.remove import remove_addon
@@ -21,6 +21,7 @@ from zenit.core.filesystem import RealFileSystem
 from zenit.core.generate import generate_all
 from zenit.core.git import init
 from zenit.core.lockfile import read_lockfile, write_lockfile
+from zenit.core.manifest import read_manifest, write_manifest
 from zenit.core.render import build_render_vars
 from zenit.schema.exceptions import ZenitError
 from zenit.templates._load_config import load_template_config
@@ -81,6 +82,7 @@ def _scaffold(tmp_path: Path, name: str, template: str, addons: list[str]) -> Pa
         ctx, fs, contributions, template_config.injection_points, render_vars
     )
     generate_all(ctx, fs, contributions)
+    write_test_manifest(project_dir, addons, render_vars)
 
     # Initialize git repo
 
@@ -419,3 +421,62 @@ class TestRemoveAddonIntegration:
 
         assert not (project_dir / "compose.yml").exists()
         assert not (project_dir / "Dockerfile").exists()
+
+
+# ── Crash-safety / retry tests ─────────────────────────────────────────────────
+
+
+class TestRemoveCrashSafety:
+    """Tests that remove_addon is resilient to partial/crashed state."""
+
+    def test_retry_after_missing_file(self, tmp_path):
+        """Remove succeeds when a file is already gone (crash after _remove_files)."""
+        project_dir = _scaffold(tmp_path, "myapp", "blank", ["sentry"])
+
+        sentry_file = project_dir / "src" / "myapp" / "integrations" / "sentry.py"
+        assert sentry_file.exists()
+        sentry_file.unlink()
+
+        with suppress_stdin():
+            remove_addon("sentry", project_dir=project_dir)
+
+        assert not sentry_file.exists()
+        manifest = read_manifest(project_dir)
+        assert not any(b.addon == "sentry" for b in manifest.python_blocks)
+
+    def test_retry_after_missing_manifest_entries(self, tmp_path):
+        """Remove succeeds when manifest python_blocks already cleaned (crash mid-write)."""
+        project_dir = _scaffold(tmp_path, "myapp", "blank", ["sentry"])
+
+        manifest = read_manifest(project_dir)
+        manifest.python_blocks = [
+            b for b in manifest.python_blocks if b.addon != "sentry"
+        ]
+        write_manifest(project_dir, manifest)
+
+        with suppress_stdin():
+            remove_addon("sentry", project_dir=project_dir)
+
+        manifest_after = read_manifest(project_dir)
+        assert not any(b.addon == "sentry" for b in manifest_after.python_blocks)
+        assert not any(e.addon == "sentry" for e in manifest_after.env)
+        assert not any(d.addon == "sentry" for d in manifest_after.dependencies)
+
+    def test_retry_after_partial_env_removal(self, tmp_path):
+        """Remove succeeds when an env file has already had entries removed."""
+        project_dir = _scaffold(tmp_path, "myapp", "blank", ["redis"])
+
+        env_path = project_dir / ".env"
+        lines = env_path.read_text(encoding="utf-8").splitlines(keepends=True)
+        env_path.write_text(
+            "".join(line for line in lines if not line.startswith("REDIS_URL")),
+            encoding="utf-8",
+        )
+
+        with suppress_stdin():
+            remove_addon("redis", project_dir=project_dir)
+
+        env_after = (project_dir / ".env").read_text()
+        assert "REDIS_URL" not in env_after
+        manifest = read_manifest(project_dir)
+        assert not any(e.addon == "redis" for e in manifest.env)

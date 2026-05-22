@@ -38,9 +38,8 @@ from zenit.core.manifest import (
     write_manifest,
 )
 from zenit.core.pkg_name import normalise_pkg_name, resolve_dest_placeholder
-from zenit.core.render import build_render_vars, make_env
 from zenit.schema.exceptions import ZenitError
-from zenit.schema.models import AddonConfig
+from zenit.schema.models import AddonConfig, Manifest
 
 
 def remove_addon(
@@ -82,34 +81,29 @@ def remove_addon(
         else:
             warn("Non-interactive mode — proceeding automatically.")
 
-    render_vars = build_render_vars(
-        name=project_dir.name,
-        pkg_name=pkg_name,
-        template=template,
-        addons=lockfile.addons,
-    )
+    # ── read manifest once, before any physical removals ─────────────────────
+    manifest = read_manifest(project_dir)
 
     # ── files ──────────────────────────────────────────────────────────────
     removed_files = _remove_files(project_dir, addon_cfg, pkg_name)
 
     # ── injections (physical removal only — manifest written at the end) ────
-    _undo_injections_physical(project_dir, addon_cfg)
+    _undo_injections_physical(project_dir, manifest, addon_id)
 
     # ── compose services ────────────────────────────────────────────────────
-    removed_services = _remove_compose_services(project_dir, addon_cfg)
-    _remove_compose_volumes(project_dir, addon_cfg)
+    removed_services = _remove_compose_services(project_dir, manifest, addon_id)
+    _remove_compose_volumes(project_dir, manifest, addon_id)
 
     # ── env vars ─────────────────────────────────────────────────────────────
-    removed_env_vars = _remove_env_vars(project_dir, addon_cfg)
+    removed_env_vars = _remove_env_vars(project_dir, manifest, addon_id)
 
     # ── deps ──────────────────────────────────────────────────────────────
-    removed_deps, removed_dev_deps = _remove_deps(project_dir, addon_cfg)
+    removed_deps, removed_dev_deps = _remove_deps(project_dir, manifest, addon_id)
 
     # ── justfile recipes ──────────────────────────────────────────────────
-    removed_recipes = _remove_just_recipes(project_dir, addon_cfg, render_vars)
+    removed_recipes = _remove_just_recipes(project_dir, manifest, addon_id)
 
     # ── manifest (written once, after all physical removals succeed) ────────
-    manifest = read_manifest(project_dir)
     remove_blocks_for_addon(manifest, addon_id)
     write_manifest(project_dir, manifest)
 
@@ -207,28 +201,28 @@ def _prune_empty_parents(directory: Path, stop_at: Path) -> None:
 
 def _undo_injections_physical(
     project_dir: Path,
-    addon_cfg: AddonConfig,
+    manifest: Manifest,
+    addon_id: str,
 ) -> None:
-    """Physically remove all Python blocks injected by *addon_cfg*.
+    """Physically remove all Python blocks injected by *addon_id*.
 
-    Reads the current manifest to find recorded blocks, dispatches each to
+    Uses the pre-read *manifest* to find recorded blocks, dispatches each to
     the appropriate handler's remove(), and stops.  It does NOT mutate or
     write the manifest — that is the caller's responsibility, once all other
     physical removals have also succeeded.  This keeps manifest writes atomic
     with respect to the full removal sequence.
     """
 
-    manifest = read_manifest(project_dir)
     dispatcher = HandlerDispatcher()
 
     for block in list(manifest.python_blocks):
-        if block.addon != addon_cfg.id:
+        if block.addon != addon_id:
             continue
         file_path = project_dir / block.file
         if not file_path.exists():
             print(
                 f"Warning: '{block.file}' is missing — skipping removal of "
-                f"'{block.point}' injection for addon '{addon_cfg.id}'. "
+                f"'{block.point}' injection for addon '{addon_id}'. "
                 f"Run 'zenit doctor' to verify project integrity.",
                 file=sys.stderr,
             )
@@ -238,12 +232,13 @@ def _undo_injections_physical(
 
 def _remove_compose_services(
     project_dir: Path,
-    addon_cfg: AddonConfig,
+    manifest: Manifest,
+    addon_id: str,
 ) -> list[str]:
     """Remove compose services that belong to this addon. Returns removed service names."""
 
     compose_path = project_dir / "compose.yml"
-    if not compose_path.exists() or not addon_cfg.compose_services:
+    if not compose_path.exists():
         return []
 
     data: dict[str, Any] = (
@@ -252,10 +247,12 @@ def _remove_compose_services(
     services: dict[str, Any] = data.get("services", {})
 
     removed: list[str] = []
-    for svc in addon_cfg.compose_services:
-        if svc.name in services:
-            del services[svc.name]
-            removed.append(svc.name)
+    for entry in manifest.compose_services:
+        if entry.addon != addon_id:
+            continue
+        if entry.name in services:
+            del services[entry.name]
+            removed.append(entry.name)
 
     if removed:
         compose_path.write_text(
@@ -266,11 +263,13 @@ def _remove_compose_services(
     return removed
 
 
-def _remove_compose_volumes(project_dir: Path, addon_cfg: AddonConfig) -> None:
+def _remove_compose_volumes(
+    project_dir: Path, manifest: Manifest, addon_id: str
+) -> None:
     """Remove named volumes that belong to this addon from compose.yml."""
 
     compose_path = project_dir / "compose.yml"
-    if not compose_path.exists() or not addon_cfg.compose_volumes:
+    if not compose_path.exists():
         return
 
     data: dict[str, Any] = (
@@ -279,9 +278,11 @@ def _remove_compose_volumes(project_dir: Path, addon_cfg: AddonConfig) -> None:
     vols: dict[str, Any] = data.get("volumes", {})
 
     changed = False
-    for vol_name in addon_cfg.compose_volumes:
-        if vol_name in vols:
-            del vols[vol_name]
+    for entry in manifest.compose_volumes:
+        if entry.addon != addon_id:
+            continue
+        if entry.name in vols:
+            del vols[entry.name]
             changed = True
 
     if changed:
@@ -291,13 +292,16 @@ def _remove_compose_volumes(project_dir: Path, addon_cfg: AddonConfig) -> None:
         )
 
 
-def _remove_env_vars(project_dir: Path, addon_cfg: AddonConfig) -> list[str]:
+def _remove_env_vars(
+    project_dir: Path,
+    manifest: Manifest,
+    addon_id: str,
+) -> list[str]:
     """Remove env var lines owned by this addon. Returns removed keys."""
 
-    if not addon_cfg.env_vars:
+    keys_to_remove = {e.key for e in manifest.env if e.addon == addon_id}
+    if not keys_to_remove:
         return []
-
-    keys_to_remove = {v.key for v in addon_cfg.env_vars}
     removed: list[str] = []
 
     for file_name in (".env", ".env.example"):
@@ -321,7 +325,7 @@ def _remove_env_vars(project_dir: Path, addon_cfg: AddonConfig) -> list[str]:
 
 
 def _remove_deps(
-    project_dir: Path, addon_cfg: AddonConfig
+    project_dir: Path, manifest: Manifest, addon_id: str
 ) -> tuple[list[str], list[str]]:
     """Remove deps contributed by this addon from pyproject.toml.
 
@@ -337,8 +341,12 @@ def _remove_deps(
     def _normalise(dep: str) -> str:
         return re.split(r"[>=<!,; \[]", dep)[0].lower().replace("-", "_")
 
-    deps_to_remove = {_normalise(d) for d in addon_cfg.deps}
-    dev_deps_to_remove = {_normalise(d) for d in addon_cfg.dev_deps}
+    deps_to_remove = {
+        d.package for d in manifest.dependencies if d.addon == addon_id and not d.dev
+    }
+    dev_deps_to_remove = {
+        d.package for d in manifest.dependencies if d.addon == addon_id and d.dev
+    }
 
     removed: list[str] = []
     removed_dev: list[str] = []
@@ -383,25 +391,16 @@ def _remove_deps(
 
 def _remove_just_recipes(
     project_dir: Path,
-    addon_cfg: AddonConfig,
-    render_vars: dict[str, object],
+    manifest: Manifest,
+    addon_id: str,
 ) -> list[str]:
     """Remove just recipes contributed by this addon from the justfile."""
 
     justfile_path = project_dir / "justfile"
-    if not justfile_path.exists() or not addon_cfg.just_recipes:
+    if not justfile_path.exists():
         return []
 
-    string_env = make_env()
-    recipe_names: set[str] = set()
-    for raw in addon_cfg.just_recipes:
-        rendered = string_env.from_string(raw).render(**render_vars)
-        # Use the same regex as apply.py for consistent name extraction
-        for line in rendered.splitlines():
-            m = _RECIPE_NAME_RE.search(line)
-            if m:
-                recipe_names.add(m.group(1))
-
+    recipe_names = {r.name for r in manifest.just_recipes if r.addon == addon_id}
     if not recipe_names:
         return []
 

@@ -18,7 +18,7 @@ from unittest.mock import patch
 import pytest
 import yaml
 from click.exceptions import Exit as ClickExit
-from conftest import ZENIT_ROOT
+from conftest import ZENIT_ROOT, write_test_manifest
 
 from zenit.addons._registry import get_available_addons
 from zenit.addons.add import add_addon, add_addon_interactive
@@ -85,6 +85,7 @@ def _scaffold(tmp_path: Path, name: str, template: str, addons: list[str]) -> Pa
         ctx, fs, contributions, template_config.injection_points, render_vars
     )
     generate_all(ctx, fs, contributions)
+    write_test_manifest(project_dir, addons, render_vars)
     init(project_dir)
     write_lockfile(project_dir, template, addons)
     return project_dir
