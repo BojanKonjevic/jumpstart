@@ -1,5 +1,6 @@
 """Addon registry — discovers ``addon.py`` files and returns ``AddonConfig`` objects."""
 
+import functools
 import importlib.util
 from pathlib import Path
 
@@ -8,6 +9,7 @@ from zenit.schema.models import AddonConfig, AddonHooks
 _HERE = Path(__file__).parent.absolute()
 
 
+@functools.cache
 def get_available_addons() -> list[AddonConfig]:
     """Return one ``AddonConfig`` for every addon directory found under this package."""
     addons: list[AddonConfig] = []

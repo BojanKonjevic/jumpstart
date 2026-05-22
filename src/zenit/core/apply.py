@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+import jinja2
 import yaml
 
 from zenit.core.filesystem import FileSystem
@@ -77,11 +78,13 @@ def apply_contributions(
                 if "path" in watch and isinstance(watch["path"], str):
                     watch["path"] = resolve_dest_placeholder(watch["path"], pkg_name)
 
+    string_env = make_env()
+    file_envs: dict[Path, jinja2.Environment] = {}
+
     for fc in contributions.files:
         dest = resolve_dest_placeholder(fc.dest, pkg_name)
         if fc.content is not None:
             if fc.template:
-                string_env = make_env()
                 rendered = string_env.from_string(fc.content).render(**render_vars)
                 fs.write_file(dest, rendered)
             else:
@@ -95,8 +98,14 @@ def apply_contributions(
                     f"This is a bug in the template or addon — please report it."
                 )
             if fc.template:
-                env = make_env(src_path.parent)
-                content = env.get_template(src_path.name).render(**render_vars)
+                loader_dir = src_path.parent
+                if loader_dir not in file_envs:
+                    file_envs[loader_dir] = make_env(loader_dir)
+                content = (
+                    file_envs[loader_dir]
+                    .get_template(src_path.name)
+                    .render(**render_vars)
+                )
                 fs.write_file(dest, content)
             else:
                 fs.copy_file(src_path, dest)
@@ -118,7 +127,6 @@ def apply_contributions(
         if not file_path.exists():
             continue
 
-        string_env = make_env()
         rendered_content = string_env.from_string(inj.content).render(**render_vars)
 
         _, start_line, end_line = dispatcher.apply(

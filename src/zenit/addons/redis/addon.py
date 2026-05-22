@@ -104,18 +104,6 @@ def can_apply(project_dir: Path, lockfile: ZenitLockfile) -> str | None:
                 f"      Remove the REDIS_URL line from {env_file}"
             )
 
-    # Check for REDIS_URL or redis imports anywhere in Python source files.
-    src_dir = project_dir / "src"
-    for py_file in src_dir.rglob("*.py"):
-        text = py_file.read_text(encoding="utf-8")
-        if "import redis" in text or "REDIS_URL" in text:
-            rel = py_file.relative_to(project_dir)
-            return (
-                f"{rel} already contains redis configuration.\n"
-                "    zenit won't add redis alongside existing configuration.\n"
-                "    Review that file and remove redis references if you want zenit to manage it."
-            )
-
     return None
 
 

@@ -144,14 +144,14 @@ class TestRedisCanApply:
         assert result is not None
         assert "REDIS_URL" in result
 
-    def test_redis_fails_redis_import_in_source(self, tmp_path):
+    def test_redis_passes_when_redis_import_in_non_integration_file(self, tmp_path):
+        """General source scan was removed for perf — redis only checks targeted paths."""
         project_dir = _project_dir(tmp_path, "myapp")
         src = project_dir / "src" / "myapp"
         src.mkdir(parents=True)
         (src / "main.py").write_text("import redis\n")
         result = _get_can_apply("redis")(project_dir, _lockfile())
-        assert result is not None
-        assert "redis" in result
+        assert result is None
 
 
 # ── sentry ────────────────────────────────────────────────────────────────────
@@ -272,14 +272,25 @@ class TestCeleryCanApply:
         assert result is not None
         assert "tasks" in result
 
-    def test_celery_fails_existing_celery_import_in_src(self, tmp_path):
+    def test_celery_fails_existing_celery_import_in_targeted_file(self, tmp_path):
         project_dir = _project_dir(tmp_path, "myapp")
         src = project_dir / "src" / "myapp"
         src.mkdir(parents=True)
-        (src / "main.py").write_text("from celery import Celery\n")
+        (src / "celery.py").write_text(
+            "from celery import Celery\napp = Celery('tasks')\n"
+        )
         result = _get_can_apply("celery")(project_dir, _lockfile())
         assert result is not None
         assert "celery" in result.lower()
+
+    def test_celery_passes_when_celery_import_in_non_targeted_file(self, tmp_path):
+        """General source scan was removed for perf — celery only checks targeted paths."""
+        project_dir = _project_dir(tmp_path, "myapp")
+        src = project_dir / "src" / "myapp"
+        src.mkdir(parents=True)
+        (src / "some_random.py").write_text("from celery import Celery\n")
+        result = _get_can_apply("celery")(project_dir, _lockfile())
+        assert result is None
 
     def test_celery_passes_empty_tasks_directory(self, tmp_path):
         project_dir = _project_dir(tmp_path, "myapp")

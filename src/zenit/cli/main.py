@@ -6,19 +6,14 @@ from __future__ import annotations
 from collections.abc import Sequence
 from importlib.metadata import version as get_version
 from pathlib import Path
-from typing import Annotated
+from typing import TYPE_CHECKING, Annotated
+
+if TYPE_CHECKING:
+    from zenit.schema.models import AddonConfig
 
 import typer
 
-from zenit.addons._registry import get_available_addons
-from zenit.addons.add import add_addon
-from zenit.cli.prompt._render import TEMPLATES
 from zenit.cli.ui import BOLD, CYAN, DIM, GREEN, RED, RESET
-from zenit.config.config import config_path, load_config
-from zenit.core.lockfile import read_lockfile
-from zenit.core.scaffold import scaffold_project
-from zenit.doctor.doctor import print_results, run_doctor
-from zenit.schema.models import AddonConfig
 
 
 def _parse_addon_list(raw: list[str] | None) -> list[str] | None:
@@ -79,6 +74,8 @@ def cmd_create(
     ] = False,
 ) -> None:
     """Create a new project from a template."""
+    from zenit.core.scaffold import scaffold_project
+
     parsed_addons = _parse_addon_list(addons)
     scaffold_project(name, dry_run=dry_run, template=template, addons=parsed_addons)
 
@@ -104,6 +101,10 @@ def cmd_list(
 
         error("--available and --installed are mutually exclusive.")
         raise typer.Exit(1)
+
+    from zenit.addons._registry import get_available_addons
+    from zenit.cli.prompt._render import TEMPLATES
+    from zenit.core.lockfile import read_lockfile
 
     project_dir = Path.cwd()
     lockfile = read_lockfile(project_dir)
@@ -229,6 +230,8 @@ def _print_default(
 @app.command("config")
 def cmd_config() -> None:
     """Show the config file path and current settings."""
+    from zenit.config.config import config_path, load_config
+
     path = config_path()
     cfg = load_config()
 
@@ -283,6 +286,8 @@ def cmd_add(
 
         add_addon_interactive(dry_run=dry_run, yes=yes)
     else:
+        from zenit.addons.add import add_addon
+
         for a in addon:
             add_addon(a, dry_run=dry_run, yes=yes)
 
@@ -335,6 +340,9 @@ def cmd_doctor(
     ] = False,
 ) -> None:
     """Check that the current project matches zenit's expectations."""
+    from zenit.core.lockfile import read_lockfile
+    from zenit.doctor.doctor import print_results, run_doctor
+
     project_dir = Path.cwd()
     lockfile = read_lockfile(project_dir)
 

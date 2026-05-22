@@ -98,12 +98,33 @@ def can_apply(project_dir: Path, lockfile: ZenitLockfile) -> str | None:
             f"      rm -r {tasks_dir.relative_to(project_dir)}"
         )
 
-    # Check for any existing celery configuration anywhere in src/.
+    # Targeted check for existing celery configuration in known locations.
+    # Avoids scanning every .py file in the project.
     src_dir = project_dir / "src"
-    for py_file in src_dir.rglob("*.py"):
-        text = py_file.read_text(encoding="utf-8")
-        if "from celery import" in text or "import celery" in text.lower():
-            rel = py_file.relative_to(project_dir)
+    targets = [
+        src_dir / pkg_name / "celery.py",
+        src_dir / pkg_name / "tasks" / "celery_app.py",
+    ]
+    for candidate in targets:
+        if candidate.is_file():
+            text = candidate.read_text(encoding="utf-8")
+            if (
+                "Celery(" in text
+                or "from celery import" in text
+                or "import celery" in text.lower()
+            ):
+                rel = candidate.relative_to(project_dir)
+                return (
+                    f"{rel} already contains celery configuration.\n"
+                    "    zenit won't add celery alongside existing configuration.\n"
+                    "    Review that file and remove celery references if you want zenit to manage it."
+                )
+
+    # Also check main entry points for Celery usage.
+    for entry_point in ("main.py", "app.py"):
+        candidate = src_dir / pkg_name / entry_point
+        if candidate.is_file() and "Celery(" in candidate.read_text(encoding="utf-8"):
+            rel = candidate.relative_to(project_dir)
             return (
                 f"{rel} already contains celery configuration.\n"
                 "    zenit won't add celery alongside existing configuration.\n"

@@ -11,7 +11,7 @@ from zenit.core.lockfile import ZenitLockfile
 
 runner = CliRunner()
 
-_PATCH = "zenit.cli.main.read_lockfile"
+_PATCH = "zenit.core.lockfile.read_lockfile"
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────

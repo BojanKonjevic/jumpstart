@@ -20,10 +20,14 @@ from zenit.core.lockfile import SCHEMA_VERSION, ZenitLockfile, read_lockfile
 from zenit.core.manifest import _pkg_name, read_manifest
 from zenit.core.pkg_name import normalise_pkg_name, resolve_dest_placeholder
 from zenit.schema.models import (
+    AddonConfig,
+    Contributions,
     DependencyEntry,
     EnvEntry,
+    Manifest,
     ManifestBlock,
     OwnedEntry,
+    TemplateConfig,
 )
 from zenit.templates._load_config import load_template_config
 
@@ -69,23 +73,45 @@ def run_doctor(project_dir: Path, *, thorough: bool = False) -> list[HealthResul
     if lockfile is None:
         return [_check_metadata(project_dir)]
 
+    manifest = read_manifest(project_dir)
+    available = get_available_addons()
+
+    zenit_root = get_zenit_root()
+    template_config: TemplateConfig | None = None
+    addon_configs: list[AddonConfig] = []
+    contributions: Contributions | None = None
+
+    if lockfile.template:
+        try:
+            template_config = load_template_config(zenit_root, lockfile.template)
+            addon_configs = [c for c in available if c.id in lockfile.addons]
+            contributions = collect_all(template_config, addon_configs)
+        except Exception:
+            pass
+
     results: list[HealthResult] = []
     results.append(_check_metadata(project_dir))
-    results.append(_check_manifest_schema(project_dir, lockfile))
-    results.append(_check_dependencies(project_dir, lockfile))
-    results.append(_check_files(project_dir, lockfile))
-    results.append(_check_addon_health(project_dir, lockfile))
+    results.append(_check_manifest_schema(project_dir, lockfile, manifest))
+    results.append(
+        _check_dependencies(project_dir, lockfile, template_config, contributions)
+    )
+    results.append(_check_files(project_dir, lockfile, template_config, addon_configs))
+    results.append(_check_addon_health(project_dir, lockfile, available))
     if "docker" in lockfile.addons:
-        results.append(_check_compose(project_dir, lockfile))
-    results.append(_check_env(project_dir, lockfile))
-    results.append(_check_manifest_env(project_dir))
-    results.append(_check_manifest_compose(project_dir))
-    results.append(_check_manifest_deps(project_dir))
-    results.append(_check_manifest_recipes(project_dir))
-    results.append(_check_python_line_presence(project_dir))
+        results.append(
+            _check_compose(
+                project_dir, lockfile, template_config, addon_configs, contributions
+            )
+        )
+    results.append(_check_env(project_dir, lockfile, template_config, contributions))
+    results.append(_check_manifest_env(project_dir, manifest))
+    results.append(_check_manifest_compose(project_dir, manifest))
+    results.append(_check_manifest_deps(project_dir, manifest))
+    results.append(_check_manifest_recipes(project_dir, manifest))
+    results.append(_check_python_line_presence(project_dir, manifest))
 
     if thorough:
-        results.append(_check_python_integrity(project_dir))
+        results.append(_check_python_integrity(project_dir, manifest))
 
     return results
 
@@ -96,9 +122,13 @@ def run_doctor(project_dir: Path, *, thorough: bool = False) -> list[HealthResul
 type _AnyEntry = ManifestBlock | EnvEntry | OwnedEntry | DependencyEntry
 
 
-def _check_manifest_schema(project_dir: Path, lockfile: ZenitLockfile) -> HealthResult:
+def _check_manifest_schema(
+    project_dir: Path, lockfile: ZenitLockfile, manifest: Manifest | None = None
+) -> HealthResult:
     """Verify schema_version == 2 and manifest has no orphan blocks."""
     result = HealthResult("Manifest schema")
+    if manifest is None:
+        manifest = read_manifest(project_dir)
 
     if lockfile.schema_version != SCHEMA_VERSION:
         result.warn(
@@ -110,8 +140,6 @@ def _check_manifest_schema(project_dir: Path, lockfile: ZenitLockfile) -> Health
         )
     else:
         result.ok(f"schema_version is {SCHEMA_VERSION}.")
-
-    manifest = read_manifest(project_dir)
 
     addon_ids = set(lockfile.addons)
 
@@ -143,10 +171,13 @@ def _check_manifest_schema(project_dir: Path, lockfile: ZenitLockfile) -> Health
     return result
 
 
-def _check_manifest_env(project_dir: Path) -> HealthResult:
+def _check_manifest_env(
+    project_dir: Path, manifest: Manifest | None = None
+) -> HealthResult:
     """All manifest.env keys must be present in .env and .env.example."""
     result = HealthResult("Manifest env integrity")
-    manifest = read_manifest(project_dir)
+    if manifest is None:
+        manifest = read_manifest(project_dir)
 
     if not manifest.env:
         result.ok("No manifest env entries to verify.")
@@ -182,10 +213,13 @@ def _check_manifest_env(project_dir: Path) -> HealthResult:
     return result
 
 
-def _check_manifest_compose(project_dir: Path) -> HealthResult:
+def _check_manifest_compose(
+    project_dir: Path, manifest: Manifest | None = None
+) -> HealthResult:
     """All manifest compose_services and compose_volumes must exist in compose.yml."""
     result = HealthResult("Manifest compose integrity")
-    manifest = read_manifest(project_dir)
+    if manifest is None:
+        manifest = read_manifest(project_dir)
 
     if not manifest.compose_services and not manifest.compose_volumes:
         result.ok("No manifest compose entries to verify.")
@@ -236,10 +270,13 @@ def _check_manifest_compose(project_dir: Path) -> HealthResult:
     return result
 
 
-def _check_manifest_deps(project_dir: Path) -> HealthResult:
+def _check_manifest_deps(
+    project_dir: Path, manifest: Manifest | None = None
+) -> HealthResult:
     """All manifest.dependencies must be present in pyproject.toml."""
     result = HealthResult("Manifest dependency integrity")
-    manifest = read_manifest(project_dir)
+    if manifest is None:
+        manifest = read_manifest(project_dir)
 
     if not manifest.dependencies:
         result.ok("No manifest dependencies to verify.")
@@ -289,10 +326,13 @@ def _check_manifest_deps(project_dir: Path) -> HealthResult:
     return result
 
 
-def _check_manifest_recipes(project_dir: Path) -> HealthResult:
+def _check_manifest_recipes(
+    project_dir: Path, manifest: Manifest | None = None
+) -> HealthResult:
     """All manifest.just_recipes must exist in the justfile."""
     result = HealthResult("Manifest just-recipe integrity")
-    manifest = read_manifest(project_dir)
+    if manifest is None:
+        manifest = read_manifest(project_dir)
 
     if not manifest.just_recipes:
         result.ok("No manifest just-recipes to verify.")
@@ -323,10 +363,13 @@ def _check_manifest_recipes(project_dir: Path) -> HealthResult:
     return result
 
 
-def _check_python_line_presence(project_dir: Path) -> HealthResult:
+def _check_python_line_presence(
+    project_dir: Path, manifest: Manifest | None = None
+) -> HealthResult:
     """Fast check: each ManifestBlock's line range still exists in the file."""
     result = HealthResult("Python block line presence")
-    manifest = read_manifest(project_dir)
+    if manifest is None:
+        manifest = read_manifest(project_dir)
 
     if not manifest.python_blocks:
         result.ok("No Python blocks recorded in manifest.")
@@ -374,7 +417,9 @@ def _check_python_line_presence(project_dir: Path) -> HealthResult:
 # ── Thorough tier ──────────────────────────────────────────────────────────────
 
 
-def _check_python_integrity(project_dir: Path) -> HealthResult:
+def _check_python_integrity(
+    project_dir: Path, manifest: Manifest | None = None
+) -> HealthResult:
     """Thorough check: parse each file, extract block, recompute fingerprints.
 
     Only imported when --thorough is passed to avoid libcst in the fast-tier
@@ -383,7 +428,8 @@ def _check_python_integrity(project_dir: Path) -> HealthResult:
     from zenit.core.manifest import fingerprint as compute_fingerprint
 
     result = HealthResult("Python block integrity (thorough)")
-    manifest = read_manifest(project_dir)
+    if manifest is None:
+        manifest = read_manifest(project_dir)
 
     if not manifest.python_blocks:
         result.ok("No Python blocks to verify.")
@@ -527,7 +573,12 @@ def _check_metadata(project_dir: Path) -> HealthResult:
     return result
 
 
-def _check_dependencies(project_dir: Path, lockfile: ZenitLockfile) -> HealthResult:
+def _check_dependencies(
+    project_dir: Path,
+    lockfile: ZenitLockfile,
+    template_config: TemplateConfig | None = None,
+    contributions: Contributions | None = None,
+) -> HealthResult:
     """Check that pyproject.toml contains all deps expected by the template and addons."""
 
     result = HealthResult("Dependencies")
@@ -559,20 +610,19 @@ def _check_dependencies(project_dir: Path, lockfile: ZenitLockfile) -> HealthRes
     installed_deps = {_pkg_name(d) for d in raw_deps}
     installed_dev_deps = {_pkg_name(d) for d in dev_group}
 
-    zenit_root = get_zenit_root()
-
-    try:
-        template_config = load_template_config(zenit_root, lockfile.template)
-    except Exception:
-        result.warn(
-            f"Could not load template '{lockfile.template}' to verify deps.",
-            hint="The template may have changed since this project was scaffolded.",
-        )
-        return result
-
-    available = get_available_addons()
-    selected_addon_configs = [cfg for cfg in available if cfg.id in lockfile.addons]
-    contributions = collect_all(template_config, selected_addon_configs)
+    if template_config is None or contributions is None:
+        zenit_root = get_zenit_root()
+        try:
+            template_config = load_template_config(zenit_root, lockfile.template)
+        except Exception:
+            result.warn(
+                f"Could not load template '{lockfile.template}' to verify deps.",
+                hint="The template may have changed since this project was scaffolded.",
+            )
+            return result
+        available = get_available_addons()
+        selected_addon_configs = [cfg for cfg in available if cfg.id in lockfile.addons]
+        contributions = collect_all(template_config, selected_addon_configs)
 
     expected_deps = contributions.deps
     expected_dev_deps = contributions.template_dev_deps + contributions.dev_deps
@@ -603,28 +653,33 @@ def _check_dependencies(project_dir: Path, lockfile: ZenitLockfile) -> HealthRes
     return result
 
 
-def _check_files(project_dir: Path, lockfile: ZenitLockfile) -> HealthResult:
+def _check_files(
+    project_dir: Path,
+    lockfile: ZenitLockfile,
+    template_config: TemplateConfig | None = None,
+    addon_configs: list[AddonConfig] | None = None,
+) -> HealthResult:
     """Check that all files generated by the template and addons still exist."""
 
     result = HealthResult("Generated files")
 
-    zenit_root = get_zenit_root()
     pkg_name = normalise_pkg_name(project_dir.name)
 
-    try:
-        template_config = load_template_config(zenit_root, lockfile.template)
-    except Exception:
-        result.warn(
-            f"Could not load template '{lockfile.template}' to verify files.",
-            hint="The template may have changed since this project was scaffolded.",
-        )
-        return result
-
-    available = get_available_addons()
-    selected_addon_configs = [cfg for cfg in available if cfg.id in lockfile.addons]
+    if template_config is None or addon_configs is None:
+        zenit_root = get_zenit_root()
+        try:
+            template_config = load_template_config(zenit_root, lockfile.template)
+        except Exception:
+            result.warn(
+                f"Could not load template '{lockfile.template}' to verify files.",
+                hint="The template may have changed since this project was scaffolded.",
+            )
+            return result
+        available = get_available_addons()
+        addon_configs = [cfg for cfg in available if cfg.id in lockfile.addons]
 
     all_files = [("template", fc) for fc in template_config.files] + [
-        (addon.id, fc) for addon in selected_addon_configs for fc in addon.files
+        (addon.id, fc) for addon in addon_configs for fc in addon.files
     ]
 
     missing: list[tuple[str, str]] = []
@@ -664,7 +719,11 @@ def _check_files(project_dir: Path, lockfile: ZenitLockfile) -> HealthResult:
     return result
 
 
-def _check_addon_health(project_dir: Path, lockfile: ZenitLockfile) -> HealthResult:
+def _check_addon_health(
+    project_dir: Path,
+    lockfile: ZenitLockfile,
+    available: list[AddonConfig] | None = None,
+) -> HealthResult:
     """Call each installed addon's health_check hook if it defines one."""
 
     result = HealthResult("Addon integrity")
@@ -673,7 +732,8 @@ def _check_addon_health(project_dir: Path, lockfile: ZenitLockfile) -> HealthRes
         result.ok("No addons installed.")
         return result
 
-    available = get_available_addons()
+    if available is None:
+        available = get_available_addons()
     addon_map = {cfg.id: cfg for cfg in available}
 
     any_checks = False
@@ -702,7 +762,13 @@ def _check_addon_health(project_dir: Path, lockfile: ZenitLockfile) -> HealthRes
     return result
 
 
-def _check_compose(project_dir: Path, lockfile: ZenitLockfile) -> HealthResult:
+def _check_compose(
+    project_dir: Path,
+    lockfile: ZenitLockfile,
+    template_config: TemplateConfig | None = None,
+    addon_configs: list[AddonConfig] | None = None,
+    contributions: Contributions | None = None,
+) -> HealthResult:
     """Check compose.yml for expected services and duplicate definitions."""
 
     result = HealthResult("Compose")
@@ -763,17 +829,18 @@ def _check_compose(project_dir: Path, lockfile: ZenitLockfile) -> HealthResult:
     else:
         result.ok("No duplicate service definitions in compose.yml.")
 
-    zenit_root = get_zenit_root()
-    try:
-        template_config = load_template_config(zenit_root, lockfile.template)
-        available = get_available_addons()
-        selected_addon_configs = [cfg for cfg in available if cfg.id in lockfile.addons]
-        contributions = collect_all(template_config, selected_addon_configs)
-    except Exception:
-        result.warn(
-            "Could not load template/addon config to verify compose services.",
-        )
-        return result
+    if template_config is None or addon_configs is None or contributions is None:
+        zenit_root = get_zenit_root()
+        try:
+            template_config = load_template_config(zenit_root, lockfile.template)
+            available = get_available_addons()
+            addon_configs = [cfg for cfg in available if cfg.id in lockfile.addons]
+            contributions = collect_all(template_config, addon_configs)
+        except Exception:
+            result.warn(
+                "Could not load template/addon config to verify compose services.",
+            )
+            return result
 
     for svc in contributions.compose_services:
         if svc.name not in services:
@@ -787,23 +854,28 @@ def _check_compose(project_dir: Path, lockfile: ZenitLockfile) -> HealthResult:
     return result
 
 
-def _check_env(project_dir: Path, lockfile: ZenitLockfile) -> HealthResult:
+def _check_env(
+    project_dir: Path,
+    lockfile: ZenitLockfile,
+    template_config: TemplateConfig | None = None,
+    contributions: Contributions | None = None,
+) -> HealthResult:
     """Check that .env and .env.example contain expected env vars."""
 
     result = HealthResult("Env vars")
 
-    zenit_root = get_zenit_root()
-    try:
-        template_config = load_template_config(zenit_root, lockfile.template)
-    except Exception:
-        result.warn(
-            f"Could not load template '{lockfile.template}' to verify env vars.",
-        )
-        return result
-
-    available = get_available_addons()
-    selected_addon_configs = [cfg for cfg in available if cfg.id in lockfile.addons]
-    contributions = collect_all(template_config, selected_addon_configs)
+    if template_config is None or contributions is None:
+        zenit_root = get_zenit_root()
+        try:
+            template_config = load_template_config(zenit_root, lockfile.template)
+        except Exception:
+            result.warn(
+                f"Could not load template '{lockfile.template}' to verify env vars.",
+            )
+            return result
+        available = get_available_addons()
+        addon_configs = [cfg for cfg in available if cfg.id in lockfile.addons]
+        contributions = collect_all(template_config, addon_configs)
     expected_keys = [ev.key for ev in contributions.env_vars]
 
     if not expected_keys:

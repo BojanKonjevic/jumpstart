@@ -1,11 +1,13 @@
 """Import a template's declarative config from its template.py file."""
 
+import functools
 import importlib.util
 from pathlib import Path
 
 from zenit.schema.models import TemplateConfig
 
 
+@functools.cache
 def load_template_config(zenit_root: Path, template_id: str) -> TemplateConfig:
     spec = importlib.util.spec_from_file_location(
         "template_config",
