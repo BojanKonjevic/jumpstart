@@ -60,14 +60,18 @@ def prompt_template(default: str | None = None) -> str:
 def prompt_single_addon(
     items: list[tuple[str, str, list[str]]],
     unavailable_indices: set[int] | None = None,
+    context: str = "add",
 ) -> str | None:
     if not tty_available():
-        return _fallback_single_add(items, unavailable_indices or set())
+        return _fallback_single_add(
+            items, unavailable_indices or set(), context=context
+        )
 
     unavailable_indices = unavailable_indices or set()
     display_items = [(name, desc) for name, desc, _ in items]
 
-    print(f"\n  {BOLD}Select an addon to add:{RESET}\n")
+    action = "remove" if context == "remove" else "add"
+    print(f"\n  {BOLD}Select an addon to {action}:{RESET}\n")
     reserve_lines(len(display_items) + 2)
     clear_lines(len(display_items) + 2)
 
@@ -81,6 +85,7 @@ def prompt_single_addon(
             unavailable=unavailable_indices,
             full_items=items,
             flash=flash,
+            context=context,
         )
 
     def on_key(key: str) -> object:
@@ -99,7 +104,8 @@ def prompt_single_addon(
                     tmpl = template_blocks[0].replace("__template__", "")
                     flash = f"{addon_id} is required by the {tmpl} template and cannot be removed"
                 elif addon_deps:
-                    flash = f"{addon_id} needs: {', '.join(addon_deps)}"
+                    label = "required by" if context == "remove" else "needs"
+                    flash = f"{addon_id} {label}: {', '.join(addon_deps)}"
                 return None
             return _DONE
         elif key == "\x03":
@@ -134,14 +140,17 @@ def _fallback_template(default: str | None = None) -> str:
 def _fallback_single_add(
     items: list[tuple[str, str, list[str]]],
     unavailable_indices: set[int],
+    context: str = "add",
 ) -> str | None:
     display_items = [(name, desc) for name, desc, _ in items]
-    print("\n  Select an addon to add:\n")
+    action = "remove" if context == "remove" else "add"
+    print(f"\n  Select an addon to {action}:\n")
     idx = run_fallback(
         display_items,
         unavailable=unavailable_indices,
         full_items=items,
         prompt_text="Addon",
+        context=context,
     )
     if idx is None:
         return None

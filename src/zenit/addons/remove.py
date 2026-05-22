@@ -29,6 +29,7 @@ from zenit.cli.ui import (
     success,
     warn,
 )
+from zenit.core._paths import get_zenit_root
 from zenit.core.handlers import HandlerDispatcher
 from zenit.core.handlers.justfile_handler import _RECIPE_NAME_RE
 from zenit.core.lockfile import ZenitLockfile, read_lockfile, write_lockfile
@@ -40,6 +41,7 @@ from zenit.core.manifest import (
 from zenit.core.pkg_name import normalise_pkg_name, resolve_dest_placeholder
 from zenit.schema.exceptions import ZenitError
 from zenit.schema.models import AddonConfig, Manifest
+from zenit.templates._load_config import load_template_config
 
 
 def remove_addon(
@@ -512,8 +514,40 @@ def remove_addon_interactive(dry_run: bool = False) -> None:
     available = get_available_addons()
     installed = [cfg for cfg in available if cfg.id in lockfile.addons]
 
+    requires_map = {cfg.id: cfg.requires for cfg in available}
+
+    zenit_root = get_zenit_root()
+    template_required: set[str] = set()
+    try:
+        template_config = load_template_config(zenit_root, lockfile.template)
+        template_required = set(template_config.requires_addons)
+    except FileNotFoundError:
+        pass
+
+    items = []
+    unavailable_indices: set[int] = set()
+
+    installed.sort(key=lambda c: c.id)
+
+    for i, addon in enumerate(installed):
+        dependents = [
+            other_id
+            for other_id in lockfile.addons
+            if other_id != addon.id and addon.id in requires_map.get(other_id, [])
+        ]
+        reasons: list[str] = []
+        if dependents:
+            reasons.extend(dependents)
+        if addon.id in template_required:
+            reasons.append(f"__template__{lockfile.template}")
+        items.append((addon.id, addon.description, reasons))
+        if reasons:
+            unavailable_indices.add(i)
+
     addon_id = prompt_single_addon(
-        [(cfg.id, cfg.description, cfg.requires) for cfg in installed]
+        items,
+        unavailable_indices=unavailable_indices,
+        context="remove",
     )
     if addon_id is None:
         raise typer.Exit(0)

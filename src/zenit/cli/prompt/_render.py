@@ -71,6 +71,7 @@ def render_single(
     unavailable: set[int] | None = None,
     full_items: list[tuple[str, str, list[str]]] | None = None,
     flash: str = "",
+    context: str = "add",
 ) -> int:
     """Render a single-select TUI list. Returns the number of lines written."""
     unavailable = unavailable or set()
@@ -109,7 +110,8 @@ def render_single(
                 addon_deps = [r for r in reqs if not r.startswith("__template__")]
                 parts = []
                 if addon_deps:
-                    parts.append(f"needs {', '.join(addon_deps)}")
+                    label = "required by" if context == "remove" else "needs"
+                    parts.append(f"{label} {', '.join(addon_deps)}")
                 if template_blocks:
                     tmpl = template_blocks[0].replace("__template__", "")
                     parts.append(f"required by {tmpl} template")
@@ -169,6 +171,7 @@ def run_fallback(
     unavailable: set[int] | None = None,
     full_items: list[tuple[str, str, list[str]]] | None = None,
     prompt_text: str = "Selection",
+    context: str = "add",
 ) -> int | None:
     """Fallback numbered-list picker for non-tty environments.
 
@@ -186,7 +189,8 @@ def run_fallback(
                 template_blocks = [r for r in reqs if r.startswith("__template__")]
                 addon_deps = [r for r in reqs if not r.startswith("__template__")]
                 if addon_deps:
-                    markers.append(f"needs {', '.join(addon_deps)}")
+                    label = "required by" if context == "remove" else "needs"
+                    markers.append(f"{label} {', '.join(addon_deps)}")
                 if template_blocks:
                     tmpl = template_blocks[0].replace("__template__", "")
                     markers.append(f"required by {tmpl} template")
@@ -219,7 +223,12 @@ def run_fallback(
         for i, (name, _) in enumerate(items):
             if raw in (str(i + 1), name.lower()):
                 if i in unavailable:
-                    warn(f"'{name}' cannot be selected yet — missing dependencies.")
+                    msg = (
+                        "required by other addons"
+                        if context == "remove"
+                        else "missing dependencies"
+                    )
+                    warn(f"'{name}' cannot be selected yet — {msg}.")
                     break
                 return i
 
