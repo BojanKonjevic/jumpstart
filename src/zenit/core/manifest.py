@@ -179,16 +179,18 @@ def record_addon_manifest_entries(
     addon_cfg: AddonConfig,
     string_env: Environment,
     render_vars: dict[str, object],
+    docker_active: bool = False,
 ) -> None:
     addon_id = addon_cfg.id
     for ev in addon_cfg.env_vars:
         add_env_entry(manifest, ev.key, source=EntrySource.ADDON, addon=addon_id)
-    for svc in addon_cfg.compose_services:
-        add_compose_service(
-            manifest, svc.name, source=EntrySource.ADDON, addon=addon_id
-        )
-    for vol in addon_cfg.compose_volumes:
-        add_compose_volume(manifest, vol, source=EntrySource.ADDON, addon=addon_id)
+    if docker_active:
+        for svc in addon_cfg.compose_services:
+            add_compose_service(
+                manifest, svc.name, source=EntrySource.ADDON, addon=addon_id
+            )
+        for vol in addon_cfg.compose_volumes:
+            add_compose_volume(manifest, vol, source=EntrySource.ADDON, addon=addon_id)
     for dep in addon_cfg.deps:
         add_dependency(
             manifest,

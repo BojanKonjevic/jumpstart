@@ -326,7 +326,7 @@ def test_record_compose_service_and_volume() -> None:
         compose_services=[svc],
         compose_volumes=["redis-data"],
     )
-    record_addon_manifest_entries(m, addon, Environment(), {})
+    record_addon_manifest_entries(m, addon, Environment(), {}, docker_active=True)
 
     assert len(m.compose_services) == 1
     assert m.compose_services[0].name == "redis"

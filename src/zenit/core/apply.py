@@ -152,7 +152,7 @@ def apply_contributions(
             add_python_block(manifest, block)
 
     if contributions.compose_services and (project_dir / "compose.yml").exists():
-        _merge_compose(
+        merge_compose(
             ctx, fs, contributions.compose_services, contributions.compose_volumes
         )
 
@@ -172,7 +172,7 @@ def apply_contributions(
 # ── Internal helpers ──────────────────────────────────────────────────────────
 
 
-def _merge_compose(
+def merge_compose(
     ctx: Context,
     fs: FileSystem,
     services: list[ComposeService],

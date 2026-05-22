@@ -125,8 +125,11 @@ def _scaffold(tmp_path: Path, name: str, template: str, addons: list[str]) -> Pa
 
     manifest = read_manifest(project_dir)
     string_env = make_env()
+    docker_active = "docker" in addons
     for addon_cfg in selected_addon_configs:
-        record_addon_manifest_entries(manifest, addon_cfg, string_env, render_vars)
+        record_addon_manifest_entries(
+            manifest, addon_cfg, string_env, render_vars, docker_active=docker_active
+        )
     write_manifest(project_dir, manifest)
 
     write_lockfile(project_dir, template, addons)
@@ -199,7 +202,7 @@ class TestSourceOwnership:
         assert redis_env.addon == "redis"
 
     def test_addon_compose_service_carries_addon_source(self, tmp_path: Path) -> None:
-        project_dir = _scaffold(tmp_path, "myapp", "fastapi", ["redis"])
+        project_dir = _scaffold(tmp_path, "myapp", "fastapi", ["docker", "redis"])
         m = read_manifest(project_dir)
 
         svc = next((s for s in m.compose_services if s.name == "redis"), None)
@@ -208,7 +211,7 @@ class TestSourceOwnership:
         assert svc.addon == "redis"
 
     def test_addon_compose_volume_carries_addon_source(self, tmp_path: Path) -> None:
-        project_dir = _scaffold(tmp_path, "myapp", "fastapi", ["redis"])
+        project_dir = _scaffold(tmp_path, "myapp", "fastapi", ["docker", "redis"])
         m = read_manifest(project_dir)
 
         vol = next((v for v in m.compose_volumes if v.name == "redis-data"), None)
