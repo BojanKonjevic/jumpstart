@@ -7,12 +7,13 @@ entries.
 
 from __future__ import annotations
 
-import re
 from pathlib import Path
 from typing import cast
 
 import tomlkit
 from tomlkit.container import Container
+
+from zenit.core.manifest import _pkg_name
 
 
 def inject_deps(
@@ -77,16 +78,3 @@ def inject_deps(
 
     pyproject_path.write_text(tomlkit.dumps(doc), encoding="utf-8")
     return added_deps, added_dev_deps
-
-
-def _pkg_name(dep: str) -> str:
-    """Extract the bare package name from a dependency specifier.
-
-    Examples:
-        "redis>=5"              -> "redis"
-        "celery[redis]>=5"      -> "celery"
-        "sentry-sdk[fastapi]"   -> "sentry-sdk"
-        "fakeredis[aioredis]"   -> "fakeredis"
-    """
-    match = re.match(r"^([a-zA-Z0-9_.-]+)", dep)
-    return match.group(1).lower() if match else dep.lower()

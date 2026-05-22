@@ -167,6 +167,7 @@ class Injection:
     point: str
     content: str
     addon_id: str = ""
+    templates: list[str] = field(default_factory=list)
 
 
 @dataclass

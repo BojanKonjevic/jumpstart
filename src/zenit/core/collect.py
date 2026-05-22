@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from zenit.core.constants import DEFAULT_DEV_DEPS
 from zenit.schema.exceptions import ZenitError
 from zenit.schema.models import (
     Contributions,
@@ -28,6 +29,7 @@ def collect_all(
     c.env_vars.extend(template_config.env_vars)
     c.deps.extend(template_config.deps)
     c.template_dev_deps.extend(template_config.dev_deps)
+    c.template_dev_deps.extend(DEFAULT_DEV_DEPS)
     c.recipes.template.extend(template_config.just_recipes)
 
     for inj in template_config.injections:

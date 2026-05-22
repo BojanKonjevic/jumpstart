@@ -109,6 +109,9 @@ def apply_contributions(
         if point is None:
             continue
 
+        if inj.templates and ctx.template not in inj.templates:
+            continue
+
         resolved_file = resolve_dest_placeholder(point.file, pkg_name)
         file_path = project_dir / resolved_file
 

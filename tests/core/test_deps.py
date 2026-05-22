@@ -19,7 +19,8 @@ from pathlib import Path
 
 import pytest
 
-from zenit.core.deps import _pkg_name, inject_deps
+from zenit.core.deps import inject_deps
+from zenit.core.manifest import _pkg_name
 
 # ── _pkg_name ─────────────────────────────────────────────────────────────────
 
@@ -37,7 +38,7 @@ def test_pkg_name_with_extras():
 
 
 def test_pkg_name_with_extras_no_version():
-    assert _pkg_name("sentry-sdk[fastapi]") == "sentry-sdk"
+    assert _pkg_name("sentry-sdk[fastapi]") == "sentry_sdk"
 
 
 def test_pkg_name_lowercased():
@@ -45,7 +46,7 @@ def test_pkg_name_lowercased():
 
 
 def test_pkg_name_with_hyphen():
-    assert _pkg_name("python-dotenv>=1.0") == "python-dotenv"
+    assert _pkg_name("python-dotenv>=1.0") == "python_dotenv"
 
 
 def test_pkg_name_complex_extras():

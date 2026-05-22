@@ -17,7 +17,7 @@ from zenit.cli.ui import BOLD, DIM, GREEN, RED, RESET, YELLOW
 from zenit.core._paths import get_zenit_root
 from zenit.core.collect import collect_all
 from zenit.core.lockfile import SCHEMA_VERSION, ZenitLockfile, read_lockfile
-from zenit.core.manifest import read_manifest
+from zenit.core.manifest import _pkg_name, read_manifest
 from zenit.core.pkg_name import normalise_pkg_name, resolve_dest_placeholder
 from zenit.schema.models import (
     DependencyEntry,
@@ -555,10 +555,6 @@ def _check_dependencies(project_dir: Path, lockfile: ZenitLockfile) -> HealthRes
         "project", {}
     ).get("optional-dependencies", {}).get("dev", [])
 
-    def _pkg_name(dep: str) -> str:
-        match = re.match(r"^([a-zA-Z0-9_.-]+)", dep)
-        return match.group(1).lower().replace("-", "_") if match else dep.lower()
-
     installed_deps = {_pkg_name(d) for d in raw_deps}
     installed_dev_deps = {_pkg_name(d) for d in dev_group}
 
@@ -578,7 +574,7 @@ def _check_dependencies(project_dir: Path, lockfile: ZenitLockfile) -> HealthRes
     contributions = collect_all(template_config, selected_addon_configs)
 
     expected_deps = contributions.deps
-    expected_dev_deps = template_config.dev_deps + contributions.dev_deps
+    expected_dev_deps = contributions.template_dev_deps + contributions.dev_deps
 
     missing_deps = [d for d in expected_deps if _pkg_name(d) not in installed_deps]
     missing_dev_deps = [

@@ -170,7 +170,8 @@ def add_just_recipe(
 
 
 def _pkg_name(dep: str) -> str:
-    return re.split(r"[>=<!,; \[@]", dep)[0].strip().lower().replace("-", "_")
+    match = re.match(r"^([a-zA-Z0-9_.-]+)", dep)
+    return match.group(1).lower().replace("-", "_") if match else dep.lower()
 
 
 def record_addon_manifest_entries(

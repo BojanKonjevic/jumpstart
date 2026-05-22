@@ -15,13 +15,6 @@ dependencies = [
 
 [dependency-groups]
 dev = [
-  "pytest>=8",
-  "pytest-cov",
-  "pytest-asyncio",
-  "httpx",
-  "mypy",
-  "ruff>=0.4",
-  "ipython",
 [% for dep in dev_deps %]
   "(( dep ))",
 [% endfor %]

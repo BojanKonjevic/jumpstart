@@ -34,10 +34,12 @@ config = AddonConfig(
     injections=[
         Injection(
             point="lifespan_startup",
+            templates=["fastapi"],
             content="    from .integrations.sentry import init_sentry\n    init_sentry()",
         ),
         Injection(
             point="main_startup",
+            templates=["blank"],
             content="    from .integrations.sentry import init_sentry\n    init_sentry()",
         ),
         Injection(

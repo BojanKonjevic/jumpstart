@@ -223,6 +223,14 @@ def remove_addon(
 
 
 # ── Removal helpers ───────────────────────────────────────────────────────────
+# Removing a zenit-managed addon involves two categories:
+#   1. Structured-entry removal — compose services/volumes, env vars, deps, and
+#      just recipes are tracked as manifest entries and removed by dedicated
+#      helpers (_remove_compose_services, _remove_env_vars, etc.).
+#   2. Line-range removal — Python code injections are tracked as ManifestBlock
+#      entries (with line ranges and fingerprints) and removed by
+#      _undo_injections_physical via HandlerDispatcher.
+# This separation keeps each removal path simple and explicit.
 
 
 def _remove_files(
