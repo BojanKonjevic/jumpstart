@@ -130,10 +130,6 @@ def _run_add_pipeline(
             record_addon_manifest_entries(manifest, addon_cfg, string_env, render_vars)
         write_manifest(project_dir, manifest)
 
-    # ── Lockfile ──────────────────────────────────────────────────────────────
-    if not ctx.dry_run:
-        write_lockfile(project_dir, template, ctx.addons)
-
     # ── Recorded files (dry-run only) ─────────────────────────────────────────
     recorded_files = list(fs.recorded_files) if ctx.dry_run else []  # type: ignore[attr-defined]
 
@@ -226,6 +222,7 @@ def add_addon(addon_id: str, dry_run: bool = False, yes: bool = False) -> None:
         )
         fs = RealFileSystem(project_dir)
         result = _run_add_pipeline(ctx, fs, addon_id, available)
+        write_lockfile(project_dir, template, ctx.addons)
 
     # ── Output ────────────────────────────────────────────────────────────────
     print()
