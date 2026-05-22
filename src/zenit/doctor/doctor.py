@@ -75,7 +75,8 @@ def run_doctor(project_dir: Path, *, thorough: bool = False) -> list[HealthResul
     results.append(_check_dependencies(project_dir, lockfile))
     results.append(_check_files(project_dir, lockfile))
     results.append(_check_addon_health(project_dir, lockfile))
-    results.append(_check_compose(project_dir, lockfile))
+    if "docker" in lockfile.addons:
+        results.append(_check_compose(project_dir, lockfile))
     results.append(_check_env(project_dir, lockfile))
     results.append(_check_manifest_env(project_dir))
     results.append(_check_manifest_compose(project_dir))

@@ -1,9 +1,22 @@
 """Shared pytest fixtures and helpers."""
 
+from collections.abc import Callable
 from pathlib import Path
 
 import pytest
 from click.exceptions import Exit as ClickExit
+
+from zenit.addons._registry import get_available_addons
+from zenit.core._apply_loader import load_apply
+from zenit.core.apply import apply_contributions
+from zenit.core.collect import collect_all
+from zenit.core.context import Context
+from zenit.core.filesystem import RealFileSystem
+from zenit.core.generate import generate_all
+from zenit.core.git import init
+from zenit.core.lockfile import write_lockfile
+from zenit.core.render import build_render_vars
+from zenit.templates._load_config import load_template_config
 
 
 def raises_exit(code: int = 1) -> pytest.ExceptionInfo[ClickExit]:
@@ -66,3 +79,54 @@ def write_test_manifest(
         cfg = next(c for c in available if c.id == addon_id)
         record_addon_manifest_entries(manifest, cfg, string_env, render_vars)
     write_manifest(project_dir, manifest)
+
+
+@pytest.fixture
+def scaffold_project(tmp_path: Path) -> Callable[[str, str, list[str]], Path]:
+    """Scaffold a project into a temporary directory and return the project path.
+
+    Runs the full pipeline: common files, template + addon contributions,
+    render, generate, manifest, git init, and lockfile.  The project is
+    placed inside *tmp_path* which is scoped to the individual test function.
+    """
+
+    def _scaffold(name: str, template: str, addons: list[str]) -> Path:
+        project_dir = tmp_path / name
+        project_dir.mkdir(parents=True)
+        pkg_name = name.replace("-", "_")
+
+        ctx = Context(
+            name=name,
+            pkg_name=pkg_name,
+            template=template,
+            addons=addons,
+            zenit_root=ZENIT_ROOT,
+            project_dir=project_dir,
+        )
+        fs = RealFileSystem(project_dir)
+
+        load_apply(ZENIT_ROOT / "templates" / "_common" / "apply.py")(ctx, fs)
+
+        available = get_available_addons()
+        template_config = load_template_config(ZENIT_ROOT, template)
+        selected_addon_configs = [cfg for cfg in available if cfg.id in addons]
+
+        render_vars = build_render_vars(
+            name=name,
+            pkg_name=pkg_name,
+            template=template,
+            addons=addons,
+        )
+
+        contributions = collect_all(template_config, selected_addon_configs)
+        apply_contributions(
+            ctx, fs, contributions, template_config.injection_points, render_vars
+        )
+        generate_all(ctx, fs, contributions)
+        write_test_manifest(project_dir, addons, render_vars)
+        init(project_dir)
+        write_lockfile(project_dir, template, addons)
+
+        return project_dir
+
+    return _scaffold

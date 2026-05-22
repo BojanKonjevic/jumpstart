@@ -768,6 +768,12 @@ class TestRunDoctor:
         assert "Dependencies" in categories
         assert "Generated files" in categories
         assert "Addon integrity" in categories
+        assert "Compose" not in categories
+
+    def test_returns_compose_section_when_docker_installed(self, tmp_path):
+        project_dir = _scaffold(tmp_path, template="fastapi", addons=["docker"])
+        results = run_doctor(project_dir)
+        categories = [r.category for r in results]
         assert "Compose" in categories
 
     def test_no_errors_on_fresh_blank(self, tmp_path):

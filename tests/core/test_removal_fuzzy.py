@@ -186,8 +186,11 @@ def test_fuzzy_removal_heavy_edit_raises(tmp_path: Path) -> None:
     len(lines) < rec_start - FUZZY_WINDOW_LINES (== 20).  We achieve this by
     injecting into a long file and then shrinking it drastically.
     """
-    # Build a long Settings class so the injection lands at line ~45+.
-    many_fields = "\n".join(f"    field_{i}: int = {i}" for i in range(40))
+    # Must push injection past FUZZY_WINDOW_LINES (20). With ~4 boilerplate lines
+    # before the first field, FUZZY_WINDOW_LINES + 10 fields guarantees rec_start > threshold.
+    many_fields = "\n".join(
+        f"    field_{i}: int = {i}" for i in range(FUZZY_WINDOW_LINES + 10)
+    )
     long_source = (
         "from pydantic_settings import BaseSettings\n\n\n"
         "class Settings(BaseSettings):\n"

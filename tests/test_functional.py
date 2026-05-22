@@ -16,64 +16,6 @@ import subprocess
 from pathlib import Path
 
 import pytest
-from conftest import ZENIT_ROOT, write_test_manifest
-
-from zenit.addons._registry import get_available_addons
-from zenit.core._apply_loader import load_apply
-from zenit.core.apply import apply_contributions
-from zenit.core.collect import collect_all
-from zenit.core.context import Context
-from zenit.core.filesystem import RealFileSystem
-from zenit.core.generate import generate_all
-from zenit.core.git import init
-from zenit.core.lockfile import write_lockfile
-from zenit.core.render import build_render_vars
-from zenit.templates._load_config import load_template_config
-
-pytestmark = pytest.mark.slow
-
-
-# ── scaffold helper (duplicated from test_integration.py to keep modules independent) ──
-
-
-def _scaffold(tmp_path: Path, name: str, template: str, addons: list[str]) -> Path:
-    project_dir = tmp_path / name
-    project_dir.mkdir(parents=True)
-    pkg_name = name.replace("-", "_")
-
-    ctx = Context(
-        name=name,
-        pkg_name=pkg_name,
-        template=template,
-        addons=addons,
-        zenit_root=ZENIT_ROOT,
-        project_dir=project_dir,
-    )
-    fs = RealFileSystem(project_dir)
-
-    load_apply(ZENIT_ROOT / "templates" / "_common" / "apply.py")(ctx, fs)
-
-    available = get_available_addons()
-    template_config = load_template_config(ZENIT_ROOT, template)
-    selected_addon_configs = [cfg for cfg in available if cfg.id in addons]
-
-    render_vars = build_render_vars(
-        name=name,
-        pkg_name=pkg_name,
-        template=template,
-        addons=addons,
-    )
-
-    contributions = collect_all(template_config, selected_addon_configs)
-    apply_contributions(
-        ctx, fs, contributions, template_config.injection_points, render_vars
-    )
-    generate_all(ctx, fs, contributions)
-    write_test_manifest(project_dir, addons, render_vars)
-    init(project_dir)
-    write_lockfile(project_dir, template, addons)
-
-    return project_dir
 
 
 def _uv(*args: str, cwd: Path) -> subprocess.CompletedProcess:
@@ -92,15 +34,16 @@ def _uv(*args: str, cwd: Path) -> subprocess.CompletedProcess:
 # ── blank template ────────────────────────────────────────────────────────────
 
 
+@pytest.mark.slow
 class TestBlankFunctional:
-    def test_uv_sync_succeeds(self, tmp_path):
-        project_dir = _scaffold(tmp_path, "myapp", "blank", [])
+    def test_uv_sync_succeeds(self, tmp_path, scaffold_project):
+        project_dir = scaffold_project("myapp", "blank", [])
         result = _uv("sync", "--quiet", cwd=project_dir)
         assert result.returncode == 0, f"uv sync failed:\n{result.stderr}"
 
-    def test_pytest_passes(self, tmp_path):
+    def test_pytest_passes(self, tmp_path, scaffold_project):
         """The generated blank project's test suite must pass out of the box."""
-        project_dir = _scaffold(tmp_path, "myapp", "blank", [])
+        project_dir = scaffold_project("myapp", "blank", [])
         _uv("sync", "--quiet", cwd=project_dir)
         result = _uv("run", "pytest", "-v", cwd=project_dir)
         assert result.returncode == 0, (
@@ -109,40 +52,40 @@ class TestBlankFunctional:
             f"stderr:\n{result.stderr}"
         )
 
-    def test_pytest_output_contains_test_name(self, tmp_path):
-        project_dir = _scaffold(tmp_path, "myapp", "blank", [])
+    def test_pytest_output_contains_test_name(self, tmp_path, scaffold_project):
+        project_dir = scaffold_project("myapp", "blank", [])
         _uv("sync", "--quiet", cwd=project_dir)
         result = _uv("run", "pytest", "-v", cwd=project_dir)
         assert "test_main" in result.stdout
 
-    def test_ruff_check_passes(self, tmp_path):
-        project_dir = _scaffold(tmp_path, "myapp", "blank", [])
+    def test_ruff_check_passes(self, tmp_path, scaffold_project):
+        project_dir = scaffold_project("myapp", "blank", [])
         _uv("sync", "--quiet", cwd=project_dir)
         result = _uv("run", "ruff", "check", ".", cwd=project_dir)
         assert result.returncode == 0, (
             f"ruff check failed in scaffolded blank project:\n{result.stdout}\n{result.stderr}"
         )
 
-    def test_ruff_format_check_passes(self, tmp_path):
-        project_dir = _scaffold(tmp_path, "myapp", "blank", [])
+    def test_ruff_format_check_passes(self, tmp_path, scaffold_project):
+        project_dir = scaffold_project("myapp", "blank", [])
         _uv("sync", "--quiet", cwd=project_dir)
         result = _uv("run", "ruff", "format", "--check", ".", cwd=project_dir)
         assert result.returncode == 0, (
             f"ruff format --check failed:\n{result.stdout}\n{result.stderr}"
         )
 
-    def test_hyphenated_name_pytest_passes(self, tmp_path):
+    def test_hyphenated_name_pytest_passes(self, tmp_path, scaffold_project):
         """Hyphenated project names convert to underscore pkg — tests must still work."""
-        project_dir = _scaffold(tmp_path, "my-cool-app", "blank", [])
+        project_dir = scaffold_project("my-cool-app", "blank", [])
         _uv("sync", "--quiet", cwd=project_dir)
         result = _uv("run", "pytest", "-v", cwd=project_dir)
         assert result.returncode == 0, (
             f"pytest failed for hyphenated project name:\n{result.stdout}\n{result.stderr}"
         )
 
-    def test_main_module_is_runnable(self, tmp_path):
+    def test_main_module_is_runnable(self, tmp_path, scaffold_project):
         """python -m myapp must run without errors (it just prints)."""
-        project_dir = _scaffold(tmp_path, "myapp", "blank", [])
+        project_dir = scaffold_project("myapp", "blank", [])
         _uv("sync", "--quiet", cwd=project_dir)
         result = _uv("run", "python", "-m", "myapp", cwd=project_dir)
         assert result.returncode == 0, (
@@ -154,22 +97,23 @@ class TestBlankFunctional:
 # ── blank + docker ────────────────────────────────────────────────────────────
 
 
+@pytest.mark.slow
 class TestBlankDockerFunctional:
-    def test_uv_sync_succeeds(self, tmp_path):
-        project_dir = _scaffold(tmp_path, "myapp", "blank", ["docker"])
+    def test_uv_sync_succeeds(self, tmp_path, scaffold_project):
+        project_dir = scaffold_project("myapp", "blank", ["docker"])
         result = _uv("sync", "--quiet", cwd=project_dir)
         assert result.returncode == 0, f"uv sync failed:\n{result.stderr}"
 
-    def test_pytest_passes(self, tmp_path):
-        project_dir = _scaffold(tmp_path, "myapp", "blank", ["docker"])
+    def test_pytest_passes(self, tmp_path, scaffold_project):
+        project_dir = scaffold_project("myapp", "blank", ["docker"])
         _uv("sync", "--quiet", cwd=project_dir)
         result = _uv("run", "pytest", "-v", cwd=project_dir)
         assert result.returncode == 0, (
             f"pytest failed in blank+docker project:\n{result.stdout}\n{result.stderr}"
         )
 
-    def test_ruff_passes(self, tmp_path):
-        project_dir = _scaffold(tmp_path, "myapp", "blank", ["docker"])
+    def test_ruff_passes(self, tmp_path, scaffold_project):
+        project_dir = scaffold_project("myapp", "blank", ["docker"])
         _uv("sync", "--quiet", cwd=project_dir)
         result = _uv("run", "ruff", "check", ".", cwd=project_dir)
         assert result.returncode == 0, f"ruff failed:\n{result.stdout}"
@@ -184,64 +128,64 @@ class TestRenderedContentCorrectness:
     These don't require uv/pytest to be installed — they just inspect content.
     """
 
-    def test_no_unrendered_jinja_in_blank_main(self, tmp_path):
-        project_dir = _scaffold(tmp_path, "myapp", "blank", [])
+    def test_no_unrendered_jinja_in_blank_main(self, tmp_path, scaffold_project):
+        project_dir = scaffold_project("myapp", "blank", [])
         main = (project_dir / "src" / "myapp" / "main.py").read_text()
         assert "((" not in main
         assert "))" not in main
 
-    def test_no_unrendered_jinja_in_blank_test(self, tmp_path):
-        project_dir = _scaffold(tmp_path, "myapp", "blank", [])
+    def test_no_unrendered_jinja_in_blank_test(self, tmp_path, scaffold_project):
+        project_dir = scaffold_project("myapp", "blank", [])
         test = (project_dir / "tests" / "test_main.py").read_text()
         assert "((" not in test
         assert "))" not in test
 
-    def test_no_unrendered_jinja_in_pyproject(self, tmp_path):
-        project_dir = _scaffold(tmp_path, "myapp", "blank", [])
+    def test_no_unrendered_jinja_in_pyproject(self, tmp_path, scaffold_project):
+        project_dir = scaffold_project("myapp", "blank", [])
         pyproject = (project_dir / "pyproject.toml").read_text()
         assert "((" not in pyproject
         assert "))" not in pyproject
 
-    def test_no_unrendered_jinja_in_justfile(self, tmp_path):
-        project_dir = _scaffold(tmp_path, "myapp", "blank", [])
+    def test_no_unrendered_jinja_in_justfile(self, tmp_path, scaffold_project):
+        project_dir = scaffold_project("myapp", "blank", [])
         justfile = (project_dir / "justfile").read_text()
         assert "((" not in justfile
         assert "))" not in justfile
 
-    def test_no_unrendered_jinja_in_fastapi_main(self, tmp_path):
-        project_dir = _scaffold(tmp_path, "myapi", "fastapi", ["docker"])
+    def test_no_unrendered_jinja_in_fastapi_main(self, tmp_path, scaffold_project):
+        project_dir = scaffold_project("myapi", "fastapi", ["docker"])
         main = (project_dir / "src" / "myapi" / "main.py").read_text()
         assert "((" not in main
 
-    def test_no_unrendered_jinja_in_fastapi_settings(self, tmp_path):
-        project_dir = _scaffold(tmp_path, "myapi", "fastapi", ["docker"])
+    def test_no_unrendered_jinja_in_fastapi_settings(self, tmp_path, scaffold_project):
+        project_dir = scaffold_project("myapi", "fastapi", ["docker"])
         settings = (project_dir / "src" / "myapi" / "settings.py").read_text()
         assert "((" not in settings
 
-    def test_no_unrendered_jinja_in_env_file(self, tmp_path):
-        project_dir = _scaffold(tmp_path, "myapi", "fastapi", ["docker"])
+    def test_no_unrendered_jinja_in_env_file(self, tmp_path, scaffold_project):
+        project_dir = scaffold_project("myapi", "fastapi", ["docker"])
         env = (project_dir / ".env").read_text()
         assert "((" not in env
 
-    def test_no_unrendered_jinja_in_github_actions_ci(self, tmp_path):
-        project_dir = _scaffold(
-            tmp_path, "myapi", "fastapi", ["docker", "redis", "github-actions"]
+    def test_no_unrendered_jinja_in_github_actions_ci(self, tmp_path, scaffold_project):
+        project_dir = scaffold_project(
+            "myapi", "fastapi", ["docker", "redis", "github-actions"]
         )
         ci = (project_dir / ".github" / "workflows" / "ci.yml").read_text()
         assert "((" not in ci
 
-    def test_no_unrendered_jinja_in_celery_app(self, tmp_path):
-        project_dir = _scaffold(
-            tmp_path, "myapi", "fastapi", ["docker", "redis", "celery"]
+    def test_no_unrendered_jinja_in_celery_app(self, tmp_path, scaffold_project):
+        project_dir = scaffold_project(
+            "myapi", "fastapi", ["docker", "redis", "celery"]
         )
         celery_app = (
             project_dir / "src" / "myapi" / "tasks" / "celery_app.py"
         ).read_text()
         assert "((" not in celery_app
 
-    def test_no_unrendered_block_tags_in_blank(self, tmp_path):
+    def test_no_unrendered_block_tags_in_blank(self, tmp_path, scaffold_project):
         """[% %] tags must not appear in any generated file."""
-        project_dir = _scaffold(tmp_path, "myapp", "blank", [])
+        project_dir = scaffold_project("myapp", "blank", [])
         for f in project_dir.rglob("*"):
             if f.is_file() and f.suffix in (
                 ".py",
@@ -257,8 +201,8 @@ class TestRenderedContentCorrectness:
                     f"Unrendered block tag found in {f.relative_to(project_dir)}"
                 )
 
-    def test_no_unrendered_block_tags_in_fastapi(self, tmp_path):
-        project_dir = _scaffold(tmp_path, "myapi", "fastapi", ["docker"])
+    def test_no_unrendered_block_tags_in_fastapi(self, tmp_path, scaffold_project):
+        project_dir = scaffold_project("myapi", "fastapi", ["docker"])
         for f in project_dir.rglob("*"):
             if f.is_file() and f.suffix in (".py", ".toml", ".yml", ".yaml", ".cfg"):
                 text = f.read_text(errors="replace")
@@ -266,9 +210,11 @@ class TestRenderedContentCorrectness:
                     f"Unrendered block tag found in {f.relative_to(project_dir)}"
                 )
 
-    def test_project_name_correctly_substituted_in_all_files(self, tmp_path):
+    def test_project_name_correctly_substituted_in_all_files(
+        self, tmp_path, scaffold_project
+    ):
         """Every occurrence of '(( name ))' should be replaced with the project name."""
-        project_dir = _scaffold(tmp_path, "uniquename", "blank", [])
+        project_dir = scaffold_project("uniquename", "blank", [])
         for f in project_dir.rglob("*"):
             if f.is_file():
                 text = f.read_text(errors="replace")
@@ -276,8 +222,10 @@ class TestRenderedContentCorrectness:
                     f"Unrendered (( name )) found in {f.relative_to(project_dir)}"
                 )
 
-    def test_pkg_name_placeholder_fully_resolved_in_file_contents(self, tmp_path):
-        project_dir = _scaffold(tmp_path, "myapp", "blank", [])
+    def test_pkg_name_placeholder_fully_resolved_in_file_contents(
+        self, tmp_path, scaffold_project
+    ):
+        project_dir = scaffold_project("myapp", "blank", [])
         for f in project_dir.rglob("*.py"):
             text = f.read_text(errors="replace")
             assert "(( pkg_name ))" not in text, (
@@ -288,9 +236,10 @@ class TestRenderedContentCorrectness:
 # ── mypy type checking ────────────────────────────────────────────────────────
 
 
+@pytest.mark.slow
 class TestMypyFunctional:
-    def test_mypy_passes_on_blank(self, tmp_path):
-        project_dir = _scaffold(tmp_path, "myapp", "blank", [])
+    def test_mypy_passes_on_blank(self, tmp_path, scaffold_project):
+        project_dir = scaffold_project("myapp", "blank", [])
         _uv("sync", "--quiet", cwd=project_dir)
         result = _uv("run", "mypy", "src/", cwd=project_dir)
         assert result.returncode == 0, (
@@ -301,6 +250,7 @@ class TestMypyFunctional:
 # ── plan §7.1 — toolchain validation and doctor integration ───────────────────
 
 
+@pytest.mark.slow
 class TestPlanToolchain:
     """Six tests from the plan's §7.1.
 
@@ -380,19 +330,24 @@ class TestPlanToolchain:
             + "\n".join(errors)
         )
 
-    def test_blank_template_passes_toolchain(self, tmp_path: Path) -> None:
-        project_dir = _scaffold(tmp_path, "myapp", "blank", [])
+    def test_blank_template_passes_toolchain(
+        self, tmp_path: Path, scaffold_project
+    ) -> None:
+        project_dir = scaffold_project("myapp", "blank", [])
         self._assert_toolchain(project_dir)
 
-    def test_fastapi_docker_template_passes_toolchain(self, tmp_path: Path) -> None:
-        project_dir = _scaffold(
-            tmp_path, "myapi", "fastapi", ["docker", "sqlalchemy", "postgres"]
+    def test_fastapi_docker_template_passes_toolchain(
+        self, tmp_path: Path, scaffold_project
+    ) -> None:
+        project_dir = scaffold_project(
+            "myapi", "fastapi", ["docker", "sqlalchemy", "postgres"]
         )
         self._assert_toolchain(project_dir, run_pytest=False)
 
-    def test_fastapi_with_all_addons_passes_toolchain(self, tmp_path: Path) -> None:
-        project_dir = _scaffold(
-            tmp_path,
+    def test_fastapi_with_all_addons_passes_toolchain(
+        self, tmp_path: Path, scaffold_project
+    ) -> None:
+        project_dir = scaffold_project(
             "myapi",
             "fastapi",
             [
@@ -408,14 +363,14 @@ class TestPlanToolchain:
         self._assert_toolchain(project_dir, run_pytest=False)
 
     def test_add_then_remove_addon_toolchain_passes(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, scaffold_project
     ) -> None:
         """Scaffold fastapi+docker+sqlalchemy+postgres, add celery and sentry, remove both, run toolchain."""
         from zenit.addons.add import add_addon
         from zenit.addons.remove import remove_addon
 
-        project_dir = _scaffold(
-            tmp_path, "myapi", "fastapi", ["docker", "sqlalchemy", "postgres"]
+        project_dir = scaffold_project(
+            "myapi", "fastapi", ["docker", "sqlalchemy", "postgres"]
         )
         monkeypatch.chdir(project_dir)
 
@@ -426,22 +381,24 @@ class TestPlanToolchain:
 
         self._assert_toolchain(project_dir, run_pytest=False)
 
-    def test_doctor_clean_on_fresh_scaffold(self, tmp_path: Path) -> None:
+    def test_doctor_clean_on_fresh_scaffold(
+        self, tmp_path: Path, scaffold_project
+    ) -> None:
         """After a fresh scaffold, run_doctor must report no errors."""
-        project_dir = _scaffold(
-            tmp_path, "myapi", "fastapi", ["docker", "sqlalchemy", "postgres", "redis"]
+        project_dir = scaffold_project(
+            "myapi", "fastapi", ["docker", "sqlalchemy", "postgres", "redis"]
         )
         self._assert_doctor_clean(project_dir)
 
     def test_doctor_clean_after_add_and_remove(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, scaffold_project
     ) -> None:
         """After an add/remove cycle, zenit doctor must exit 0 with no errors."""
         from zenit.addons.add import add_addon
         from zenit.addons.remove import remove_addon
 
-        project_dir = _scaffold(
-            tmp_path, "myapi", "fastapi", ["docker", "sqlalchemy", "postgres"]
+        project_dir = scaffold_project(
+            "myapi", "fastapi", ["docker", "sqlalchemy", "postgres"]
         )
         monkeypatch.chdir(project_dir)
 
