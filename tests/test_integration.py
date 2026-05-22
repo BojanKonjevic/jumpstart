@@ -1,8 +1,6 @@
 """Integration tests — scaffold real projects into tmp_path and verify the results."""
 
 
-
-
 # ── blank template ────────────────────────────────────────────────────────────
 
 
@@ -75,6 +73,16 @@ class TestBlankTemplate:
     def test_git_repo_initialised(self, tmp_path, scaffold_project):
         project_dir = scaffold_project("myapp", "blank", [])
         assert (project_dir / ".git").exists()
+        import subprocess
+
+        log = subprocess.run(
+            ["git", "log", "-1", "--oneline"],
+            cwd=project_dir,
+            capture_output=True,
+            text=True,
+        )
+        assert log.returncode == 0
+        assert "Initial commit" in log.stdout
 
     def test_no_duplicate_recipes_in_justfile(self, tmp_path, scaffold_project):
         project_dir = scaffold_project("myapp", "blank", [])
@@ -188,6 +196,16 @@ class TestFastapiTemplate:
     def test_git_repo_initialised(self, tmp_path, scaffold_project):
         project_dir = scaffold_project("myapi", "fastapi", ["docker"])
         assert (project_dir / ".git").exists()
+        import subprocess
+
+        log = subprocess.run(
+            ["git", "log", "-1", "--oneline"],
+            cwd=project_dir,
+            capture_output=True,
+            text=True,
+        )
+        assert log.returncode == 0
+        assert "Initial commit" in log.stdout
 
 
 # ── fastapi + all addons ──────────────────────────────────────────────────────

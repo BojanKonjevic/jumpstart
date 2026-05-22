@@ -22,3 +22,4 @@ def init(project_dir: Path) -> None:
             run("git", "config", "user.name", "zenit")
 
         run("git", "add", ".")
+        run("git", "commit", "-m", "Initial commit")

@@ -139,7 +139,7 @@ def confirm(ctx: Context) -> bool:
         steps.append(f"apply addon: {a}")
     steps += [
         "generate pyproject.toml, justfile",
-        "git init",
+        "git init + initial commit",
     ]
     for s in steps:
         print(f"    {CYAN}·{RESET}  {DIM}{s}{RESET}")

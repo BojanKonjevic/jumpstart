@@ -86,7 +86,7 @@ def scaffold_project(tmp_path: Path) -> Callable[[str, str, list[str]], Path]:
     """Scaffold a project into a temporary directory and return the project path.
 
     Runs the full pipeline: common files, template + addon contributions,
-    render, generate, manifest, git init, and lockfile.  The project is
+    render, generate, manifest, git init/commit, and lockfile.  The project is
     placed inside *tmp_path* which is scoped to the individual test function.
     """
 

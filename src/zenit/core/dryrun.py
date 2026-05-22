@@ -106,6 +106,7 @@ def run_dry(ctx: Context) -> None:
         "direnv allow",
         "git init",
         "git add .",
+        "git commit -m 'Initial commit'",
     ]:
         dry_cmd(cmd)
 
