@@ -2,10 +2,22 @@
 
 from __future__ import annotations
 
+import os
 import shutil
 import subprocess
+import tempfile
 from pathlib import Path
 from typing import Protocol
+
+
+def atomic_write_text(path: Path, content: str, encoding: str = "utf-8") -> None:
+    fd, tmp = tempfile.mkstemp(dir=path.parent, prefix=f".{path.name}.tmp.")
+    try:
+        os.write(fd, content.encode(encoding))
+        os.fsync(fd)
+    finally:
+        os.close(fd)
+    os.replace(tmp, path)
 
 
 class FileSystem(Protocol):

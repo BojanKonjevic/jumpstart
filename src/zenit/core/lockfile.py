@@ -25,6 +25,8 @@ from pathlib import Path
 
 import tomlkit
 
+from zenit.core.filesystem import atomic_write_text
+
 LOCKFILE_NAME = ".zenit.toml"
 SCHEMA_VERSION = 2
 
@@ -62,7 +64,7 @@ def write_lockfile(project_dir: Path, template: str, addons: list[str]) -> None:
     project.add("schema_version", SCHEMA_VERSION)
     doc["project"] = project
 
-    path.write_text(tomlkit.dumps(doc), encoding="utf-8")
+    atomic_write_text(path, tomlkit.dumps(doc))
 
 
 def read_lockfile(project_dir: Path) -> ZenitLockfile | None:

@@ -56,14 +56,22 @@ def _full_manifest() -> Manifest:
     m.python_blocks.append(_block("sentry", "lifespan_startup"))
     m.env.append(EnvEntry(key="DATABASE_URL", source=EntrySource.TEMPLATE, addon=""))
     m.env.append(EnvEntry(key="REDIS_URL", source=EntrySource.ADDON, addon="redis"))
-    m.compose_services.append(OwnedEntry(name="db", source=EntrySource.TEMPLATE, addon=""))
-    m.compose_services.append(OwnedEntry(name="redis", source=EntrySource.ADDON, addon="redis"))
+    m.compose_services.append(
+        OwnedEntry(name="db", source=EntrySource.TEMPLATE, addon="")
+    )
+    m.compose_services.append(
+        OwnedEntry(name="redis", source=EntrySource.ADDON, addon="redis")
+    )
     m.compose_volumes.append(
         OwnedEntry(name="redis-data", source=EntrySource.ADDON, addon="redis")
     )
     m.dependencies.append(
         DependencyEntry(
-            package="redis", spec="redis>=5", source=EntrySource.ADDON, addon="redis", dev=False
+            package="redis",
+            spec="redis>=5",
+            source=EntrySource.ADDON,
+            addon="redis",
+            dev=False,
         )
     )
     m.dependencies.append(
@@ -75,7 +83,9 @@ def _full_manifest() -> Manifest:
             dev=True,
         )
     )
-    m.just_recipes.append(OwnedEntry(name="redis-up", source=EntrySource.ADDON, addon="redis"))
+    m.just_recipes.append(
+        OwnedEntry(name="redis-up", source=EntrySource.ADDON, addon="redis")
+    )
     return m
 
 
@@ -109,8 +119,12 @@ def test_roundtrip_full_manifest(tmp_path: Path) -> None:
     assert result.python_blocks[1].addon == "sentry"
 
     assert len(result.env) == 2
-    assert result.env[0] == EnvEntry(key="DATABASE_URL", source=EntrySource.TEMPLATE, addon="")
-    assert result.env[1] == EnvEntry(key="REDIS_URL", source=EntrySource.ADDON, addon="redis")
+    assert result.env[0] == EnvEntry(
+        key="DATABASE_URL", source=EntrySource.TEMPLATE, addon=""
+    )
+    assert result.env[1] == EnvEntry(
+        key="REDIS_URL", source=EntrySource.ADDON, addon="redis"
+    )
 
     assert len(result.compose_services) == 2
     assert result.compose_services[1].name == "redis"
@@ -209,10 +223,20 @@ def test_add_compose_service_deduplicates_by_name() -> None:
 def test_add_dependency_deduplicates_by_package() -> None:
     m = Manifest()
     add_dependency(
-        m, package="redis", spec="redis>=5", source=EntrySource.ADDON, addon="redis", dev=False
+        m,
+        package="redis",
+        spec="redis>=5",
+        source=EntrySource.ADDON,
+        addon="redis",
+        dev=False,
     )
     add_dependency(
-        m, package="redis", spec="redis>=5", source=EntrySource.ADDON, addon="redis", dev=False
+        m,
+        package="redis",
+        spec="redis>=5",
+        source=EntrySource.ADDON,
+        addon="redis",
+        dev=False,
     )
     assert len(m.dependencies) == 1
 
@@ -251,6 +275,15 @@ def test_read_manifest_returns_empty_on_corrupt_toml(
     err = capsys.readouterr().err
     assert "Warning" in err
     assert ".zenit.toml" in err
+
+
+# ── atomic write ──────────────────────────────────────────────────────────────
+
+
+def test_write_manifest_leaves_no_temp_files(tmp_path: Path) -> None:
+    write_manifest(tmp_path, _full_manifest())
+    leftovers = [p for p in tmp_path.iterdir() if p.name.endswith(".tmp")]
+    assert not leftovers
 
 
 # ── schema version ────────────────────────────────────────────────────────────

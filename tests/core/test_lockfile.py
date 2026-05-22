@@ -1,5 +1,7 @@
 """Tests for zenit.lockfile — read/write round-trip."""
 
+from pathlib import Path
+
 from zenit.core.lockfile import (
     LOCKFILE_NAME,
     ZenitLockfile,
@@ -91,6 +93,12 @@ def test_lockfile_dataclass_defaults():
     assert lf.template == ""
     assert lf.addons == []
     assert lf.zenit_version == ""
+
+
+def test_write_lockfile_leaves_no_temp_files(tmp_path: Path) -> None:
+    write_lockfile(tmp_path, "fastapi", ["redis"])
+    leftovers = [p for p in tmp_path.iterdir() if p.name.endswith(".tmp")]
+    assert not leftovers
 
 
 def test_write_lockfile_preserves_manifest_section(tmp_path):

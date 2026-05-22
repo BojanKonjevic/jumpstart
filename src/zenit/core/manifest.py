@@ -35,6 +35,7 @@ import libcst
 import tomlkit
 import tomlkit.items
 
+from zenit.core.filesystem import atomic_write_text
 from zenit.schema.models import (
     DependencyEntry,
     EntrySource,
@@ -93,7 +94,7 @@ def write_manifest(project_dir: Path, manifest: Manifest) -> None:
         doc = tomlkit.document()
 
     doc["manifest"] = _encode_manifest(manifest)
-    path.write_text(tomlkit.dumps(doc), encoding="utf-8")
+    atomic_write_text(path, tomlkit.dumps(doc))
 
 
 # ── Manifest mutation helpers ─────────────────────────────────────────────────
@@ -117,19 +118,25 @@ def remove_blocks_for_addon(manifest: Manifest, addon_id: str) -> None:
     manifest.just_recipes = [r for r in manifest.just_recipes if r.addon != addon_id]
 
 
-def add_env_entry(manifest: Manifest, key: str, source: EntrySource, addon: str) -> None:
+def add_env_entry(
+    manifest: Manifest, key: str, source: EntrySource, addon: str
+) -> None:
     if not any(e.key == key for e in manifest.env):
         manifest.env.append(EnvEntry(key=key, source=source, addon=addon))
 
 
-def add_compose_service(manifest: Manifest, name: str, source: EntrySource, addon: str) -> None:
+def add_compose_service(
+    manifest: Manifest, name: str, source: EntrySource, addon: str
+) -> None:
     if not any(s.name == name for s in manifest.compose_services):
         manifest.compose_services.append(
             OwnedEntry(name=name, source=source, addon=addon)
         )
 
 
-def add_compose_volume(manifest: Manifest, name: str, source: EntrySource, addon: str) -> None:
+def add_compose_volume(
+    manifest: Manifest, name: str, source: EntrySource, addon: str
+) -> None:
     if not any(v.name == name for v in manifest.compose_volumes):
         manifest.compose_volumes.append(
             OwnedEntry(name=name, source=source, addon=addon)
@@ -137,7 +144,12 @@ def add_compose_volume(manifest: Manifest, name: str, source: EntrySource, addon
 
 
 def add_dependency(
-    manifest: Manifest, package: str, spec: str, source: EntrySource, addon: str, dev: bool
+    manifest: Manifest,
+    package: str,
+    spec: str,
+    source: EntrySource,
+    addon: str,
+    dev: bool,
 ) -> None:
     if not any(d.package == package for d in manifest.dependencies):
         manifest.dependencies.append(
@@ -147,7 +159,9 @@ def add_dependency(
         )
 
 
-def add_just_recipe(manifest: Manifest, name: str, source: EntrySource, addon: str) -> None:
+def add_just_recipe(
+    manifest: Manifest, name: str, source: EntrySource, addon: str
+) -> None:
     if not any(r.name == name for r in manifest.just_recipes):
         manifest.just_recipes.append(OwnedEntry(name=name, source=source, addon=addon))
 
