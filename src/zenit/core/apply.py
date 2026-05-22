@@ -2,21 +2,13 @@
 
 from __future__ import annotations
 
-import re
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 import yaml
-from jinja2 import Environment
 
 from zenit.core.handlers.base import HandlerDispatcher
-from zenit.core.handlers.justfile_handler import _RECIPE_NAME_RE
 from zenit.core.manifest import (
-    add_compose_service,
-    add_compose_volume,
-    add_dependency,
-    add_env_entry,
-    add_just_recipe,
     add_python_block,
     fingerprint,
     read_manifest,
@@ -25,27 +17,16 @@ from zenit.core.manifest import (
 from zenit.core.pkg_name import resolve_dest_placeholder
 from zenit.core.render import make_env
 from zenit.schema.exceptions import ZenitError
-from zenit.schema.models import EntrySource, LocatorSpec, Manifest, ManifestBlock
+from zenit.schema.models import LocatorSpec, ManifestBlock
 
 if TYPE_CHECKING:
     from zenit.core.context import Context
     from zenit.schema.models import (
-        AddonConfig,
         ComposeService,
         Contributions,
         EnvVar,
         InjectionPoint,
     )
-
-
-def _pkg_name(dep: str) -> str:
-    """Canonical package-name extractor for PEP 508 dependency specifiers.
-
-    Handles >=, ==, !=, ~=, extras ([...]), environment markers (;), and
-    URL references (@).  Normalises separators to underscores so that
-    'my-package' and 'my_package' compare equal.
-    """
-    return re.split(r"[>=<!,; \[@]", dep)[0].strip().lower().replace("-", "_")
 
 
 def apply_contributions(
@@ -166,26 +147,13 @@ def apply_contributions(
             add_python_block(manifest, block)
 
     if contributions.compose_services and (project_dir / "compose.yml").exists():
-        _merge_compose(ctx, contributions.compose_services, contributions.compose_volumes)
+        _merge_compose(
+            ctx, contributions.compose_services, contributions.compose_volumes
+        )
 
     for file_name in (".env", ".env.example"):
         if (project_dir / file_name).exists() and contributions.env_vars:
             _merge_env_vars(ctx, file_name, contributions.env_vars)
-
-    # ── Per-addon manifest recording ──────────────────────────────────────────
-    #
-    # We iterate each AddonConfig directly so that every manifest entry carries
-    # the correct addon_id.  Using the merged flat lists on `contributions` with
-    # a single addon_id derived from _addon_configs[0] would assign all entries
-    # to one addon when multiple addons are applied together (e.g. at scaffold
-    # time via collect_all), corrupting ownership metadata.
-    #
-    # Template-owned entries are intentionally excluded here: _stamp_template_manifest
-    # in scaffold.py records those with source="template", addon="" after write_lockfile.
-    # Doing it here would double-record them on every scaffold run.
-    string_env = make_env()
-    for addon_cfg in contributions._addon_configs:
-        _record_addon_manifest_entries(manifest, addon_cfg, string_env, render_vars)
 
     for addon_cfg in contributions._addon_configs:
         hooks = addon_cfg._module
@@ -194,60 +162,6 @@ def apply_contributions(
 
     if not ctx.dry_run:
         write_manifest(project_dir, manifest)
-
-
-# ── Manifest recording ────────────────────────────────────────────────────────
-
-
-def _record_addon_manifest_entries(
-    manifest: Manifest,
-    addon_cfg: AddonConfig,
-    string_env: Environment,
-    render_vars: dict[str, object],
-) -> None:
-    """Record all non-Python manifest entries owned by *addon_cfg*.
-
-    Python block entries are recorded inline in the injection loop above,
-    because they require the post-write line numbers and fingerprints that
-    are only available at injection time.
-    """
-
-    addon_id = addon_cfg.id
-
-    for ev in addon_cfg.env_vars:
-        add_env_entry(manifest, ev.key, source=EntrySource.ADDON, addon=addon_id)
-
-    for svc in addon_cfg.compose_services:
-        add_compose_service(manifest, svc.name, source=EntrySource.ADDON, addon=addon_id)
-
-    for vol in addon_cfg.compose_volumes:
-        add_compose_volume(manifest, vol, source=EntrySource.ADDON, addon=addon_id)
-
-    for dep in addon_cfg.deps:
-        add_dependency(
-            manifest,
-            _pkg_name(dep),
-            dep,
-            source=EntrySource.ADDON,
-            addon=addon_id,
-            dev=False,
-        )
-
-    for dep in addon_cfg.dev_deps:
-        add_dependency(
-            manifest,
-            _pkg_name(dep),
-            dep,
-            source=EntrySource.ADDON,
-            addon=addon_id,
-            dev=True,
-        )
-
-    for recipe_raw in addon_cfg.just_recipes:
-        rendered = string_env.from_string(recipe_raw).render(**render_vars)
-        m = _RECIPE_NAME_RE.search(rendered)
-        if m:
-            add_just_recipe(manifest, m.group(1), source=EntrySource.ADDON, addon=addon_id)
 
 
 # ── Internal helpers ──────────────────────────────────────────────────────────

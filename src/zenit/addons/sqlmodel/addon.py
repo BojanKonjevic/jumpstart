@@ -12,14 +12,7 @@ config = AddonConfig(
     files=[
         FileContribution(
             dest="src/{{pkg_name}}/models/base.py",
-            source=str(
-                _HERE
-                / "files"
-                / "src"
-                / "{{pkg_name}}"
-                / "models"
-                / "base.py"
-            ),
+            source=str(_HERE / "files" / "src" / "{{pkg_name}}" / "models" / "base.py"),
         ),
     ],
     deps=[

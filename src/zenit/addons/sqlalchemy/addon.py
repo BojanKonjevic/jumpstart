@@ -28,24 +28,14 @@ config = AddonConfig(
         FileContribution(
             dest="src/{{pkg_name}}/db/session.py",
             source=str(
-                _HERE
-                / "files"
-                / "src"
-                / "{{pkg_name}}"
-                / "db"
-                / "session.py.j2"
+                _HERE / "files" / "src" / "{{pkg_name}}" / "db" / "session.py.j2"
             ),
             template=True,
         ),
         FileContribution(
             dest="src/{{pkg_name}}/models/mixins.py",
             source=str(
-                _HERE
-                / "files"
-                / "src"
-                / "{{pkg_name}}"
-                / "models"
-                / "mixins.py"
+                _HERE / "files" / "src" / "{{pkg_name}}" / "models" / "mixins.py"
             ),
         ),
         FileContribution(

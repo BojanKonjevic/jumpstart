@@ -34,9 +34,12 @@ from typing import Any
 import libcst
 import tomlkit
 import tomlkit.items
+from jinja2 import Environment
 
 from zenit.core.filesystem import atomic_write_text
+from zenit.core.handlers.justfile_handler import _RECIPE_NAME_RE
 from zenit.schema.models import (
+    AddonConfig,
     DependencyEntry,
     EntrySource,
     EnvEntry,
@@ -164,6 +167,52 @@ def add_just_recipe(
 ) -> None:
     if not any(r.name == name for r in manifest.just_recipes):
         manifest.just_recipes.append(OwnedEntry(name=name, source=source, addon=addon))
+
+
+def _pkg_name(dep: str) -> str:
+    return re.split(r"[>=<!,; \[@]", dep)[0].strip().lower().replace("-", "_")
+
+
+def record_addon_manifest_entries(
+    manifest: Manifest,
+    addon_cfg: AddonConfig,
+    string_env: Environment,
+    render_vars: dict[str, object],
+) -> None:
+    addon_id = addon_cfg.id
+    for ev in addon_cfg.env_vars:
+        add_env_entry(manifest, ev.key, source=EntrySource.ADDON, addon=addon_id)
+    for svc in addon_cfg.compose_services:
+        add_compose_service(
+            manifest, svc.name, source=EntrySource.ADDON, addon=addon_id
+        )
+    for vol in addon_cfg.compose_volumes:
+        add_compose_volume(manifest, vol, source=EntrySource.ADDON, addon=addon_id)
+    for dep in addon_cfg.deps:
+        add_dependency(
+            manifest,
+            _pkg_name(dep),
+            dep,
+            source=EntrySource.ADDON,
+            addon=addon_id,
+            dev=False,
+        )
+    for dep in addon_cfg.dev_deps:
+        add_dependency(
+            manifest,
+            _pkg_name(dep),
+            dep,
+            source=EntrySource.ADDON,
+            addon=addon_id,
+            dev=True,
+        )
+    for recipe_raw in addon_cfg.just_recipes:
+        rendered = string_env.from_string(recipe_raw).render(**render_vars)
+        m = _RECIPE_NAME_RE.search(rendered)
+        if m:
+            add_just_recipe(
+                manifest, m.group(1), source=EntrySource.ADDON, addon=addon_id
+            )
 
 
 # ── Fingerprinting ────────────────────────────────────────────────────────────

@@ -10,6 +10,7 @@ from pathlib import Path
 
 import pytest
 import tomlkit
+from jinja2 import Environment
 
 from zenit.core.manifest import (
     MANIFEST_SCHEMA_VERSION,
@@ -19,13 +20,18 @@ from zenit.core.manifest import (
     add_just_recipe,
     add_python_block,
     read_manifest,
+    record_addon_manifest_entries,
     remove_blocks_for_addon,
     write_manifest,
 )
+from zenit.core.render import make_env
 from zenit.schema.models import (
+    AddonConfig,
+    ComposeService,
     DependencyEntry,
     EntrySource,
     EnvEntry,
+    EnvVar,
     LocatorSpec,
     Manifest,
     ManifestBlock,
@@ -291,3 +297,136 @@ def test_write_manifest_leaves_no_temp_files(tmp_path: Path) -> None:
 
 def test_schema_version_constant_is_2() -> None:
     assert MANIFEST_SCHEMA_VERSION == 2
+
+
+# ── record_addon_manifest_entries ──────────────────────────────────────────────
+
+
+def test_record_env_vars() -> None:
+    m = Manifest()
+    addon = AddonConfig(
+        id="redis",
+        description="",
+        env_vars=[EnvVar(key="REDIS_URL", default="redis://localhost")],
+    )
+    record_addon_manifest_entries(m, addon, Environment(), {})
+
+    assert len(m.env) == 1
+    assert m.env[0].key == "REDIS_URL"
+    assert m.env[0].source == EntrySource.ADDON
+    assert m.env[0].addon == "redis"
+
+
+def test_record_compose_service_and_volume() -> None:
+    m = Manifest()
+    svc = ComposeService(name="redis", image="redis:7-alpine")
+    addon = AddonConfig(
+        id="redis",
+        description="",
+        compose_services=[svc],
+        compose_volumes=["redis-data"],
+    )
+    record_addon_manifest_entries(m, addon, Environment(), {})
+
+    assert len(m.compose_services) == 1
+    assert m.compose_services[0].name == "redis"
+    assert m.compose_services[0].source == EntrySource.ADDON
+    assert m.compose_services[0].addon == "redis"
+
+    assert len(m.compose_volumes) == 1
+    assert m.compose_volumes[0].name == "redis-data"
+    assert m.compose_volumes[0].source == EntrySource.ADDON
+    assert m.compose_volumes[0].addon == "redis"
+
+
+def test_record_deps_and_dev_deps() -> None:
+    m = Manifest()
+    addon = AddonConfig(
+        id="redis", description="", deps=["redis>=5"], dev_deps=["fakeredis"]
+    )
+    record_addon_manifest_entries(m, addon, Environment(), {})
+
+    assert len(m.dependencies) == 2
+
+    runtime = next(d for d in m.dependencies if d.package == "redis")
+    assert runtime.dev is False
+    assert runtime.source == EntrySource.ADDON
+    assert runtime.addon == "redis"
+
+    dev = next(d for d in m.dependencies if d.package == "fakeredis")
+    assert dev.dev is True
+    assert dev.source == EntrySource.ADDON
+    assert dev.addon == "redis"
+
+
+def test_record_just_recipe() -> None:
+    m = Manifest()
+    addon = AddonConfig(
+        id="docker",
+        description="",
+        just_recipes=["docker-up:\n    docker compose up -d\n"],
+    )
+    record_addon_manifest_entries(m, addon, Environment(), {})
+
+    assert len(m.just_recipes) == 1
+    assert m.just_recipes[0].name == "docker-up"
+    assert m.just_recipes[0].source == EntrySource.ADDON
+    assert m.just_recipes[0].addon == "docker"
+
+
+def test_record_just_recipe_with_render() -> None:
+    m = Manifest()
+    addon = AddonConfig(
+        id="docker",
+        description="",
+        just_recipes=["((name))-up:\n    docker compose up -d\n"],
+    )
+    record_addon_manifest_entries(m, addon, make_env(), {"name": "docker"})
+
+    assert len(m.just_recipes) == 1
+    assert m.just_recipes[0].name == "docker-up"
+    assert m.just_recipes[0].source == EntrySource.ADDON
+    assert m.just_recipes[0].addon == "docker"
+
+
+def test_record_just_recipe_skips_unrecognised() -> None:
+    m = Manifest()
+    addon = AddonConfig(
+        id="docker",
+        description="",
+        just_recipes=["some non-recipe content\n"],
+    )
+    record_addon_manifest_entries(m, addon, Environment(), {})
+
+    assert len(m.just_recipes) == 0
+
+
+def test_record_empty_addon() -> None:
+    m = Manifest()
+    addon = AddonConfig(id="empty", description="")
+    record_addon_manifest_entries(m, addon, Environment(), {})
+
+    assert m.env == []
+    assert m.compose_services == []
+    assert m.compose_volumes == []
+    assert m.dependencies == []
+    assert m.just_recipes == []
+
+
+def test_record_idempotent() -> None:
+    m = Manifest()
+    addon = AddonConfig(
+        id="redis",
+        description="",
+        env_vars=[EnvVar(key="REDIS_URL", default="redis://localhost")],
+        deps=["redis>=5"],
+    )
+    env = Environment()
+    record_addon_manifest_entries(m, addon, env, {})
+    record_addon_manifest_entries(m, addon, env, {})
+
+    redis_url_entries = [e for e in m.env if e.key == "REDIS_URL"]
+    assert len(redis_url_entries) == 1
+
+    redis_dep_entries = [d for d in m.dependencies if d.package == "redis"]
+    assert len(redis_dep_entries) == 1

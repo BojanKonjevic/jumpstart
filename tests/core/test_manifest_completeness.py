@@ -28,10 +28,11 @@ from zenit.core.manifest import (
     add_env_entry,
     add_just_recipe,
     read_manifest,
+    record_addon_manifest_entries,
     write_manifest,
 )
 from zenit.core.manifest import fingerprint as _fp
-from zenit.core.render import build_render_vars
+from zenit.core.render import build_render_vars, make_env
 from zenit.schema.models import EntrySource
 from zenit.templates._load_config import load_template_config
 
@@ -119,6 +120,13 @@ def _scaffold(tmp_path: Path, name: str, template: str, addons: list[str]) -> Pa
     )
     generate_all(ctx, contributions)
     init(project_dir)
+
+    manifest = read_manifest(project_dir)
+    string_env = make_env()
+    for addon_cfg in selected_addon_configs:
+        record_addon_manifest_entries(manifest, addon_cfg, string_env, render_vars)
+    write_manifest(project_dir, manifest)
+
     write_lockfile(project_dir, template, addons)
     _stamp_template_manifest(project_dir, template_config)
 

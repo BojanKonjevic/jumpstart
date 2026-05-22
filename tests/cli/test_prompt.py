@@ -230,9 +230,7 @@ class TestRenderSingle:
         captured = capsys.readouterr()
         assert captured.out.count("(default)") == 0
 
-    def test_flash_message_displayed(
-        self, capsys: pytest.CaptureFixture[str]
-    ) -> None:
+    def test_flash_message_displayed(self, capsys: pytest.CaptureFixture[str]) -> None:
         render_single(self.ITEMS, cursor=0, flash="some warning")
         captured = capsys.readouterr()
         assert "some warning" in captured.out
@@ -363,15 +361,17 @@ class TestRunFallback:
             assert run_fallback(self.ITEMS, unavailable={0}) == 1
 
     def test_eof_exits(self) -> None:
-        with patch("builtins.input", side_effect=EOFError), pytest.raises(
-            SystemExit
-        ) as exc:
+        with (
+            patch("builtins.input", side_effect=EOFError),
+            pytest.raises(SystemExit) as exc,
+        ):
             run_fallback(self.ITEMS)
         assert exc.value.code == 0
 
     def test_keyboard_interrupt_exits(self) -> None:
-        with patch("builtins.input", side_effect=KeyboardInterrupt), pytest.raises(
-            SystemExit
+        with (
+            patch("builtins.input", side_effect=KeyboardInterrupt),
+            pytest.raises(SystemExit),
         ):
             run_fallback(self.ITEMS)
 
@@ -417,17 +417,19 @@ def test_fallback_template_retries_multiple_times() -> None:
 
 
 def test_fallback_template_eof_raises_system_exit() -> None:
-    with patch("builtins.input", side_effect=EOFError), pytest.raises(
-        SystemExit
-    ) as exc:
+    with (
+        patch("builtins.input", side_effect=EOFError),
+        pytest.raises(SystemExit) as exc,
+    ):
         _fallback_template()
     assert exc.value.code == 0
 
 
 def test_fallback_template_keyboard_interrupt_raises_system_exit() -> None:
-    with patch("builtins.input", side_effect=KeyboardInterrupt), pytest.raises(
-        SystemExit
-    ) as exc:
+    with (
+        patch("builtins.input", side_effect=KeyboardInterrupt),
+        pytest.raises(SystemExit) as exc,
+    ):
         _fallback_template()
     assert exc.value.code == 0
 
@@ -634,9 +636,7 @@ class TestRenderMulti:
         captured = capsys.readouterr()
         assert "●" in captured.out
 
-    def test_incompatible_shows_cross(
-        self, capsys: pytest.CaptureFixture[str]
-    ) -> None:
+    def test_incompatible_shows_cross(self, capsys: pytest.CaptureFixture[str]) -> None:
         _render_multi(
             self.ITEMS,
             cursor=0,
@@ -648,9 +648,7 @@ class TestRenderMulti:
         assert "—" in captured.out
         assert "celery" in captured.out
 
-    def test_requires_hint_displayed(
-        self, capsys: pytest.CaptureFixture[str]
-    ) -> None:
+    def test_requires_hint_displayed(self, capsys: pytest.CaptureFixture[str]) -> None:
         _render_multi(
             self.ITEMS, cursor=1, selected=set(), requires_map={"celery": ["redis"]}
         )
@@ -734,9 +732,7 @@ class TestTuiMulti:
             assert _tui_multi("test", self.ITEMS, {}, set()) == ["docker"]
 
     def test_space_toggles_off_selection(self) -> None:
-        with patch(
-            "zenit.cli.prompt._render.read_key", side_effect=[" ", " ", "\r"]
-        ):
+        with patch("zenit.cli.prompt._render.read_key", side_effect=[" ", " ", "\r"]):
             assert _tui_multi("test", self.ITEMS, {}, set()) == []
 
     def test_multiple_selections(self) -> None:
@@ -797,9 +793,7 @@ class TestTuiMulti:
 
     def test_defaults_pre_selected(self) -> None:
         with patch("zenit.cli.prompt._render.read_key", return_value="\r"):
-            result = _tui_multi(
-                "test", self.ITEMS, {}, set(), default_selected={0, 2}
-            )
+            result = _tui_multi("test", self.ITEMS, {}, set(), default_selected={0, 2})
         assert "docker" in result
         assert "celery" in result
 
@@ -883,9 +877,7 @@ class TestPromptAddons:
             patch("zenit.cli.prompt._render.read_key", return_value="\r"),
             patch("zenit.cli.prompt._multi.tty_available", return_value=True),
         ):
-            result = prompt_addons(
-                addons, template="blank", default_addons=["celery"]
-            )
+            result = prompt_addons(addons, template="blank", default_addons=["celery"])
         assert "celery" in result
         assert "redis" in result
 
@@ -984,9 +976,7 @@ def test_fallback_multi_auto_selects_only_direct_requirements() -> None:
     items = _items("docker", "redis", "celery")
     requires = _requires(("celery", ["redis"]), ("redis", ["docker"]))
     with patch("builtins.input", return_value="3"):
-        result = _fallback_multi(
-            items, requires, template="", default_addon_names=[]
-        )
+        result = _fallback_multi(items, requires, template="", default_addon_names=[])
     assert "celery" in result
     assert "redis" in result
     assert "docker" not in result
@@ -1031,17 +1021,19 @@ def test_fallback_multi_retries_on_mixed_valid_invalid() -> None:
 
 def test_fallback_multi_eof_raises_system_exit() -> None:
     items = _items("docker", "redis")
-    with patch("builtins.input", side_effect=EOFError), pytest.raises(
-        SystemExit
-    ) as exc:
+    with (
+        patch("builtins.input", side_effect=EOFError),
+        pytest.raises(SystemExit) as exc,
+    ):
         _fallback_multi(items, _requires(), template="", default_addon_names=[])
     assert exc.value.code == 0
 
 
 def test_fallback_multi_keyboard_interrupt_raises_system_exit() -> None:
     items = _items("docker", "redis")
-    with patch("builtins.input", side_effect=KeyboardInterrupt), pytest.raises(
-        SystemExit
+    with (
+        patch("builtins.input", side_effect=KeyboardInterrupt),
+        pytest.raises(SystemExit),
     ):
         _fallback_multi(items, _requires(), template="", default_addon_names=[])
 

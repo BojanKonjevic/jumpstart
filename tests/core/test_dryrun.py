@@ -211,7 +211,15 @@ def test_run_dry_all_fastapi_addons(tmp_path, capsys):
     ctx = _real_ctx(
         tmp_path,
         template="fastapi",
-        addons=["docker", "postgres", "sqlalchemy", "redis", "celery", "sentry", "github-actions"],
+        addons=[
+            "docker",
+            "postgres",
+            "sqlalchemy",
+            "redis",
+            "celery",
+            "sentry",
+            "github-actions",
+        ],
     )
     run_dry(ctx)
     captured = capsys.readouterr()

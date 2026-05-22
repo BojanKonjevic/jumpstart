@@ -97,8 +97,7 @@ def check_can_add(
     if conflicting:
         conflict_str = ", ".join(conflicting)
         raise ZenitError(
-            f"'{addon_id}' conflicts with {conflict_str}. "
-            f"Remove {conflict_str} first."
+            f"'{addon_id}' conflicts with {conflict_str}. Remove {conflict_str} first."
         )
 
     # ── addon's own can_apply check ───────────────────────────────────────────

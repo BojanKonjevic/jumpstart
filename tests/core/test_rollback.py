@@ -245,11 +245,11 @@ def test_addon_failure_restores_modified_existing_file(tmp_path):
     project_dir = tmp_path / "myapp"
     project_dir.mkdir()
     existing = project_dir / "pyproject.toml"
-    existing.write_text("[project]\nname = \"myapp\"\n")
+    existing.write_text('[project]\nname = "myapp"\n')
     with pytest.raises(SystemExit), addon_or_rollback(project_dir, "redis"):
-        existing.write_text("[project]\nname = \"myapp\"\ndependencies = [\"redis\"]\n")
+        existing.write_text('[project]\nname = "myapp"\ndependencies = ["redis"]\n')
         raise RuntimeError("boom")
-    assert existing.read_text() == "[project]\nname = \"myapp\"\n"
+    assert existing.read_text() == '[project]\nname = "myapp"\n'
 
 
 def test_addon_failure_restores_multiple_modified_files(tmp_path):

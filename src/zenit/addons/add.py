@@ -34,6 +34,11 @@ from zenit.core.deps import inject_deps
 from zenit.core.filesystem import RecordingFileSystem
 from zenit.core.justfile import inject_just_recipes
 from zenit.core.lockfile import read_lockfile, write_lockfile
+from zenit.core.manifest import (
+    read_manifest,
+    record_addon_manifest_entries,
+    write_manifest,
+)
 from zenit.core.pkg_name import normalise_pkg_name
 from zenit.core.recipes import _recipe_name
 from zenit.core.render import build_recipe_render_vars, build_render_vars, make_env
@@ -115,6 +120,13 @@ def _run_add_pipeline(
         added_recipes = [n for r in rendered_recipes if (n := _recipe_name(r))]
     else:
         added_recipes = inject_just_recipes(project_dir, rendered_recipes)
+
+    # ── Manifest recording ────────────────────────────────────────────────────
+    if not ctx.dry_run:
+        manifest = read_manifest(project_dir)
+        for addon_cfg in selected_addon_configs:
+            record_addon_manifest_entries(manifest, addon_cfg, string_env, render_vars)
+        write_manifest(project_dir, manifest)
 
     # ── Lockfile ──────────────────────────────────────────────────────────────
     if not ctx.dry_run:

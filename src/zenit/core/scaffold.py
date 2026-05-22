@@ -15,7 +15,7 @@ from zenit.cli.ui import confirm, error, info, print_commands_from_just, success
 from zenit.config.config import load_config
 from zenit.core._apply_loader import load_apply
 from zenit.core._paths import get_zenit_root
-from zenit.core.apply import _pkg_name, apply_contributions
+from zenit.core.apply import apply_contributions
 from zenit.core.collect import collect_all
 from zenit.core.context import Context
 from zenit.core.dryrun import run_dry
@@ -24,16 +24,18 @@ from zenit.core.git import init
 from zenit.core.handlers.justfile_handler import _RECIPE_NAME_RE
 from zenit.core.lockfile import write_lockfile
 from zenit.core.manifest import (
+    _pkg_name,
     add_compose_service,
     add_compose_volume,
     add_dependency,
     add_env_entry,
     add_just_recipe,
     read_manifest,
+    record_addon_manifest_entries,
     write_manifest,
 )
 from zenit.core.pkg_name import normalise_pkg_name
-from zenit.core.render import build_render_vars
+from zenit.core.render import build_render_vars, make_env
 from zenit.core.rollback import scaffold_or_rollback
 from zenit.core.validate import (
     check_preflight,
@@ -148,6 +150,12 @@ def scaffold_project(
         )
         generate_all(ctx, contributions)
         init(project_dir)
+
+        manifest = read_manifest(project_dir)
+        string_env = make_env()
+        for addon_cfg in selected_addon_configs:
+            record_addon_manifest_entries(manifest, addon_cfg, string_env, render_vars)
+        write_manifest(project_dir, manifest)
 
         _stamp_template_manifest(project_dir, template_config)
 
