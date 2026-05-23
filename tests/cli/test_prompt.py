@@ -1162,14 +1162,16 @@ class TestPromptMultiAddon:
         assert "docker" in result
         assert "redis" in result
 
-    def test_cannot_select_unavailable(self) -> None:
+    def test_auto_selects_deps_on_toggle(self) -> None:
         keys = iter(["\x1b[B", "\x1b[B", " ", "\r"])
+        requires_map = {"docker": [], "redis": [], "celery": ["redis"]}
         with (
             patch("zenit.cli.prompt._render.read_key", side_effect=keys),
             patch("zenit.cli.prompt._multi.tty_available", return_value=True),
         ):
-            result = prompt_multi_addon(self.ITEMS, unavailable_indices={2})
-        assert "celery" not in result
+            result = prompt_multi_addon(self.ITEMS, requires_map=requires_map)
+        assert "celery" in result
+        assert "redis" in result
 
     def test_fallback_path(self) -> None:
         with (
@@ -1197,54 +1199,61 @@ class TestFallbackMultiAddon:
 
     def test_empty_input_returns_empty(self) -> None:
         with patch("builtins.input", return_value=""):
-            assert _fallback_multi_addon(self.ITEMS, set()) == []
+            assert _fallback_multi_addon(self.ITEMS) == []
 
     def test_select_by_number(self) -> None:
         with patch("builtins.input", return_value="2"):
-            assert _fallback_multi_addon(self.ITEMS, set()) == ["redis"]
+            assert _fallback_multi_addon(self.ITEMS) == ["redis"]
 
     def test_select_by_name(self) -> None:
         with patch("builtins.input", return_value="celery"):
-            assert _fallback_multi_addon(self.ITEMS, set()) == ["celery"]
+            assert _fallback_multi_addon(self.ITEMS) == ["celery"]
 
     def test_select_multiple(self) -> None:
         with patch("builtins.input", return_value="1 2"):
-            result = _fallback_multi_addon(self.ITEMS, set())
+            result = _fallback_multi_addon(self.ITEMS)
         assert "docker" in result
         assert "redis" in result
 
-    def test_unavailable_refused_by_number(self) -> None:
-        with (
-            patch("builtins.input", side_effect=["3", ""]),
-        ):
-            assert _fallback_multi_addon(self.ITEMS, {2}) == []
+    def test_fallback_add_auto_selects_deps(self) -> None:
+        requires_map = {"docker": [], "redis": [], "celery": ["redis"]}
+        with patch("builtins.input", return_value="3"):
+            result = _fallback_multi_addon(
+                self.ITEMS, context="add", requires_map=requires_map
+            )
+        assert "celery" in result
+        assert "redis" in result
 
     def test_out_of_range_retries(self) -> None:
         with (
             patch("builtins.input", side_effect=["5", "1"]),
         ):
-            assert _fallback_multi_addon(self.ITEMS, set()) == ["docker"]
+            assert _fallback_multi_addon(self.ITEMS) == ["docker"]
 
     def test_unknown_name_retries(self) -> None:
         with (
             patch("builtins.input", side_effect=["zzz", "1"]),
         ):
-            assert _fallback_multi_addon(self.ITEMS, set()) == ["docker"]
+            assert _fallback_multi_addon(self.ITEMS) == ["docker"]
 
-    def test_context_remove_label(self, capsys: pytest.CaptureFixture[str]) -> None:
+    def test_context_remove_shows_template_marker(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
         items = [
             ("redis", "Redis", []),
-            ("celery", "Celery", ["redis"]),
+            ("celery", "Celery", ["__template__fastapi"]),
         ]
         with (
             patch("builtins.input", return_value=""),
             patch("zenit.cli.prompt._multi.tty_available", return_value=False),
         ):
-            prompt_multi_addon(items, unavailable_indices={1}, context="remove")
+            prompt_multi_addon(items, context="remove")
         captured = capsys.readouterr()
-        assert "required by" in captured.out
+        assert "required by fastapi template" in captured.out
 
-    def test_context_add_label(self, capsys: pytest.CaptureFixture[str]) -> None:
+    def test_context_add_fallback_lists_items(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
         items = [
             ("celery", "Celery", ["redis"]),
             ("redis", "Redis", []),
@@ -1253,9 +1262,10 @@ class TestFallbackMultiAddon:
             patch("builtins.input", return_value=""),
             patch("zenit.cli.prompt._multi.tty_available", return_value=False),
         ):
-            prompt_multi_addon(items, unavailable_indices={0}, context="add")
+            prompt_multi_addon(items, context="add")
         captured = capsys.readouterr()
-        assert "needs" in captured.out
+        assert "celery" in captured.out
+        assert "redis" in captured.out
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

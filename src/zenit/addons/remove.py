@@ -614,30 +614,20 @@ def remove_addon_interactive(dry_run: bool = False, yes: bool = False) -> None:
         pass
 
     items = []
-    unavailable_indices: set[int] = set()
 
     installed.sort(key=lambda c: c.id)
 
-    for i, addon in enumerate(installed):
-        dependents = [
-            other_id
-            for other_id in lockfile.addons
-            if other_id != addon.id and addon.id in requires_map.get(other_id, [])
-        ]
+    for addon in installed:
         reasons: list[str] = []
-        if dependents:
-            reasons.extend(dependents)
         if addon.id in template_required:
             reasons.append(f"__template__{lockfile.template}")
         items.append((addon.id, addon.description, reasons))
-        if reasons:
-            unavailable_indices.add(i)
 
     selected = prompt_multi_addon(
         items,
-        unavailable_indices=unavailable_indices,
         context="remove",
         prompt="Select addon(s) to remove:",
+        requires_map=requires_map,
     )
 
     if not selected:

@@ -91,18 +91,27 @@ def _render_multi(
             extra = f"  {DIM}(fastapi only){RESET}"
         elif is_unavailable and full_items and orig_i < len(full_items):
             reasons = full_items[orig_i][2]
-            if reasons:
-                parts = []
-                template_blocks = [r for r in reasons if r.startswith("__template__")]
-                addon_deps = [r for r in reasons if not r.startswith("__template__")]
-                if addon_deps:
-                    label = "required by" if context == "remove" else "needs"
-                    parts.append(f"{label} {', '.join(addon_deps)}")
-                if template_blocks:
-                    tmpl = template_blocks[0].replace("__template__", "")
-                    parts.append(f"required by {tmpl} template")
-                if parts:
-                    extra = f"  {DIM}({', '.join(parts)}){RESET}"
+            parts = []
+            template_blocks = [r for r in reasons if r.startswith("__template__")]
+            addon_deps = [r for r in reasons if not r.startswith("__template__")]
+
+            if context == "remove" and not addon_deps:
+                dep_names = [
+                    items[j][0]
+                    for j, (other_name, _) in enumerate(items)
+                    if name in requires_map.get(other_name, []) and j not in selected
+                ]
+                if dep_names:
+                    addon_deps = dep_names
+
+            if addon_deps:
+                label = "required by" if context == "remove" else "needs"
+                parts.append(f"{label} {', '.join(addon_deps)}")
+            if template_blocks:
+                tmpl = template_blocks[0].replace("__template__", "")
+                parts.append(f"required by {tmpl} template")
+            if parts:
+                extra = f"  {DIM}({', '.join(parts)}){RESET}"
         elif orig_i in default_selected and orig_i not in locked and not is_cursor:
             extra = f"  {DIM}(default){RESET}"
 
@@ -192,12 +201,10 @@ def _tui_multi(
     always_locked: set[int],
     default_selected: set[int] | None = None,
     incompatible: set[int] | None = None,
-    unavailable: set[int] | None = None,
     full_items: list[tuple[str, str, list[str]]] | None = None,
     context: str = "add",
 ) -> list[str]:
     incompatible = incompatible or set()
-    unavailable = unavailable or set()
     print(f"\n  {BOLD}{prompt}{RESET}\n")
     n_items = len(items)
     reserve_lines(n_items + 2)
@@ -221,7 +228,28 @@ def _tui_multi(
                     locked.add(name_to_idx[req])
         return locked
 
+    def _compute_unavailable() -> set[int]:
+        if context != "remove":
+            return set()
+        unavail: set[int] = set()
+        for idx, (name, _) in enumerate(items):
+            if full_items and idx < len(full_items):
+                reasons = full_items[idx][2]
+                if any(r.startswith("__template__") for r in reasons):
+                    unavail.add(idx)
+                    continue
+
+            for other_idx, (other_name, _) in enumerate(items):
+                if (
+                    name in requires_map.get(other_name, [])
+                    and other_idx not in selected
+                ):
+                    unavail.add(idx)
+                    break
+        return unavail
+
     locked = _compute_locked()
+    unavailable = _compute_unavailable()
 
     def render() -> int:
         return _render_multi(
@@ -241,7 +269,14 @@ def _tui_multi(
         )
 
     def on_key(key: str) -> object:
-        nonlocal cursor, flash, locked, search_query, filtered_indices_list
+        nonlocal \
+            cursor, \
+            flash, \
+            locked, \
+            search_query, \
+            filtered_indices_list, \
+            unavailable, \
+            selected
         flash = ""
 
         if key == "\x1b[A":
@@ -261,6 +296,16 @@ def _tui_multi(
                 reasons = full_items[orig_idx][2] if full_items else []
                 template_blocks = [r for r in reasons if r.startswith("__template__")]
                 addon_deps = [r for r in reasons if not r.startswith("__template__")]
+
+                if context == "remove" and not addon_deps:
+                    dep_names = [
+                        items[i][0]
+                        for i, (n, _) in enumerate(items)
+                        if item_name in requires_map.get(n, []) and i not in selected
+                    ]
+                    if dep_names:
+                        addon_deps = dep_names
+
                 if addon_deps:
                     label = "required by" if context == "remove" else "needs"
                     flash = f"{item_name} {label}: {', '.join(addon_deps)}"
@@ -311,6 +356,9 @@ def _tui_multi(
             filtered_indices_list = filter_indices(items, search_query)
             cursor = 0
         locked = _compute_locked()
+        if context == "remove":
+            unavailable = _compute_unavailable()
+            selected -= unavailable
         return None
 
     run_tui(render, on_key)
@@ -434,9 +482,9 @@ def _fallback_multi(
 
 def prompt_multi_addon(
     items: list[tuple[str, str, list[str]]],
-    unavailable_indices: set[int] | None = None,
     context: str = "add",
     prompt: str = "Select addons:",
+    requires_map: dict[str, list[str]] | None = None,
 ) -> list[str]:
     """Multi-select TUI for add/remove context.
 
@@ -444,18 +492,18 @@ def prompt_multi_addon(
     has no template concept — it simply shows items and lets the user pick
     any number of available ones.
     """
-    unavailable_indices = unavailable_indices or set()
+    if requires_map is None:
+        requires_map = {}
     display_items = [(name, desc) for name, desc, _ in items]
 
     if not tty_available():
-        return _fallback_multi_addon(items, unavailable_indices, context)
+        return _fallback_multi_addon(items, context, requires_map)
 
     return _tui_multi(
         prompt,
         display_items,
-        requires_map={},
+        requires_map,
         always_locked=set(),
-        unavailable=unavailable_indices,
         full_items=items,
         context=context,
     )
@@ -463,25 +511,21 @@ def prompt_multi_addon(
 
 def _fallback_multi_addon(
     items: list[tuple[str, str, list[str]]],
-    unavailable_indices: set[int],
     context: str = "add",
+    requires_map: dict[str, list[str]] | None = None,
 ) -> list[str]:
     """Fallback numbered-list multi-picker for non-tty environments."""
+    if requires_map is None:
+        requires_map = {}
     action = "remove" if context == "remove" else "add"
 
     print(f"\n  Select addon(s) to {action}:\n")
     for i, (addon_id, desc, reasons) in enumerate(items, 1):
-        is_unavailable = (i - 1) in unavailable_indices
         markers = []
-        if is_unavailable and reasons:
-            template_blocks = [r for r in reasons if r.startswith("__template__")]
-            addon_deps = [r for r in reasons if not r.startswith("__template__")]
-            if addon_deps:
-                label = "required by" if context == "remove" else "needs"
-                markers.append(f"{label} {', '.join(addon_deps)}")
-            if template_blocks:
-                tmpl = template_blocks[0].replace("__template__", "")
-                markers.append(f"required by {tmpl} template")
+        template_blocks = [r for r in reasons if r.startswith("__template__")]
+        if template_blocks:
+            tmpl = template_blocks[0].replace("__template__", "")
+            markers.append(f"required by {tmpl} template")
         suffix = f"  {DIM}({', '.join(markers)}){RESET}" if markers else ""
         print(f"    {CYAN}{i}){RESET} {addon_id:<18} {DIM}—{RESET} {desc}{suffix}")
     print()
@@ -509,39 +553,29 @@ def _fallback_multi_addon(
                     valid = False
                     break
                 addon_id = items[idx][0]
-                if idx in unavailable_indices:
-                    warn(
-                        f"'{addon_id}' cannot be selected — "
-                        + (
-                            "it is required by other addons"
-                            if context == "remove"
-                            else "dependencies not met"
-                        )
-                        + "."
-                    )
-                    valid = False
-                    break
                 if addon_id not in selected:
                     selected.append(addon_id)
+                    if context == "add":
+                        for req in requires_map.get(addon_id, []):
+                            if req not in selected:
+                                selected.append(req)
+                                warn(
+                                    f"Auto-selected '{req}' (required by '{addon_id}')."
+                                )
             else:
                 # Try by name
                 name_lower = token.lower()
                 matched = False
-                for idx, (addon_id, _, _) in enumerate(items):
+                for _idx, (addon_id, _, _) in enumerate(items):
                     if addon_id.lower() == name_lower and addon_id not in selected:
-                        if idx in unavailable_indices:
-                            warn(
-                                f"'{addon_id}' cannot be selected — "
-                                + (
-                                    "it is required by other addons"
-                                    if context == "remove"
-                                    else "dependencies not met"
-                                )
-                                + "."
-                            )
-                            valid = False
-                            break
                         selected.append(addon_id)
+                        if context == "add":
+                            for req in requires_map.get(addon_id, []):
+                                if req not in selected:
+                                    selected.append(req)
+                                    warn(
+                                        f"Auto-selected '{req}' (required by '{addon_id}')."
+                                    )
                         matched = True
                         break
                 if not matched:

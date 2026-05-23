@@ -290,6 +290,7 @@ def add_addon_interactive(dry_run: bool = False, yes: bool = False) -> None:
         raise typer.Exit(1)
 
     available = get_available_addons()
+    requires_map = {cfg.id: cfg.requires for cfg in available}
 
     already_installed = set(lockfile.addons)
     if already_installed:
@@ -298,17 +299,12 @@ def add_addon_interactive(dry_run: bool = False, yes: bool = False) -> None:
         )
 
     items = []
-    unavailable_indices = set()
 
     for addon in available:
         if addon.id in already_installed:
             continue
 
-        deps_met = all(req in lockfile.addons for req in addon.requires)
         items.append((addon.id, addon.description, addon.requires))
-
-        if not deps_met:
-            unavailable_indices.add(len(items) - 1)
 
     if not items:
         info("All available addons are already installed.")
@@ -317,9 +313,9 @@ def add_addon_interactive(dry_run: bool = False, yes: bool = False) -> None:
 
     selected = prompt_multi_addon(
         items,
-        unavailable_indices=unavailable_indices,
         context="add",
         prompt="Select addon(s) to add:",
+        requires_map=requires_map,
     )
 
     if not selected:
@@ -327,7 +323,7 @@ def add_addon_interactive(dry_run: bool = False, yes: bool = False) -> None:
         print()
         return
 
-    for addon_id in selected:
+    for addon_id in sorted(selected, key=lambda a: len(requires_map.get(a, []))):
         add_addon(addon_id, dry_run=dry_run, yes=yes)
 
 
