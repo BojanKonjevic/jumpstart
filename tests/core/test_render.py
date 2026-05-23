@@ -10,7 +10,7 @@ from __future__ import annotations
 import jinja2
 import pytest
 
-from zenit.core.render import make_env
+from zenit.core.render import build_render_vars, make_env
 
 # ── Delimiter configuration ───────────────────────────────────────────────────
 
@@ -162,3 +162,50 @@ def test_two_envs_with_different_loader_paths_are_independent(tmp_path):
 
     assert env_a.get_template("tmpl.txt").render(x="hello") == "from A: hello"
     assert env_b.get_template("tmpl.txt").render(x="hello") == "from B: hello"
+
+
+# ── build_render_vars ──────────────────────────────────────────────────────────
+
+
+def test_build_render_vars_includes_deps_and_dev_deps():
+    result = build_render_vars(
+        name="myapp",
+        pkg_name="myapp",
+        template="blank",
+        deps=["fastapi", "redis"],
+        dev_deps=["pytest", "mypy"],
+    )
+    assert result["deps"] == ["fastapi", "redis"]
+    assert result["dev_deps"] == ["pytest", "mypy"]
+
+
+def test_build_render_vars_defaults_deps_to_empty():
+    result = build_render_vars(name="myapp", pkg_name="myapp", template="blank")
+    assert result["deps"] == []
+    assert result["dev_deps"] == []
+
+
+def test_build_render_vars_deps_are_renderable_in_template():
+    env = make_env()
+    vars = build_render_vars(
+        name="myapp",
+        pkg_name="myapp",
+        template="blank",
+        deps=["fastapi", "redis>=5"],
+    )
+    tmpl = "[% for dep in deps %](( dep ))\n[% endfor %]"
+    result = env.from_string(tmpl).render(**vars)
+    assert result == "fastapi\nredis>=5\n"
+
+
+def test_build_render_vars_dev_deps_are_renderable_in_template():
+    env = make_env()
+    vars = build_render_vars(
+        name="myapp",
+        pkg_name="myapp",
+        template="blank",
+        dev_deps=["pytest>=8", "mypy"],
+    )
+    tmpl = "[% for dep in dev_deps %](( dep ))\n[% endfor %]"
+    result = env.from_string(tmpl).render(**vars)
+    assert result == "pytest>=8\nmypy\n"

@@ -116,14 +116,17 @@ def scaffold_project(tmp_path: Path) -> Callable[[str, str, list[str]], Path]:
         template_config = load_template_config(ZENIT_ROOT, template)
         selected_addon_configs = [cfg for cfg in available if cfg.id in addons]
 
+        contributions = collect_all(template_config, selected_addon_configs)
+
         render_vars = build_render_vars(
             name=name,
             pkg_name=pkg_name,
             template=template,
             addons=addons,
+            deps=contributions.deps,
+            dev_deps=contributions.template_dev_deps + contributions.dev_deps,
         )
 
-        contributions = collect_all(template_config, selected_addon_configs)
         apply_contributions(
             ctx, fs, contributions, template_config.injection_points, render_vars
         )

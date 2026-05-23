@@ -65,12 +65,18 @@ def build_render_vars(
     *,
     secret_key: str = "change-me-run-openssl-rand-hex-32",
     addons: list[str] | None = None,
+    deps: list[str] | None = None,
+    dev_deps: list[str] | None = None,
 ) -> dict[str, object]:
     """Build the standard render-variables dict for template rendering.
 
     ``has_postgres`` and ``has_redis`` are derived from the ``addons`` list
     so that all rendering code stays in sync without callers having to pass
     redundant flags.
+
+    ``deps`` and ``dev_deps`` let template files use ``(( deps ))`` and
+    ``(( dev_deps ))`` in their content — e.g. to list dependencies in a
+    README or generate an ``__init__.py`` that re-exports them.
     """
     addon_list = addons or []
     return {
@@ -81,6 +87,8 @@ def build_render_vars(
         "has_postgres": "postgres" in addon_list,
         "has_redis": "redis" in addon_list,
         "addons": addon_list,
+        "deps": deps or [],
+        "dev_deps": dev_deps or [],
     }
 
 
@@ -89,6 +97,8 @@ def build_recipe_render_vars(
     pkg_name: str,
     template: str,
     addons: list[str],
+    deps: list[str] | None = None,
+    dev_deps: list[str] | None = None,
 ) -> dict[str, object]:
     """Build render-variables for Justfile recipe rendering only."""
     return {
@@ -96,4 +106,6 @@ def build_recipe_render_vars(
         "pkg_name": pkg_name,
         "template": template,
         "addons": addons,
+        "deps": deps or [],
+        "dev_deps": dev_deps or [],
     }

@@ -29,6 +29,8 @@ def generate_all(
         pkg_name=ctx.pkg_name,
         template=ctx.template,
         addons=ctx.addons,
+        deps=contributions.deps,
+        dev_deps=contributions.template_dev_deps + contributions.dev_deps,
     )
 
     rendered_template_recipes = [

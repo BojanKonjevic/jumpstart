@@ -140,6 +140,8 @@ def scaffold_project(
             pkg_name=pkg_name,
             template=tpl,
             addons=adns,
+            deps=contributions.deps,
+            dev_deps=contributions.template_dev_deps + contributions.dev_deps,
         )
 
         write_lockfile(project_dir, tpl, adns)

@@ -84,6 +84,8 @@ def _run_add_pipeline(
         pkg_name=pkg_name,
         template=template,
         addons=ctx.addons,
+        deps=contributions.deps,
+        dev_deps=contributions.dev_deps,
     )
 
     apply_contributions(
@@ -115,6 +117,8 @@ def _run_add_pipeline(
         pkg_name=pkg_name,
         template=template,
         addons=ctx.addons,
+        deps=contributions.deps,
+        dev_deps=contributions.dev_deps,
     )
     string_env = make_env()
     rendered_recipes = [
