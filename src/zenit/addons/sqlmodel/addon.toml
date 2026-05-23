@@ -1,0 +1,5 @@
+[addon]
+id = "sqlmodel"
+description = "SQLModel ORM (Pydantic + SQLAlchemy)"
+requires = ["sqlalchemy"]
+templates = ["fastapi"]

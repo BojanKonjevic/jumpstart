@@ -1,0 +1,4 @@
+[template]
+id = "fastapi"
+description = "FastAPI web framework skeleton"
+requires_addons = []

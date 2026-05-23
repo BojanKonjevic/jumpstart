@@ -8,7 +8,7 @@ from pathlib import Path
 
 import typer
 
-from zenit.addons._registry import get_available_addons
+from zenit.addons._registry import get_addon, list_addons
 from zenit.cli.prompt import prompt_addons, prompt_template
 from zenit.cli.prompt._render import TEMPLATES
 from zenit.cli.ui import confirm, error, info, print_commands_from_just, success
@@ -59,12 +59,13 @@ def validate_template_exists(template: str) -> None:
 
 def validate_addons_exist(addons: list[str]) -> None:
     """Exit with code 1 if any addon doesn't exist."""
-    available = {cfg.id for cfg in get_available_addons()}
+    available_meta = list_addons()
+    available_ids = {m.id for m in available_meta}
     for addon in addons:
-        if addon not in available:
+        if addon not in available_ids:
             error(f"Unknown addon '{addon}'.")
             valid = "\n    ".join(
-                f"• {cfg.id}  — {cfg.description}" for cfg in get_available_addons()
+                f"• {m.id}  — {m.description}" for m in available_meta
             )
             print(f"\n  Available addons:\n    {valid}\n")
             raise typer.Exit(1)
@@ -99,12 +100,12 @@ def scaffold_project(
     else:
         tpl = prompt_template(default=cfg.default_template)
 
-    available = get_available_addons()
+    available_meta = list_addons()
     if addons is not None:
         adns = addons
     else:
-        adns = prompt_addons(available, tpl, default_addons=cfg.default_addons)
-    validate_addon_deps(adns, available, template=tpl)
+        adns = prompt_addons(available_meta, tpl, default_addons=cfg.default_addons)
+    validate_addon_deps(adns, available_meta, template=tpl)
 
     ctx = Context(
         name=name,
@@ -131,7 +132,7 @@ def scaffold_project(
         load_apply(zenit_root / "templates" / "_common" / "apply.py")(ctx, fs)
 
         template_config = load_template_config(zenit_root, tpl)
-        selected_addon_configs = [a for a in available if a.id in adns]
+        selected_addon_configs = [get_addon(a) for a in adns]
 
         contributions = collect_all(template_config, selected_addon_configs)
 

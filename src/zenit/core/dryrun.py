@@ -3,7 +3,7 @@ recording context that captures every file operation without touching disk."""
 
 from __future__ import annotations
 
-from zenit.addons._registry import get_available_addons
+from zenit.addons._registry import get_addon, list_addons
 from zenit.cli.ui import (
     BOLD,
     DIM,
@@ -41,9 +41,11 @@ def run_dry(ctx: Context) -> None:
     sr = dry_ctx.zenit_root
     load_apply(sr / "templates" / "_common" / "apply.py")(dry_ctx, fs)
 
-    available = get_available_addons()
+    available_meta = list_addons()
     template_config = load_template_config(sr, dry_ctx.template)
-    selected_addon_configs = [cfg for cfg in available if cfg.id in dry_ctx.addons]
+    selected_addon_configs = [
+        get_addon(m.id) for m in available_meta if m.id in dry_ctx.addons
+    ]
 
     contributions = collect_all(template_config, selected_addon_configs)
 

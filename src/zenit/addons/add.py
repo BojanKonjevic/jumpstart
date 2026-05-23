@@ -8,7 +8,7 @@ from pathlib import Path
 
 import typer
 
-from zenit.addons._registry import get_available_addons
+from zenit.addons._registry import get_addon, list_addons
 from zenit.addons.checks import check_can_add
 from zenit.cli.prompt import prompt_multi_addon
 from zenit.cli.ui import (
@@ -65,8 +65,7 @@ class _AddResult:
 def _run_add_pipeline(
     ctx: Context,
     fs: FileSystem,
-    addon_id: str,
-    available: list[AddonConfig],
+    addon_cfg: AddonConfig,
 ) -> _AddResult:
     """Shared pipeline body for both real and dry-run add operations."""
 
@@ -76,8 +75,7 @@ def _run_add_pipeline(
     project_dir = ctx.project_dir
 
     template_config = load_template_config(zenit_root, template)
-    selected_addon_configs = [a for a in available if a.id == addon_id]
-    contributions = collect_addon_only(selected_addon_configs)
+    contributions = collect_addon_only([addon_cfg])
 
     render_vars = build_render_vars(
         name=ctx.name,
@@ -135,14 +133,13 @@ def _run_add_pipeline(
     if not ctx.dry_run:
         manifest = read_manifest(project_dir)
         docker_active = "docker" in ctx.addons
-        for addon_cfg in selected_addon_configs:
-            record_addon_manifest_entries(
-                manifest,
-                addon_cfg,
-                string_env,
-                render_vars,
-                docker_active=docker_active,
-            )
+        record_addon_manifest_entries(
+            manifest,
+            addon_cfg,
+            string_env,
+            render_vars,
+            docker_active=docker_active,
+        )
         write_manifest(project_dir, manifest)
 
     # ── Recorded files (dry-run only) ─────────────────────────────────────────
@@ -160,10 +157,9 @@ def add_addon(addon_id: str, dry_run: bool = False, yes: bool = False) -> None:
     """Apply a single addon to an existing zenit project."""
 
     project_dir = Path.cwd()
-    available = get_available_addons()
 
     try:
-        lockfile = check_can_add(project_dir, addon_id, available)
+        lockfile = check_can_add(project_dir, addon_id)
     except ZenitError as exc:
         error(str(exc))
         raise typer.Exit(1) from exc
@@ -185,7 +181,8 @@ def add_addon(addon_id: str, dry_run: bool = False, yes: bool = False) -> None:
             project_dir=project_dir,
             dry_run=True,
         )
-        result = _run_add_pipeline(ctx, fs, addon_id, available)
+        addon_cfg = get_addon(addon_id)
+        result = _run_add_pipeline(ctx, fs, addon_cfg)
 
         dry_run_banner("add", addon_id)
 
@@ -225,6 +222,7 @@ def add_addon(addon_id: str, dry_run: bool = False, yes: bool = False) -> None:
         else:
             warn("Non‑interactive mode — proceeding automatically.")
 
+    addon_cfg = get_addon(addon_id)
     with addon_or_rollback(project_dir, addon_id):
         ctx = Context(
             name=project_dir.name,
@@ -235,7 +233,7 @@ def add_addon(addon_id: str, dry_run: bool = False, yes: bool = False) -> None:
             project_dir=project_dir,
         )
         fs = RealFileSystem(project_dir)
-        result = _run_add_pipeline(ctx, fs, addon_id, available)
+        result = _run_add_pipeline(ctx, fs, addon_cfg)
         write_lockfile(project_dir, template, ctx.addons)
 
     # ── Backfill compose entries when adding docker ──────────────────
@@ -294,8 +292,8 @@ def add_addon_interactive(dry_run: bool = False, yes: bool = False) -> None:
         error(".zenit.toml exists but has no template field — it may be corrupt.")
         raise typer.Exit(1)
 
-    available = get_available_addons()
-    graph = DependencyGraph.build(available)
+    available_meta = list_addons()
+    graph = DependencyGraph.build_from_meta(available_meta)
 
     already_installed = set(lockfile.addons)
     if already_installed:
@@ -303,14 +301,14 @@ def add_addon_interactive(dry_run: bool = False, yes: bool = False) -> None:
             f"\n  {DIM}Already installed: {', '.join(sorted(already_installed))}{RESET}"
         )
 
-    requires_map = {cfg.id: cfg.requires for cfg in available}
+    requires_map = {m.id: m.requires for m in available_meta}
     items = []
 
-    for addon in available:
-        if addon.id in already_installed:
+    for addon_meta in available_meta:
+        if addon_meta.id in already_installed:
             continue
 
-        items.append((addon.id, addon.description, addon.requires))
+        items.append((addon_meta.id, addon_meta.description, addon_meta.requires))
 
     if not items:
         info("All available addons are already installed.")
@@ -342,8 +340,7 @@ def _backfill_compose_on_docker_add(
     """When docker is added to a project with existing addons, backfill their
     compose services and volumes into both compose.yml and the manifest."""
     template_config = load_template_config(zenit_root, template)
-    available = get_available_addons()
-    active_configs = [a for a in available if a.id in current_addons]
+    active_configs = [get_addon(a) for a in current_addons]
 
     contributions = collect_all(template_config, active_configs)
     if not contributions.compose_services and not contributions.compose_volumes:

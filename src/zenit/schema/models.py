@@ -221,6 +221,26 @@ class TemplateConfig:
 
 
 @dataclass
+class AddonMeta:
+    """Lightweight addon metadata — read from ``addon.toml`` without exec."""
+
+    id: str
+    description: str
+    requires: list[str] = field(default_factory=list)
+    conflicts_with: list[str] = field(default_factory=list)
+    templates: list[str] = field(default_factory=list)
+
+
+@dataclass
+class TemplateMeta:
+    """Lightweight template metadata — read from ``template.toml`` without exec."""
+
+    id: str
+    description: str
+    requires_addons: list[str] = field(default_factory=list)
+
+
+@dataclass
 class Contributions:
     """Merged contributions from all selected addons (and the template)."""
 

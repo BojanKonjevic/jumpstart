@@ -6,6 +6,8 @@ import sys
 from collections.abc import Callable
 
 from zenit.cli.ui import BOLD, CYAN, DIM, GREEN, MAGENTA, RESET, YELLOW, abort, warn
+from zenit.core._paths import get_zenit_root
+from zenit.templates._load_config import list_templates
 
 from ._keys import read_key
 
@@ -52,11 +54,16 @@ CROSS = f"{DIM}—{RESET}"
 LABEL_WIDTH = 20
 DESC_INDENT = "  "
 
-TEMPLATES: list[tuple[str, str]] = [
-    ("blank", "dev tools only  (pytest, ruff, mypy)"),
-    ("fastapi", "FastAPI web framework skeleton"),
-]
 
+def _get_templates() -> list[tuple[str, str]]:
+    """Return template id/description pairs from TOML metadata (cached)."""
+    try:
+        return [(t.id, t.description) for t in list_templates(get_zenit_root())]
+    except Exception:
+        return []
+
+
+TEMPLATES: list[tuple[str, str]] = _get_templates()
 TEMPLATE_REQUIRES: dict[str, list[str]] = {}
 
 

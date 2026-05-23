@@ -1,0 +1,3 @@
+[addon]
+id = "postgres"
+description = "PostgreSQL driver + DATABASE_URL + compose service"

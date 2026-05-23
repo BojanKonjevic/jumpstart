@@ -130,9 +130,9 @@ def test_default_hides_incompatible_addons_for_template() -> None:
 
 
 def test_default_all_addons_installed_shows_message() -> None:
-    from zenit.addons._registry import get_available_addons
+    from zenit.addons._registry import list_addons
 
-    all_ids = [a.id for a in get_available_addons()]
+    all_ids = [a.id for a in list_addons()]
     lf = _lockfile(template="fastapi", addons=all_ids)
     with patch(_PATCH, return_value=lf):
         result = runner.invoke(app, ["list"])

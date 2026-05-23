@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 
 from zenit.core.dependency import DependencyGraph, DependencySpec
-from zenit.schema.models import AddonConfig
+from zenit.schema.models import AddonConfig, AddonMeta
 
 # ── helpers ───────────────────────────────────────────────────────────────────
 
@@ -480,3 +480,52 @@ class TestDependencySpec:
         spec = DependencySpec(id="redis")
         with pytest.raises(AttributeError):
             spec.id = "other"  # type: ignore[misc]
+
+
+# ── build_from_meta ─────────────────────────────────────────────────────────────
+
+
+class TestBuildFromMeta:
+    def _m(self, id: str, requires: list[str] | None = None) -> AddonMeta:
+        return AddonMeta(id=id, description="", requires=requires or [])
+
+    def test_empty(self) -> None:
+        graph = DependencyGraph.build_from_meta([])
+        assert graph.nodes == {}
+        assert graph.edges == {}
+        assert graph.reverse == {}
+
+    def test_single(self) -> None:
+        graph = DependencyGraph.build_from_meta([self._m("redis")])
+        assert "redis" in graph.nodes
+        assert graph.edges["redis"] == []
+
+    def test_dep_edge(self) -> None:
+        graph = DependencyGraph.build_from_meta(
+            [self._m("redis"), self._m("celery", requires=["redis"])]
+        )
+        assert graph.edges["celery"] == ["redis"]
+        assert graph.reverse["redis"] == ["celery"]
+
+    def test_behaves_like_build(self) -> None:
+        """build_from_meta and build produce identical graphs for same data."""
+        graph_a = DependencyGraph.build(
+            [
+                AddonConfig(id="redis", description=""),
+                AddonConfig(id="celery", description="", requires=["redis"]),
+            ]
+        )
+        graph_b = DependencyGraph.build_from_meta(
+            [self._m("redis"), self._m("celery", requires=["redis"])]
+        )
+        assert graph_a.nodes == graph_b.nodes
+        assert graph_a.edges == graph_b.edges
+        assert graph_a.reverse == graph_b.reverse
+
+    def test_validate_on_meta_graph(self) -> None:
+        graph = DependencyGraph.build_from_meta(
+            [self._m("a"), self._m("b", requires=["missing"])]
+        )
+        errors = graph.validate()
+        assert any(e.type == "missing_dep" for e in errors)
+        assert any("missing" in e.message for e in errors)

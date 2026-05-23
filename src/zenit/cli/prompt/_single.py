@@ -5,6 +5,8 @@ from __future__ import annotations
 import sys
 
 from zenit.cli.ui import BOLD, DIM, GREEN, RESET
+from zenit.core._paths import get_zenit_root
+from zenit.templates._load_config import list_templates
 
 from ._keys import tty_available
 from ._render import (
@@ -23,22 +25,24 @@ def prompt_template(default: str | None = None) -> str:
     if not tty_available():
         return _fallback_template(default)
 
+    templates = TEMPLATES or _load_templates_list()
+
     cursor = 0
     search_query = ""
-    filtered = list(range(len(TEMPLATES)))
+    filtered = list(range(len(templates)))
     if default is not None:
-        for i, (name, _) in enumerate(TEMPLATES):
+        for i, (name, _) in enumerate(templates):
             if name == default:
                 cursor = i
                 break
 
     print(f"\n  {BOLD}Select a base template:{RESET}\n")
-    reserve_lines(len(TEMPLATES) + 2)
-    clear_lines(len(TEMPLATES) + 2)
+    reserve_lines(len(templates) + 2)
+    clear_lines(len(templates) + 2)
 
     def render() -> int:
         return render_single(
-            TEMPLATES,
+            templates,
             cursor,
             default_name=default,
             filtered_indices=filtered,
@@ -57,18 +61,18 @@ def prompt_template(default: str | None = None) -> str:
             return _DONE
         elif key == "\x1b":
             search_query = ""
-            filtered = list(range(len(TEMPLATES)))
+            filtered = list(range(len(templates)))
             cursor = 0
         elif key in ("\x7f", "\b"):
             search_query = search_query[:-1]
-            filtered = filter_indices(TEMPLATES, search_query)
+            filtered = filter_indices(templates, search_query)
             cursor = 0
         elif key == "\x03":
             print()
             sys.exit(0)
         elif len(key) == 1 and key.isprintable():
             search_query += key
-            filtered = filter_indices(TEMPLATES, search_query)
+            filtered = filter_indices(templates, search_query)
             cursor = 0
         return None
 
@@ -76,10 +80,10 @@ def prompt_template(default: str | None = None) -> str:
 
     if filtered:
         orig_i = filtered[cursor]
-        name, desc = TEMPLATES[orig_i]
+        name, desc = templates[orig_i]
         clear_lines(
             render_single(
-                TEMPLATES,
+                templates,
                 cursor,
                 default_name=default,
                 filtered_indices=filtered,
@@ -87,10 +91,18 @@ def prompt_template(default: str | None = None) -> str:
             )
         )
     else:
-        name, desc = TEMPLATES[0]
+        name, desc = templates[0]
         clear_lines(1)
     print(f"  {GREEN}✓{RESET}  {BOLD}{name}{RESET}  {DIM}{desc}{RESET}\n")
     return name
+
+
+def _load_templates_list() -> list[tuple[str, str]]:
+    """Load template metadata from TOML files (dynamic fallback)."""
+    try:
+        return [(t.id, t.description) for t in list_templates(get_zenit_root())]
+    except Exception:
+        return TEMPLATES
 
 
 def prompt_single_addon(
@@ -193,11 +205,12 @@ def prompt_single_addon(
 
 
 def _fallback_template(default: str | None = None) -> str:
+    templates = TEMPLATES or _load_templates_list()
     print("\n  Select a base template:\n")
-    idx = run_fallback(TEMPLATES, default_name=default, prompt_text="Template")
+    idx = run_fallback(templates, default_name=default, prompt_text="Template")
     if idx is None:
-        return TEMPLATES[0][0]
-    return TEMPLATES[idx][0]
+        return templates[0][0]
+    return templates[idx][0]
 
 
 def _fallback_single_add(

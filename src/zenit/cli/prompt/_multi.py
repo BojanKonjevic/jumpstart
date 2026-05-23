@@ -6,7 +6,7 @@ import sys
 
 from zenit.cli.ui import BOLD, CYAN, DIM, GREEN, RESET, YELLOW, abort, warn
 from zenit.core.dependency import DependencyGraph, DependencySpec
-from zenit.schema.models import AddonConfig
+from zenit.schema.models import AddonMeta
 
 from ._keys import tty_available
 from ._render import (
@@ -151,7 +151,7 @@ def _render_multi(
 
 
 def prompt_addons(
-    available: list[AddonConfig],
+    available: list[AddonMeta],
     template: str = "",
     default_addons: list[str] | None = None,
 ) -> list[str]:
@@ -396,7 +396,7 @@ def _fallback_multi(
     requires_map: dict[str, list[str]],
     template: str,
     default_addon_names: list[str],
-    available: list[AddonConfig] | None = None,
+    available: list[AddonMeta] | None = None,
 ) -> list[str]:
     always_locked_names = set(TEMPLATE_REQUIRES.get(template, []))
 

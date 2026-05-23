@@ -1,0 +1,3 @@
+[addon]
+id = "docker"
+description = "Dockerfile + compose.yml + .dockerignore"

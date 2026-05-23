@@ -1,0 +1,5 @@
+[addon]
+id = "auth-manual"
+description = "JWT auth: register, login, refresh, logout, current user"
+requires = ["sqlalchemy"]
+templates = ["fastapi"]

@@ -1,0 +1,3 @@
+[addon]
+id = "sentry"
+description = "Sentry error tracking + performance monitoring"

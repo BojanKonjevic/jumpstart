@@ -1,0 +1,4 @@
+[template]
+id = "blank"
+description = "dev tools only  (pytest, ruff, mypy)"
+requires_addons = []

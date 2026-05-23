@@ -1,0 +1,4 @@
+[addon]
+id = "celery"
+description = "Celery worker + beat scheduler, backed by Redis"
+requires = ["redis"]

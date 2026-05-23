@@ -1,0 +1,3 @@
+[addon]
+id = "github-actions"
+description = "CI workflow (lint, type-check, test on push/PR)"

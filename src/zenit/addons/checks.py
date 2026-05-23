@@ -29,18 +29,21 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from zenit.addons._registry import get_addon, list_addons
 from zenit.core._paths import get_zenit_root
 from zenit.core.dependency import DependencyGraph
 from zenit.core.lockfile import ZenitLockfile, read_lockfile
 from zenit.schema.exceptions import ZenitError
-from zenit.schema.models import AddonConfig
 from zenit.templates._load_config import load_template_config
+
+
+def _known_addon_ids() -> set[str]:
+    return {m.id for m in list_addons()}
 
 
 def _read_lockfile_and_validate(
     project_dir: Path,
     addon_id: str,
-    available: list[AddonConfig],
     command: str,
 ) -> ZenitLockfile:
     lockfile = read_lockfile(project_dir)
@@ -53,7 +56,7 @@ def _read_lockfile_and_validate(
         raise ZenitError(
             ".zenit.toml exists but has no template field — it may be corrupt."
         )
-    addon_ids = {cfg.id for cfg in available}
+    addon_ids = _known_addon_ids()
     if addon_id not in addon_ids:
         known = ", ".join(sorted(addon_ids))
         raise ZenitError(f"Unknown addon '{addon_id}'. Available addons: {known}")
@@ -63,7 +66,6 @@ def _read_lockfile_and_validate(
 def check_can_add(
     project_dir: Path,
     addon_id: str,
-    available: list[AddonConfig],
 ) -> ZenitLockfile:
     """Run all precondition checks for adding *addon_id* to *project_dir*.
 
@@ -73,7 +75,8 @@ def check_can_add(
     Raises ZenitError with a clear message on any failure — the caller
     just needs to print it and exit.
     """
-    lockfile = _read_lockfile_and_validate(project_dir, addon_id, available, "add")
+    lockfile = _read_lockfile_and_validate(project_dir, addon_id, "add")
+    available_meta = list_addons()
 
     # ── not already installed ─────────────────────────────────────────────────
     if addon_id in lockfile.addons:
@@ -83,16 +86,16 @@ def check_can_add(
         )
 
     # ── template compatibility ─────────────────────────────────────────────────
-    cfg = next(c for c in available if c.id == addon_id)
-    if cfg.templates and lockfile.template not in cfg.templates:
-        allowed = ", ".join(cfg.templates)
+    cfg_meta = next(c for c in available_meta if c.id == addon_id)
+    if cfg_meta.templates and lockfile.template not in cfg_meta.templates:
+        allowed = ", ".join(cfg_meta.templates)
         raise ZenitError(
             f"'{addon_id}' is only compatible with the {allowed} template, "
             f"but this project uses '{lockfile.template}'."
         )
 
     # ── dependency addons are installed (transitive) ──────────────────────────
-    graph = DependencyGraph.build(available)
+    graph = DependencyGraph.build_from_meta(available_meta)
     all_deps = graph.closure({addon_id}) - {addon_id}
     missing_deps = sorted(d for d in all_deps if d not in lockfile.addons)
     if missing_deps:
@@ -103,7 +106,7 @@ def check_can_add(
         )
 
     # ── conflicting addons are not installed ──────────────────────────────────
-    conflicting = [c for c in cfg.conflicts_with if c in lockfile.addons]
+    conflicting = [c for c in cfg_meta.conflicts_with if c in lockfile.addons]
     if conflicting:
         conflict_str = ", ".join(conflicting)
         raise ZenitError(
@@ -111,6 +114,7 @@ def check_can_add(
         )
 
     # ── addon's own can_apply check ───────────────────────────────────────────
+    cfg = get_addon(addon_id)
     hooks = cfg._module
     if hooks is not None and hooks.can_apply is not None:
         reason = hooks.can_apply(project_dir, lockfile)
@@ -123,7 +127,6 @@ def check_can_add(
 def check_can_remove(
     project_dir: Path,
     addon_id: str,
-    available: list[AddonConfig],
 ) -> ZenitLockfile:
     """Run all precondition checks for removing *addon_id* from *project_dir*.
 
@@ -132,7 +135,8 @@ def check_can_remove(
 
     Raises ZenitError with a clear message on any failure.
     """
-    lockfile = _read_lockfile_and_validate(project_dir, addon_id, available, "remove")
+    lockfile = _read_lockfile_and_validate(project_dir, addon_id, "remove")
+    available_meta = list_addons()
 
     # ── is actually installed ─────────────────────────────────────────────────
     if addon_id not in lockfile.addons:
@@ -142,7 +146,7 @@ def check_can_remove(
         )
 
     # ── no other installed addon depends on this one (transitive) ─────────────
-    graph = DependencyGraph.build(available)
+    graph = DependencyGraph.build_from_meta(available_meta)
     all_dependents = graph.dependents(addon_id) & set(lockfile.addons)
     if all_dependents:
         dep_str = ", ".join(sorted(all_dependents))
@@ -165,7 +169,7 @@ def check_can_remove(
         pass  # Template not found locally — skip this check
 
     # ── addon's own can_remove check ──────────────────────────────────────────
-    cfg = next(c for c in available if c.id == addon_id)
+    cfg = get_addon(addon_id)
     hooks = cfg._module
     if hooks is not None and hooks.can_remove is not None:
         reason = hooks.can_remove(project_dir, lockfile)

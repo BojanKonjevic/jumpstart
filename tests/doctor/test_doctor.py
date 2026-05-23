@@ -35,7 +35,7 @@ from zenit.doctor.doctor import (
     print_results,
     run_doctor,
 )
-from zenit.schema.models import AddonConfig, AddonHooks
+from zenit.schema.models import AddonConfig, AddonHooks, AddonMeta
 from zenit.templates._load_config import load_template_config
 
 # ── helpers ───────────────────────────────────────────────────────────────────
@@ -549,7 +549,11 @@ class TestCheckAddonHealth:
         cfg = AddonConfig(id="docker", description="")
         cfg._module = hooks
 
-        with mock.patch("zenit.doctor.doctor.get_available_addons", return_value=[cfg]):
+        meta = AddonMeta(id="docker", description="Docker addon")
+        with (
+            mock.patch("zenit.doctor.doctor.list_addons", return_value=[meta]),
+            mock.patch("zenit.doctor.doctor.get_addon", return_value=cfg),
+        ):
             result = _check_addon_health(project_dir, lockfile)
         assert result.has_warnings
         assert any("health_check" in i.message for i in _warnings(result))

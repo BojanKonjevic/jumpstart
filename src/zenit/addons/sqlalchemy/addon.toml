@@ -1,0 +1,3 @@
+[addon]
+id = "sqlalchemy"
+description = "SQLAlchemy ORM + Alembic migrations"

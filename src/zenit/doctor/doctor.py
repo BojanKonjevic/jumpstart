@@ -12,7 +12,7 @@ from pathlib import Path
 
 import yaml
 
-from zenit.addons._registry import get_available_addons
+from zenit.addons._registry import get_addon, list_addons
 from zenit.cli.ui import BOLD, DIM, GREEN, RED, RESET, YELLOW
 from zenit.core._paths import get_zenit_root
 from zenit.core.collect import collect_all
@@ -75,7 +75,8 @@ def run_doctor(project_dir: Path, *, thorough: bool = False) -> list[HealthResul
         return [_check_metadata(project_dir)]
 
     manifest = read_manifest(project_dir)
-    available = get_available_addons()
+    available_meta = list_addons()
+    available_configs = [get_addon(m.id) for m in available_meta]
 
     zenit_root = get_zenit_root()
     template_config: TemplateConfig | None = None
@@ -85,7 +86,7 @@ def run_doctor(project_dir: Path, *, thorough: bool = False) -> list[HealthResul
     if lockfile.template:
         try:
             template_config = load_template_config(zenit_root, lockfile.template)
-            addon_configs = [c for c in available if c.id in lockfile.addons]
+            addon_configs = [c for c in available_configs if c.id in lockfile.addons]
             contributions = collect_all(template_config, addon_configs)
         except Exception:
             pass
@@ -97,7 +98,7 @@ def run_doctor(project_dir: Path, *, thorough: bool = False) -> list[HealthResul
         _check_dependencies(project_dir, lockfile, template_config, contributions)
     )
     results.append(_check_files(project_dir, lockfile, template_config, addon_configs))
-    results.append(_check_addon_health(project_dir, lockfile, available))
+    results.append(_check_addon_health(project_dir, lockfile, available_configs))
     if "docker" in lockfile.addons:
         results.append(
             _check_compose(
@@ -519,8 +520,8 @@ def _check_metadata(project_dir: Path) -> HealthResult:
     else:
         result.ok(f"Template is '{lockfile.template}'.")
 
-    available = get_available_addons()
-    known_ids = {cfg.id for cfg in available}
+    available_meta = list_addons()
+    known_ids = {m.id for m in available_meta}
     unknown = [a for a in lockfile.addons if a not in known_ids]
     if unknown:
         result.error(
@@ -534,7 +535,7 @@ def _check_metadata(project_dir: Path) -> HealthResult:
         else:
             result.ok("No addons installed.")
 
-    requires_map = {cfg.id: cfg.requires for cfg in available}
+    requires_map = {m.id: m.requires for m in available_meta}
     for addon_id in lockfile.addons:
         for req in requires_map.get(addon_id, []):
             if req not in lockfile.addons:
@@ -617,8 +618,10 @@ def _check_dependencies(
                 hint="The template may have changed since this project was scaffolded.",
             )
             return result
-        available = get_available_addons()
-        selected_addon_configs = [cfg for cfg in available if cfg.id in lockfile.addons]
+        available_meta = list_addons()
+        selected_addon_configs = [
+            get_addon(m.id) for m in available_meta if m.id in lockfile.addons
+        ]
         contributions = collect_all(template_config, selected_addon_configs)
 
     expected_deps = contributions.deps
@@ -672,8 +675,10 @@ def _check_files(
                 hint="The template may have changed since this project was scaffolded.",
             )
             return result
-        available = get_available_addons()
-        addon_configs = [cfg for cfg in available if cfg.id in lockfile.addons]
+        available_meta = list_addons()
+        addon_configs = [
+            get_addon(m.id) for m in available_meta if m.id in lockfile.addons
+        ]
 
     all_files = [("template", fc) for fc in template_config.files] + [
         (addon.id, fc) for addon in addon_configs for fc in addon.files
@@ -730,7 +735,7 @@ def _check_addon_health(
         return result
 
     if available is None:
-        available = get_available_addons()
+        available = [get_addon(m.id) for m in list_addons()]
     addon_map = {cfg.id: cfg for cfg in available}
 
     any_checks = False
@@ -830,8 +835,10 @@ def _check_compose(
         zenit_root = get_zenit_root()
         try:
             template_config = load_template_config(zenit_root, lockfile.template)
-            available = get_available_addons()
-            addon_configs = [cfg for cfg in available if cfg.id in lockfile.addons]
+            available_meta = list_addons()
+            addon_configs = [
+                get_addon(m.id) for m in available_meta if m.id in lockfile.addons
+            ]
             contributions = collect_all(template_config, addon_configs)
         except Exception:
             result.warn(
@@ -870,8 +877,10 @@ def _check_env(
                 f"Could not load template '{lockfile.template}' to verify env vars.",
             )
             return result
-        available = get_available_addons()
-        addon_configs = [cfg for cfg in available if cfg.id in lockfile.addons]
+        available_meta = list_addons()
+        addon_configs = [
+            get_addon(m.id) for m in available_meta if m.id in lockfile.addons
+        ]
         contributions = collect_all(template_config, addon_configs)
     expected_keys = [ev.key for ev in contributions.env_vars]
 

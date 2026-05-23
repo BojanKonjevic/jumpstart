@@ -19,7 +19,7 @@ from zenit.schema.models import AddonConfig
 runner = CliRunner()
 
 _PATCH_LOCKFILE = "zenit.core.lockfile.read_lockfile"
-_PATCH_ADDONS = "zenit.addons._registry.get_available_addons"
+_PATCH_ADDONS = "zenit.addons._registry.list_addons"
 
 
 def _lf(template: str = "fastapi", addons: list[str] | None = None) -> ZenitLockfile:

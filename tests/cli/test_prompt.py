@@ -62,7 +62,7 @@ from zenit.cli.prompt._single import (
     prompt_single_addon,
     prompt_template,
 )
-from zenit.schema.models import AddonConfig
+from zenit.schema.models import AddonMeta
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # _keys
@@ -1073,8 +1073,8 @@ class TestPromptAddons:
 
     def test_fallback_path_when_no_tty(self) -> None:
         addons = [
-            AddonConfig(id="docker", description="Docker"),
-            AddonConfig(id="redis", description="Redis"),
+            AddonMeta(id="docker", description="Docker"),
+            AddonMeta(id="redis", description="Redis"),
         ]
         with patch("builtins.input", return_value="1"):
             result = prompt_addons(addons, template="blank")
@@ -1082,8 +1082,8 @@ class TestPromptAddons:
 
     def test_incompatible_filtered_in_tui(self) -> None:
         addons = [
-            AddonConfig(id="docker", description=""),
-            AddonConfig(id="auth-manual", description="", templates=["fastapi"]),
+            AddonMeta(id="docker", description=""),
+            AddonMeta(id="auth-manual", description="", templates=["fastapi"]),
         ]
         with (
             patch("zenit.cli.prompt._render.read_key", return_value="\r"),
@@ -1094,8 +1094,8 @@ class TestPromptAddons:
 
     def test_default_addons_pre_selected_in_tui(self) -> None:
         addons = [
-            AddonConfig(id="docker", description=""),
-            AddonConfig(id="redis", description=""),
+            AddonMeta(id="docker", description=""),
+            AddonMeta(id="redis", description=""),
         ]
         with (
             patch("zenit.cli.prompt._render.read_key", return_value="\r"),
@@ -1109,9 +1109,9 @@ class TestPromptAddons:
         """prompt_addons computes transitive deps for default_selected
         before passing to _tui_multi."""
         addons = [
-            AddonConfig(id="docker", description=""),
-            AddonConfig(id="redis", description=""),
-            AddonConfig(id="celery", description="", requires=["redis"]),
+            AddonMeta(id="docker", description=""),
+            AddonMeta(id="redis", description=""),
+            AddonMeta(id="celery", description="", requires=["redis"]),
         ]
         with (
             patch("zenit.cli.prompt._render.read_key", return_value="\r"),

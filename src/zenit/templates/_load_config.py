@@ -1,10 +1,42 @@
 """Import a template's declarative config from its template.py file."""
 
+from __future__ import annotations
+
 import functools
 import importlib.util
+import tomllib
 from pathlib import Path
 
-from zenit.schema.models import TemplateConfig
+from zenit.schema.models import TemplateConfig, TemplateMeta
+
+# ── Metadata-only discovery (no exec) ─────────────────────────────────────
+
+
+@functools.cache
+def list_templates(zenit_root: Path) -> list[TemplateMeta]:
+    """Iterate template dirs, read ``template.toml``. No exec."""
+    metas: list[TemplateMeta] = []
+    templates_dir = zenit_root / "templates"
+    for template_dir in sorted(
+        p for p in templates_dir.iterdir() if p.is_dir() and not p.name.startswith("_")
+    ):
+        toml_path = template_dir / "template.toml"
+        if not toml_path.exists():
+            continue
+        with open(toml_path, "rb") as f:
+            data = tomllib.load(f)
+        raw = data["template"]
+        metas.append(
+            TemplateMeta(
+                id=raw["id"],
+                description=raw["description"],
+                requires_addons=list(raw.get("requires_addons", [])),
+            )
+        )
+    return metas
+
+
+# ── Full config (exec) ────────────────────────────────────────────────────
 
 
 @functools.cache

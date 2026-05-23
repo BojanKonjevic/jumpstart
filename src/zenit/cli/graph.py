@@ -4,31 +4,41 @@ import json
 import re
 from collections.abc import Generator, Sequence
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from zenit.schema.models import AddonConfig
+from typing import TYPE_CHECKING, Protocol
 
 from zenit.cli.ui import BOLD, CYAN, DIM, GREEN, RESET
 from zenit.core.dependency import DependencyGraph
 
+if TYPE_CHECKING:
+    pass
+
+
+class _HasIdAndRequires(Protocol):
+    """Minimal addon shape — both AddonConfig and AddonMeta satisfy this."""
+
+    id: str
+    requires: list[str]
+
 
 @dataclass
 class TreeNode:
-    addon: AddonConfig
+    addon: _HasIdAndRequires
     depth: int
     is_installed: bool
     children: list[TreeNode] = field(default_factory=list)
 
 
 def build_tree(
-    addons: Sequence[AddonConfig],
+    addons: Sequence[_HasIdAndRequires],
     installed_ids: set[str],
     reverse: bool = False,
     depth_limit: int = 20,
 ) -> list[TreeNode]:
     addon_map = {a.id: a for a in addons}
-    graph = DependencyGraph.build(list(addons))
+    graph = DependencyGraph._build(
+        [(a.id, list(a.requires)) for a in addons],
+        {a.id for a in addons},
+    )
 
     if reverse:
         roots = [a for a in addons if a.requires]
@@ -66,11 +76,11 @@ def build_tree(
 
 
 def _build_node(
-    addon: AddonConfig,
+    addon: _HasIdAndRequires,
     depth: int,
     installed_ids: set[str],
     required_by: dict[str, list[str]],
-    addon_map: dict[str, AddonConfig],
+    addon_map: dict[str, _HasIdAndRequires],
     visited: set[str],
     depth_limit: int,
 ) -> TreeNode:
@@ -222,12 +232,15 @@ def _collect_dot_edges(node: TreeNode, lines: list[str]) -> None:
 def render_json(
     forest: list[TreeNode],
     installed_ids: set[str],
-    all_addons: Sequence[AddonConfig],
+    all_addons: Sequence[_HasIdAndRequires],
     project_name: str | None = None,
     project_dir: str | None = None,
     template: str | None = None,
 ) -> str:
-    graph = DependencyGraph.build(list(all_addons))
+    graph = DependencyGraph._build(
+        [(a.id, list(a.requires)) for a in all_addons],
+        {a.id for a in all_addons},
+    )
     addons_list: list[dict[str, object]] = []
     for addon in all_addons:
         addons_list.append(

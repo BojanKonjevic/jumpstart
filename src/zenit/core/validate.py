@@ -8,7 +8,7 @@ import typer
 
 from zenit.cli.ui import error, info
 from zenit.core.dependency import DependencyGraph
-from zenit.schema.models import AddonConfig
+from zenit.schema.models import AddonMeta
 
 
 def validate_name(name: str, pkg_name: str) -> None:
@@ -78,14 +78,14 @@ def _check_git() -> list[str]:
 
 def validate_addon_deps(
     addons: list[str],
-    available: list[AddonConfig],
+    available: list[AddonMeta],
     template: str = "",
 ) -> None:
     """Abort with exit code 1 if any selected addon's requirements are missing
     or if an addon is incompatible with the selected template."""
-    graph = DependencyGraph.build(available)
-    conflicts_map = {cfg.id: cfg.conflicts_with for cfg in available}
-    templates_map = {cfg.id: cfg.templates for cfg in available}
+    graph = DependencyGraph.build_from_meta(available)
+    conflicts_map = {m.id: m.conflicts_with for m in available}
+    templates_map = {m.id: m.templates for m in available}
 
     # Template-compatibility check (before dep check — better error messages).
     for addon in addons:

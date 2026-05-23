@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from zenit.schema.models import AddonConfig
+from zenit.schema.models import AddonConfig, AddonMeta
 
 
 @dataclass(frozen=True)
@@ -54,15 +54,37 @@ class DependencyGraph:
         Every addon becomes a node.  Each addon's ``requires`` list becomes
         its outgoing edges.  The ``reverse`` map is built automatically.
         """
+        return DependencyGraph._build(
+            [(a.id, a.requires) for a in addons],
+            {a.id for a in addons},
+        )
+
+    @staticmethod
+    def build_from_meta(addons: list[AddonMeta]) -> DependencyGraph:
+        """Construct a ``DependencyGraph`` from a list of ``AddonMeta`` objects.
+
+        Same structure as ``build()`` but uses lightweight metadata — no exec
+        of addon.py files required.
+        """
+        return DependencyGraph._build(
+            [(a.id, a.requires) for a in addons],
+            {a.id for a in addons},
+        )
+
+    @staticmethod
+    def _build(
+        items: list[tuple[str, list[str]]],
+        node_ids: set[str],
+    ) -> DependencyGraph:
         nodes: dict[str, DependencySpec] = {}
         edges: dict[str, list[str]] = {}
         reverse: dict[str, list[str]] = {}
 
-        for addon in addons:
-            nodes[addon.id] = DependencySpec(id=addon.id)
-            edges[addon.id] = list(addon.requires)
-            for req in addon.requires:
-                reverse.setdefault(req, []).append(addon.id)
+        for addon_id, requires in items:
+            nodes[addon_id] = DependencySpec(id=addon_id)
+            edges[addon_id] = list(requires)
+            for req in requires:
+                reverse.setdefault(req, []).append(addon_id)
 
         return DependencyGraph(nodes=nodes, edges=edges, reverse=reverse)
 

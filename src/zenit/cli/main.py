@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Annotated
 
 if TYPE_CHECKING:
-    from zenit.schema.models import AddonConfig
+    from zenit.schema.models import AddonMeta
 
 import typer
 
@@ -105,7 +105,7 @@ def cmd_list(
         error("--available and --installed are mutually exclusive.")
         raise typer.Exit(1)
 
-    from zenit.addons._registry import get_available_addons
+    from zenit.addons._registry import list_addons
     from zenit.cli.prompt._render import TEMPLATES
     from zenit.core.lockfile import read_lockfile
 
@@ -125,15 +125,15 @@ def cmd_list(
         return
 
     if available or lockfile is None:
-        _print_available(TEMPLATES, get_available_addons())
+        _print_available(TEMPLATES, list_addons())
         return
 
-    _print_default(lockfile, get_available_addons(), project_dir)
+    _print_default(lockfile, list_addons(), project_dir)
 
 
 def _print_available(
     templates: list[tuple[str, str]],
-    addons: Sequence[AddonConfig],
+    addons: Sequence[AddonMeta],
 ) -> None:
     print(f"\n  {BOLD}Templates{RESET}")
     for name, desc in templates:
@@ -182,7 +182,7 @@ def _print_installed(
 
 def _print_default(
     lockfile: object,
-    addons: Sequence[AddonConfig],
+    addons: Sequence[AddonMeta],
     project_dir: Path,
 ) -> None:
     from zenit.core.lockfile import ZenitLockfile
@@ -402,13 +402,13 @@ def cmd_graph(
     ] = False,
 ) -> None:
     """Show the addon dependency graph."""
-    from zenit.addons._registry import get_available_addons
+    from zenit.addons._registry import list_addons
     from zenit.cli.graph import build_tree, render_dot, render_json, render_terminal
     from zenit.core.lockfile import read_lockfile
 
     project_dir = Path.cwd()
     lockfile = read_lockfile(project_dir)
-    all_addons = get_available_addons()
+    all_addons = list_addons()
 
     installed_ids: set[str] = set(lockfile.addons) if lockfile is not None else set()
 

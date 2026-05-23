@@ -12,7 +12,7 @@ import typer
 import yaml
 from tomlkit.items import Array
 
-from zenit.addons._registry import get_available_addons
+from zenit.addons._registry import get_addon, list_addons
 from zenit.addons.checks import check_can_remove
 from zenit.cli.prompt import prompt_multi_addon
 from zenit.cli.ui import (
@@ -98,13 +98,12 @@ def remove_addon(
 
     if project_dir is None:
         project_dir = Path.cwd()
-    available = get_available_addons()
 
-    lockfile = check_can_remove(project_dir, addon_id, available)
+    lockfile = check_can_remove(project_dir, addon_id)
 
     template = lockfile.template
     pkg_name = normalise_pkg_name(project_dir.name)
-    addon_cfg = next(cfg for cfg in available if cfg.id == addon_id)
+    addon_cfg = get_addon(addon_id)
 
     if dry_run:
         _dry_remove(project_dir, addon_id, addon_cfg, lockfile, pkg_name)
@@ -602,11 +601,11 @@ def remove_addon_interactive(dry_run: bool = False, yes: bool = False) -> None:
         error("No addons are installed in this project.")
         raise typer.Exit(1)
 
-    available = get_available_addons()
-    graph = DependencyGraph.build(available)
-    installed = [cfg for cfg in available if cfg.id in lockfile.addons]
+    available_meta = list_addons()
+    graph = DependencyGraph.build_from_meta(available_meta)
+    installed = [get_addon(aid) for aid in lockfile.addons]
 
-    requires_map = {cfg.id: cfg.requires for cfg in available}
+    requires_map = {m.id: m.requires for m in available_meta}
 
     zenit_root = get_zenit_root()
     template_required: set[str] = set()
