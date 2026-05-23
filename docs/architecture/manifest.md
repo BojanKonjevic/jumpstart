@@ -102,7 +102,7 @@ One entry per environment variable added by an addon.
 
 `key` — the variable name, e.g. `REDIS_URL`.
 
-`source` — `"addon"` for addon-added vars, `"template"` for template-added vars.
+`source` — one of the `EntrySource` enum values: `"addon"` for addon-added entries, `"template"` for template-owned entries. See [EntrySource](./addons-and-templates.md#entrysource-enum).
 
 `addon` — the addon that added this variable. Empty string for template-owned vars.
 
@@ -116,6 +116,8 @@ One entry per package added to `pyproject.toml`.
 
 `spec` — the version specifier written to `pyproject.toml`, e.g. `redis>=5`.
 
+`source` — one of the `EntrySource` enum values (`"template"` or `"addon"`).
+
 `dev` — `true` if added to the dev dependency group, `false` for main dependencies.
 
 ---
@@ -124,11 +126,14 @@ One entry per package added to `pyproject.toml`.
 
 One entry per Docker Compose service or named volume added by an addon. Both have `name`, `source`, and `addon` fields. Used by `zenit doctor` to verify the service exists in `compose.yml`.
 
+> [!NOTE]
+> Compose entries are only recorded in the manifest when the `docker` addon is active. If `docker` is added later (via `zenit add docker`), the manifest is backfilled with compose entries from all installed addons that declare compose services.
+
 ---
 
 ## `[[manifest.just_recipes]]`
 
-One entry per recipe appended to the `justfile`. Has `name`, `source`, and `addon`.
+One entry per recipe appended to the `justfile`. Has `name`, `source` (one of the `EntrySource` enum values), and `addon`.
 
 ---
 

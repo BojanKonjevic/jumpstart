@@ -14,7 +14,7 @@ cd zenit
 curl -LsSf https://astral.sh/uv/install.sh | sh
 
 uv sync
-just test    # full test suite (800+ tests)
+just test    # full test suite (986+ tests)
 just lint    # ruff check
 just fmt     # ruff format
 just check   # mypy strict
@@ -56,7 +56,7 @@ Small, focused changes move faster than large refactors.
 
 ## Testing
 
-Zenit has 800+ tests covering injection, removal, round-trip integrity, and edge cases. Every PR-level change includes tests.
+Zenit has 985+ tests covering injection, removal, round-trip integrity, and edge cases. Every PR-level change includes tests.
 
 Test layers: unit (single function, mocked dependencies), integration (multiple modules, real filesystem), functional (end-to-end CLI), and slow (I/O-heavy). Cover edge cases — empty input, malformed input, missing files, permission errors — and every `raise` and `except` branch.
 

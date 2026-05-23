@@ -1,5 +1,5 @@
 <h1 align="center">
-  <a href="https://bojankonjevic.github.io/zenit/" target="_blank">
+  <a href="https://bojankonjevic.github.io/zenit/landing.html" target="_blank" rel="noopener noreferrer">
     zenit
   </a>
 </h1>
@@ -47,9 +47,9 @@ Full documentation is available at **[bojankonjevic.github.io/zenit/docs](https:
 
 - [Getting Started](https://bojankonjevic.github.io/zenit/docs/getting-started) — install, create, and run in under five minutes
 - [Architecture](https://bojankonjevic.github.io/zenit/docs/architecture/) — how the manifest, libcst injection, and declarative addons work
-- [Commands](https://bojankonjevic.github.io/zenit/docs/commands/) — `create`, `add`, `remove`, `doctor`, `list`
+- [Commands](https://bojankonjevic.github.io/zenit/docs/commands/) — `create`, `add`, `remove`, `doctor`, `list`, `config`
 - [Templates](https://bojankonjevic.github.io/zenit/docs/templates/) — `blank` and `fastapi`
-- [Addons](https://bojankonjevic.github.io/zenit/docs/addons/) — Docker, Redis, Celery, auth, Sentry, GitHub Actions
+- [Addons](https://bojankonjevic.github.io/zenit/docs/addons/) — Docker, Redis, Celery, auth, Sentry, GitHub Actions, SQLAlchemy, PostgreSQL, SQLModel
 - [Contributing](https://bojankonjevic.github.io/zenit/docs/contributing) — coding standards, tests, and how to submit changes
 
 ## Why Zenit?

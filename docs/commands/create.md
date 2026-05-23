@@ -35,18 +35,17 @@ If any step fails, all written files are removed and the directory is left in th
 ## Options
 
 | Flag | Description |
-|---|---|
+|---|---|---|
+| `--template` / `-t` | Template to use. Skips the template picker. |
+| `--addons` / `-a` | Addon(s) to include. Repeat the flag or use comma-separated values (e.g. `-a redis,celery`). Skips the addon picker. |
 | `--dry-run` | Print all files that would be created and all changes that would be made, without writing anything. |
 | `--version` | Show the Zenit version and exit. |
-
-> [!NOTE]
-> Non-interactive mode (passing `--template`, `--addons`, and other values as flags to skip prompts entirely) is planned but not yet available. For now, interactive selection is the only supported flow.
 
 ---
 
 ## Interactive prompts
 
-Zenit asks four questions in order. Arrow keys navigate each prompt; Enter confirms. In environments without a TTY (CI, pipes), Zenit falls back to numbered input automatically.
+When run without `--template` or `--addons`, Zenit asks three questions in order. Arrow keys navigate each prompt; Enter confirms. In environments without a TTY (CI, pipes), Zenit falls back to numbered input automatically.
 
 **1. Template**
 
@@ -56,7 +55,7 @@ Template:
     blank
 ```
 
-Select the project template. See [Templates](../templates/index.md) for what each one generates.
+Select the project template. See [Templates](../templates/index.md) for what each one generates. Pass `--template` to skip this prompt.
 
 **2. Addons**
 
@@ -68,9 +67,12 @@ Addons (space to select, enter to confirm):
     ◯ auth-manual
     ◯ sentry
     ◯ github-actions
+    ◯ sqlalchemy
+    ◯ postgres
+    ◯ sqlmodel
 ```
 
-Space toggles selection. The list shows only addons compatible with the selected template. If an addon has unmet dependencies (e.g. `celery` requires `redis`), selecting it automatically selects its dependencies.
+Space toggles selection. The list shows only addons compatible with the selected template. If an addon has unmet dependencies (e.g. `celery` requires `redis`), selecting it automatically selects its dependencies. Pass `--addons` to skip this prompt.
 
 **3. Project name**
 
@@ -80,13 +82,7 @@ Project name [my-api]:
 
 The human-readable project name, used in `pyproject.toml` as `[project].name`. Defaults to the directory name passed as the `create` argument.
 
-**4. Package name**
-
-```
-Package name [my_api]:
-```
-
-The Python package name — the importable name used throughout the generated source. Defaults to the project name with hyphens replaced by underscores.
+The Python package name is derived automatically from the project name (hyphens replaced by underscores). No separate package-name prompt is shown.
 
 ---
 
@@ -140,10 +136,6 @@ my-project/
 ├── .gitattributes
 ├── .pre-commit-config.yaml
 ├── shell.nix
-├── alembic.ini
-├── alembic/
-│   ├── env.py
-│   └── script.py.mako
 └── my_project/
     ├── main.py              # FastAPI app instance, lifespan, middleware
     ├── settings.py          # Pydantic Settings wired to .env
@@ -153,21 +145,12 @@ my-project/
     │   ├── router.py        # Registers all route groups
     │   └── routes/
     │       └── health.py    # GET /health
-    ├── db/
-    │   ├── base.py          # SQLAlchemy DeclarativeBase
-    │   └── session.py       # Async session factory, get_session dependency
-    ├── models/
-    │   └── mixins.py        # TimestampMixin
     ├── schemas/
     │   └── common.py        # PaginationParams, PaginatedResponse[T]
-    ├── scripts/
-    │   └── wait_db.py       # Polls postgres until ready (used by justfile)
     └── tests/
-        ├── conftest.py      # Async session and HTTP client fixtures
         └── test_health.py
-```
 
-The `fastapi` template requires the `docker` addon. It is automatically selected if not already chosen.
+If you also select the `sqlalchemy` and `postgres` addons, the generated project gains the database layer (db/, alembic/, models/mixins.py, scripts/wait_db.py, tests/conftest.py).
 
 ---
 
@@ -197,7 +180,7 @@ Addons may append additional recipes. The `docker` addon adds `just up` and `jus
 | Unknown template selected | Cannot occur via interactive prompt; exits with an error if somehow triggered. |
 | Unknown addon selected | Same as above. |
 | `uv` not found on PATH | Exits with an error and a link to the uv install instructions. |
-| `git` not found on PATH | Skips `git init` and the initial commit, prints a warning. The project is still created. |
+| `git` not found on PATH | Exits with an error. Git is required for the initial commit and for project versioning. |
 | Addon dependency conflict | Exits with an error identifying the conflicting requirements before any files are written. |
 
 ---

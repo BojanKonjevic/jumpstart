@@ -12,7 +12,7 @@ Get a project running in under five minutes.
 - **just** — optional, but generated projects use it heavily
 - **direnv** — optional, auto-activates the virtualenv on `cd`
 
-The `fastapi` template additionally requires **Docker** running locally.
+Docker is optional — add the `docker` addon if you want containers.
 
 > [!NOTE]
 > **NixOS:** set `UV_PYTHON_DOWNLOADS=never` before installing. Generated projects detect NixOS automatically and write a `shell.nix` + `.envrc` that activates the system Python via direnv.
@@ -55,18 +55,20 @@ Template:
     blank
 
 Addons (space to select, enter to confirm):
-  ❯ ◉ docker
-    ◉ redis
+  ❯ ◯ docker
+    ◯ redis
     ◯ celery
     ◯ auth-manual
     ◯ sentry
     ◯ github-actions
+    ◯ sqlalchemy
+    ◯ postgres
+    ◯ sqlmodel
 
 Project name [my-api]:
-Package name [my_api]:
 ```
 
-Select **fastapi** as the template, then **docker** and **redis** as addons. Arrow keys navigate; space toggles; enter confirms. In CI environments without a TTY, Zenit falls back to numbered input automatically.
+Select **fastapi** as the template, then **docker**, **sqlalchemy**, and **postgres** as addons. Arrow keys navigate; space toggles; enter confirms. The package name is derived automatically from the project name. In CI environments without a TTY, Zenit falls back to numbered input automatically.
 
 > [!TIP]
 > Set personal defaults in your config file so they appear pre-selected every time:
@@ -88,10 +90,10 @@ my-api/
 ├── justfile                 # task runner recipes (run, test, lint, …)
 ├── .env                     # local env vars (not committed)
 ├── .env.example             # committed template for .env
-├── compose.yml              # Docker Compose — app + postgres + redis
+├── compose.yml              # Docker Compose — app + postgres
 ├── Dockerfile
-├── alembic.ini
-├── alembic/
+├── alembic.ini              # from sqlalchemy addon
+├── alembic/                 # from sqlalchemy addon
 │   └── env.py
 ├── my_api/
 │   ├── main.py              # FastAPI app, lifespan, middleware
@@ -102,15 +104,15 @@ my-api/
 │   │   ├── router.py
 │   │   └── routes/
 │   │       └── health.py    # GET /health — always present
-│   ├── db/
+│   ├── db/                  # from sqlalchemy addon
 │   │   ├── base.py
 │   │   └── session.py
 │   ├── models/
-│   │   └── mixins.py        # TimestampMixin
+│   │   └── mixins.py        # TimestampMixin — from sqlalchemy addon
 │   ├── schemas/
 │   │   └── common.py        # PaginationParams, PaginatedResponse[T]
 │   └── scripts/
-│       └── wait_db.py
+│       └── wait_db.py       # from postgres addon
 └── tests/
     ├── conftest.py
     └── test_health.py
@@ -119,7 +121,7 @@ my-api/
 `.zenit.toml` is the only file that links this project to Zenit. The rest is plain Python — no Zenit-specific imports, no runtime dependency.
 
 > [!NOTE]
-> Zenit's core pipeline is validated by 800+ tests covering injection, removal, round-trip integrity, and edge cases. What you see in `.zenit.toml` matches what actually happened.
+> Zenit's core pipeline is validated by 986+ tests covering injection, removal, round-trip integrity, and edge cases. What you see in `.zenit.toml` matches what actually happened.
 
 ---
 
@@ -130,7 +132,7 @@ cd my-api
 just run
 ```
 
-This starts the Postgres and Redis containers and launches the API server with hot-reload. Open `http://localhost:8000/health` to confirm it's running.
+This starts the Docker containers (Postgres from the `postgres` addon) and launches the API server with hot-reload. Open `http://localhost:8000/health` to confirm it's running.
 
 Other useful recipes:
 

@@ -53,7 +53,16 @@ Addons (space to select, enter to confirm):
     ◯ celery
     ◯ sentry
     ◯ github-actions
+    ◯ sqlalchemy
+    ◯ postgres
+    ◯ sqlmodel
 ```
+
+**Multi-select:** Space toggles each addon; Enter confirms the selection.
+
+**Type-to-search:** Start typing to filter the list by name. Matches are highlighted as you type.
+
+**Unavailable addons** are shown greyed out with the reason (e.g. "requires: fastapi template" or "depends on: redis"). A tooltip explains why each unavailable addon cannot be selected.
 
 Already-installed addons are not shown. Addons incompatible with the current template are not shown.
 
@@ -120,7 +129,7 @@ Dry run — nothing was written.
 
 ## Rollback
 
-If any step fails — a file write error, a failed injection validation, a malformed `pyproject.toml` — Zenit rolls back all changes made during that `add` invocation before reporting the error:
+If any step fails — a file write error, a failed injection validation, a malformed `pyproject.toml` — Zenit rolls back all changes made during that `add` invocation before reporting the error. The rollback operates at the file level: modified files are restored from backup, and newly created files are deleted:
 
 ```
   ✔ wrote     my_project/redis.py
@@ -128,13 +137,13 @@ If any step fails — a file write error, a failed injection validation, a malfo
   ✗ injection failed: my_project/lifecycle.py — result is not valid Python
 
 Rolling back...
-  ✔ removed   my_project/redis.py
-  ✔ restored  my_project/settings.py
+  ✔ restored  my_project/redis.py  →  deleted
+  ✔ restored  my_project/settings.py  →  original content restored
 
 Error: add failed. No changes were made to the project.
 ```
 
-The rollback is complete — no partial state is left behind.
+The rollback is complete — no partial state is left behind. Every file touched during the operation is either reverted to its original content (if it existed before) or deleted (if it was created).
 
 ---
 

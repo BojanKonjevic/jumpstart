@@ -60,11 +60,12 @@ just run
 The `blank` template is intentionally minimal. It exposes two injection points:
 
 | Point | File | Locator | What goes here |
-|---|---|---|---|
+|---|---|---|---|---|
+| `settings_fields` | `src/{{pkg_name}}/settings.py` | `after_last_class_attribute` (`Settings`) | Pydantic settings fields |
 | `main_startup` | `src/{{pkg_name}}/main.py` | `before_return_in_function` (`main`) | Startup calls — e.g. `init_sentry()` |
 | `env_vars` | `.env` | `at_file_end` | Key=value pairs appended to the env file |
 
-If you need richer hooks (lifespan, router registration, settings fields, test fixtures), use the `fastapi` template — it exposes nine distinct injection points. If you want a new hook added to `blank`, open an issue or see [Contributing](../contributing.md).
+If you need richer hooks (lifespan, router registration, test fixtures), use the `fastapi` template — it exposes ten distinct injection points. If you want a new hook added to `blank`, open an issue or see [Contributing](../contributing.md).
 
 ---
 
@@ -97,7 +98,7 @@ Dev tooling (`pytest`, `mypy`, `ruff`, `pytest-cov`) is added under `[dependency
 ## Compatibility and constraints
 
 > [!NOTE]
-> `auth-manual` is the only addon that does not work with `blank` — it requires the `fastapi` template. All other addons are optional and compatible.
+> Two addons do not work with `blank`: `auth-manual` (requires `fastapi` template) and `sqlmodel` (requires `fastapi` template). All other addons are optional and compatible.
 
 
 **NixOS:** `shell.nix` is written alongside `.envrc` to provide `libstdc++.so.6`. The `.envrc` is prefixed with `use nix shell.nix`. On non-NixOS systems `shell.nix` is not written.

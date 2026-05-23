@@ -35,8 +35,11 @@ Addons
   celery        Celery worker and beat scheduler, backed by Redis. Requires redis.
   docker        Dockerfile, compose.yml, and .dockerignore.
   github-actions  CI workflow: lint, type-check, test on push and PR.
+  postgres      PostgreSQL driver + DATABASE_URL + compose service.
   redis         Async Redis connection helper with connection pooling.
   sentry        Sentry SDK initialisation. No-ops when DSN is unset.
+  sqlalchemy    SQLAlchemy ORM + Alembic migrations.
+  sqlmodel      SQLModel ORM (Pydantic + SQLAlchemy). Requires sqlalchemy, fastapi template.
 ```
 
 ---

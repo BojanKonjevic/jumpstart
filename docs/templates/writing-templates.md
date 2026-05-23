@@ -41,7 +41,7 @@ Unlike addons, **templates are not auto-discovered for the interactive picker**.
 ```python
 TEMPLATES: list[tuple[str, str]] = [
     ("blank", "dev tools only  (pytest, ruff, mypy)"),
-    ("fastapi", "FastAPI + SQLAlchemy + Alembic + asyncpg"),
+    ("fastapi", "FastAPI web framework skeleton"),
     ("cli", "Click CLI application"),   # ← add this line
 ]
 ```
@@ -213,7 +213,7 @@ zenit remove hello-cmd
 
 ## Step 7: force an addon with `requires_addons`
 
-If your template needs an addon at scaffold time — the way `fastapi` forces `docker` — list it in `requires_addons`:
+If your template needs an addon at scaffold time — for example, forcing `github-actions` for all CLI projects — list it in `requires_addons`:
 
 ```python
 config = TemplateConfig(

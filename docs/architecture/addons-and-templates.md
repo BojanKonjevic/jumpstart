@@ -46,7 +46,9 @@ class AddonConfig:
     id: str                              # CLI name: "zenit add <id>"
     description: str                     # one sentence, shown in zenit list
     requires: list[str]                  # addon dependencies, e.g. ["redis"]
+    conflicts_with: list[str]            # mutually exclusive addons
     templates: list[str]                 # allowed templates; empty = all
+    dirs: list[str]                      # directories to create
     files: list[FileContribution]        # files to write
     compose_services: list[ComposeService]
     compose_volumes: list[str]           # named volume names
@@ -141,7 +143,7 @@ class EnvVar:
 ```python
 @dataclass
 class AddonHooks:
-    post_apply:   Callable[[Context], None] | None
+    post_apply:   Callable[[Context, FileSystem], None] | None
     health_check: Callable[[Path, ZenitLockfile], list[HealthIssue]] | None
     can_apply:    Callable[[Path, ZenitLockfile], str | None] | None
     can_remove:   Callable[[Path, ZenitLockfile], str | None] | None
@@ -151,18 +153,96 @@ Optional module-level functions in `addon.py`. The registry attaches them automa
 
 ---
 
+## `EntrySource` enum
+
+Every manifest entry records its origin. The `source` field is always one of:
+
+```python
+class EntrySource(StrEnum):
+    TEMPLATE = "template"
+    ADDON = "addon"
+```
+
+Used by `[[manifest.env]]`, `[[manifest.dependencies]]`, `[[manifest.compose_services]]`, `[[manifest.just_recipes]]`, and all other manifest entries to track ownership. The `zenit doctor` command uses this to attribute each check to the correct addon or template.
+
+---
+
+## `FileSystem` protocol
+
+The pipeline writes files through a `FileSystem` abstraction, enabling dry-run previews without touching disk:
+
+```python
+class FileSystem(Protocol):
+    def write_file(self, path: str, content: str) -> None: ...
+    def create_dir(self, path: str) -> None: ...
+    def copy_file(self, src: Path, dest_relative: str) -> None: ...
+    def append_to_file(self, path: str, content: str) -> None: ...
+    def record_modification(self, path: str, description: str) -> None: ...
+    def execute_command(self, cmd: list[str], check: bool = True) -> None: ...
+```
+
+Two implementations:
+
+| Implementation | Behaviour |
+|---|---|
+| `RealFileSystem` | Performs real I/O — writes files, creates directories, runs commands. Used during actual scaffold/add/remove operations. |
+| `RecordingFileSystem` | Records every operation in a list without touching disk. Used for `--dry-run` previews. `execute_command` is a no-op. |
+
+---
+
+## `RecipeCollection`
+
+Recipes from templates and addons are kept separate to give template recipes priority during deduplication:
+
+```python
+@dataclass
+class RecipeCollection:
+    template: list[str]    # template recipes, always kept
+    addon: list[str]       # addon recipes, deduplicated against template
+
+    def resolve(self) -> list[str]:
+        """Return deduplicated list: template first, then unique addon recipes."""
+```
+
+An addon recipe is silently dropped if its name matches a template recipe.
+
+---
+
+## `Contributions`
+
+Merged contributions from the template and all selected addons, used by the pipeline to apply everything in order:
+
+```python
+@dataclass
+class Contributions:
+    files: list[FileContribution]
+    dirs: list[str]
+    compose_services: list[ComposeService]
+    compose_volumes: list[str]
+    env_vars: list[EnvVar]
+    deps: list[str]
+    dev_deps: list[str]
+    template_dev_deps: list[str]   # dev deps from the template
+    recipes: RecipeCollection
+    injections: list[Injection]
+```
+
+The `template_dev_deps` field holds dev dependencies declared by the template, kept separate from addon dev deps for clean removal.
+
+---
+
 ## Jinja2 template variables
 
 Files rendered with `template=True` have access to these variables:
 
 | Variable | Type | Example |
-|---|---|---|
+|---|---|---|---|
 | `pkg_name` | `str` | `"my_project"` |
 | `name` | `str` | `"my-project"` |
 | `template` | `str` | `"fastapi"` or `"blank"` |
-| `has_postgres` | `bool` | `True` if template is `fastapi` |
-| `has_redis` | `bool` | `True` if `redis` addon is in the project |
 | `addons` | `list[str]` | `["docker", "redis"]` |
+| `has_redis` | `bool` | `True` if `redis` addon is in the project |
+| `has_docker` | `bool` | `True` if `docker` addon is in the project |
 
 Zenit uses non-standard Jinja2 delimiters to avoid conflicts with Python source and YAML:
 
@@ -183,8 +263,9 @@ Injection points are named locations in template files where addons can insert c
 ### `fastapi` template injection points
 
 | Point | Target file | Locator | What goes here |
-|---|---|---|---|
+|---|---|---|---|---|
 | `settings_fields` | `settings.py` | `after_last_class_attribute` on `Settings` | Pydantic settings fields |
+| `lifespan_imports` | `lifecycle.py` | `after_last_import` | Imports needed by lifespan hooks |
 | `lifespan_startup` | `lifecycle.py` | `before_yield_in_function` on `lifespan` | Startup hooks |
 | `lifespan_shutdown` | `lifecycle.py` | `in_function_body` after `yield` in `lifespan` | Shutdown hooks |
 | `router_imports` | `api/router.py` | `after_last_import` | Import statements for addon routers |
@@ -197,7 +278,8 @@ Injection points are named locations in template files where addons can insert c
 ### `blank` template injection points
 
 | Point | Target file | Locator | What goes here |
-|---|---|---|---|
+|---|---|---|---|---|
+| `settings_fields` | `settings.py` | `after_last_class_attribute` on `Settings` | Pydantic settings fields |
 | `main_startup` | `main.py` | `before_return_in_function` on `main` | Startup calls |
 | `env_vars` | `.env` | `at_file_end` | Environment variable definitions |
 
@@ -248,9 +330,9 @@ def health_check(project_dir: Path, lockfile: ZenitLockfile) -> list[HealthIssue
     return issues
 ```
 
-### `post_apply(ctx) -> None`
+### `post_apply(ctx, fs) -> None`
 
-Called after the addon pipeline completes successfully. Use for post-install steps that can't be expressed declaratively.
+Called after the addon pipeline completes successfully. Receives the rendering `Context` and a `FileSystem` instance for any additional file operations. Use for post-install steps that can't be expressed declaratively.
 
 ---
 

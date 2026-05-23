@@ -29,8 +29,8 @@ After a successful `remove`, run `uv sync` to uninstall the removed packages.
 ## Arguments
 
 | Argument | Description |
-|---|---|
-| `addon...` | One or more addon names to remove. Required. |
+|---|---|---|
+| `addon...` | One or more addon names to remove. Optional — omit to open the interactive picker. |
 
 ---
 
@@ -40,6 +40,24 @@ After a successful `remove`, run `uv sync` to uninstall the removed packages.
 |---|---|
 | `--dry-run` | Print everything that would be removed without writing anything. |
 | `--yes` | Skip the confirmation prompt. |
+
+---
+
+## Interactive mode
+
+Running `zenit remove` with no arguments opens the addon picker, pre-filtered to addons currently installed in the project:
+
+```
+Addons (space to select, enter to confirm):
+  ❯ ◯ redis
+    ◯ celery
+```
+
+**Multi-select:** Space toggles each addon; Enter confirms the selection.
+
+**Type-to-search:** Start typing to filter the list by name. Matches are highlighted as you type.
+
+**Unavailable addons** (e.g. addons that cannot be removed because another addon depends on them) are shown greyed out with the reason.
 
 ---
 

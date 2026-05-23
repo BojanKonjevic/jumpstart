@@ -32,7 +32,7 @@ Every package recorded in the manifest is checked against the current `[project.
 
 **5. Compose services are present**
 
-If any installed addon declares compose services, `compose.yml` is checked for each service name. A missing service is an error. If no addon has compose services, this check is skipped.
+Only runs when the `docker` addon is installed. If any installed addon (or the template) declares compose services, `compose.yml` is checked for each service name. A missing service is an error. If docker is not installed or no addon has compose services, this check is skipped.
 
 **6. Env vars are defined**
 
