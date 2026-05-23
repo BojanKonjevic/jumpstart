@@ -1,5 +1,5 @@
 <h1 align="center">
-  <a href="https://bojankonjevic.github.io/zenit/landing.html" target="_blank" rel="noopener noreferrer">
+  <a href="https://bojankonjevic.github.io/zenit/" target="_blank" rel="noopener noreferrer">
     zenit
   </a>
 </h1>
