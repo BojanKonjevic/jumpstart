@@ -30,8 +30,8 @@ from zenit.cli.ui import (
     warn,
 )
 from zenit.core._paths import get_zenit_root
+from zenit.core.constants import _RECIPE_NAME_RE
 from zenit.core.handlers import HandlerDispatcher
-from zenit.core.handlers.justfile_handler import _RECIPE_NAME_RE
 from zenit.core.lockfile import ZenitLockfile, read_lockfile, write_lockfile
 from zenit.core.manifest import (
     fingerprint as _fingerprint,

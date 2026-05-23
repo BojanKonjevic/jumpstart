@@ -37,8 +37,8 @@ import tomlkit
 import tomlkit.items
 from jinja2 import Environment
 
+from zenit.core.constants import _RECIPE_NAME_RE
 from zenit.core.filesystem import atomic_write_text
-from zenit.core.handlers.justfile_handler import _RECIPE_NAME_RE
 from zenit.schema.models import (
     AddonConfig,
     DependencyEntry,

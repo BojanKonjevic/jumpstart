@@ -1,12 +1,9 @@
 from __future__ import annotations
 
-import re
 from pathlib import Path
 
 from zenit.core.handlers.base import FileHandler
 from zenit.schema.models import ManifestBlock
-
-_RECIPE_NAME_RE = re.compile(r"^([a-zA-Z0-9_-]+)\s*:", re.MULTILINE)
 
 
 class JustfileHandler(FileHandler):

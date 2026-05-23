@@ -17,12 +17,12 @@ from zenit.core._apply_loader import load_apply
 from zenit.core._paths import get_zenit_root
 from zenit.core.apply import apply_contributions
 from zenit.core.collect import collect_all
+from zenit.core.constants import _RECIPE_NAME_RE
 from zenit.core.context import Context
 from zenit.core.dryrun import run_dry
 from zenit.core.filesystem import RealFileSystem
 from zenit.core.generate import generate_all
 from zenit.core.git import init
-from zenit.core.handlers.justfile_handler import _RECIPE_NAME_RE
 from zenit.core.lockfile import write_lockfile
 from zenit.core.manifest import (
     _pkg_name,
