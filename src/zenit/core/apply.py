@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, Any
 import jinja2
 import yaml
 
+from zenit.cli.ui import warn as _warn
 from zenit.core.filesystem import FileSystem
 from zenit.core.handlers.base import HandlerDispatcher
 from zenit.core.manifest import (
@@ -142,6 +143,10 @@ def apply_contributions(
         file_path = project_dir / resolved_file
 
         if not file_path.exists():
+            _warn(
+                f"Injection point '{inj.point}' targets "
+                f"non-existent file '{resolved_file}' — skipping."
+            )
             continue
 
         content = inj.content

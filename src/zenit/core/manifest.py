@@ -234,7 +234,12 @@ def fingerprint(code: str) -> tuple[str, str]:
 
     If *code* is not a valid Python module (e.g. a class-body fragment such as
     a single annotated attribute), libcst round-tripping is skipped and the
-    raw text is hashed directly.
+    raw text is hashed directly.  This means the hash is computed without a
+    canonical libcst round-trip: Stage A and B removal will not match, and
+    removal will fall through to Stage C (fuzzy match).
+
+    This is an explicit trade-off: fingerprinting must not crash on fragments,
+    but removal precision degrades for syntactically invalid blocks.
     """
     try:
         module = libcst.parse_module(code)

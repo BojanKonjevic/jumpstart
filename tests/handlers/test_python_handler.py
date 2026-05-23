@@ -158,6 +158,18 @@ def test_apply_raises_injection_error_on_locator_failure(tmp_path: Path) -> None
     assert str(f) in msg
 
 
+def test_apply_raises_injection_error_on_invalid_python(tmp_path: Path) -> None:
+    f = tmp_path / "mod.py"
+    f.write_text("import os\n\nx = 1\n", encoding="utf-8")
+    # Overwrite with invalid Python
+    f.write_text("def foo(:\n    pass\n", encoding="utf-8")
+    with pytest.raises(InjectionError) as exc_info:
+        apply(f, "x = 2\n", LOCATOR_AFTER_LAST_IMPORT, {})
+    msg = str(exc_info.value)
+    assert "invalid Python" in msg or "Cannot parse" in msg
+    assert str(f) in msg
+
+
 def test_apply_adds_trailing_newline_if_missing(tmp_path: Path) -> None:
     f = tmp_path / "mod.py"
     _write(

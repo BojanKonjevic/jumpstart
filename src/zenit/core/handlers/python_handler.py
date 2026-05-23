@@ -154,7 +154,14 @@ def apply(
     locator_args: dict[str, object],
 ) -> tuple[str, int, int]:
     source = file.read_text(encoding="utf-8")
-    module = cst.parse_module(source)
+    try:
+        module = cst.parse_module(source)
+    except (SyntaxError, cst.ParserSyntaxError) as exc:
+        raise InjectionError(
+            f"Cannot parse '{file}' for injection at '{locator_name}'. "
+            f"The file contains invalid Python syntax and cannot be modified.\n"
+            f"  {exc}"
+        ) from exc
     try:
         insert_index = locate(module, locator_name, locator_args)
     except LocatorError as exc:

@@ -51,12 +51,21 @@ def test_normalised_differs_on_semantic_change() -> None:
 
 
 def test_invalid_python_falls_back_gracefully() -> None:
-    # An indented class-body fragment is not a valid Python module.
-    # fingerprint() must not raise — it falls back to raw-text hashing.
+    """An indented fragment is not a valid Python module.
+
+    fingerprint() must not raise — it falls back to raw-text hashing
+    with no libcst round-trip.  The hashes are still valid sha256
+    values, but because no canonical round-trip occurred, Stage A/B
+    removal will not match and removal falls through to Stage C fuzzy.
+    This is a known contract, not a bug.
+    """
     fragment = '    redis_url: str = ""\n'
     raw, normalised = fingerprint(fragment)
     assert raw.startswith("sha256:")
     assert normalised.startswith("sha256:")
+    # Raw and normalised differ because _normalise strips trailing
+    # whitespace/newlines even without a libcst round-trip.
+    assert raw != normalised
 
 
 # ── _normalise() — internal contract ─────────────────────────────────────────
