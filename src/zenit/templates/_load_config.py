@@ -9,14 +9,16 @@ from pathlib import Path
 
 from zenit.schema.models import TemplateConfig, TemplateMeta
 
+_HERE = Path(__file__).parent.absolute()
+
 # ── Metadata-only discovery (no exec) ─────────────────────────────────────
 
 
 @functools.cache
-def list_templates(zenit_root: Path) -> list[TemplateMeta]:
+def list_templates() -> list[TemplateMeta]:
     """Iterate template dirs, read ``template.toml``. No exec."""
     metas: list[TemplateMeta] = []
-    templates_dir = zenit_root / "templates"
+    templates_dir = _HERE
     for template_dir in sorted(
         p for p in templates_dir.iterdir() if p.is_dir() and not p.name.startswith("_")
     ):

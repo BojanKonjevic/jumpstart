@@ -1,7 +1,14 @@
 from pathlib import Path
 
+from zenit.addons._registry import get_addon
+from zenit.core.apply import merge_compose
+from zenit.core.collect import collect_all
+from zenit.core.context import Context
+from zenit.core.filesystem import FileSystem
 from zenit.core.lockfile import ZenitLockfile
+from zenit.doctor.doctor import HealthIssue, Severity
 from zenit.schema.models import AddonConfig, FileContribution
+from zenit.templates._load_config import load_template_config
 
 _HERE = Path(__file__).parent.absolute()
 
@@ -30,6 +37,33 @@ config = AddonConfig(
         "# stop all services\ndocker-down:\n    docker compose down",
     ],
 )
+
+
+def health_check(project_dir: Path, lockfile: ZenitLockfile) -> list[HealthIssue]:
+    issues: list[HealthIssue] = []
+    if not (project_dir / "compose.yml").exists():
+        issues.append(
+            HealthIssue(
+                Severity.ERROR,
+                "compose.yml is missing but docker addon is installed.",
+                "Restore compose.yml or re-run 'zenit add docker'.",
+            )
+        )
+    return issues
+
+
+def post_apply(ctx: Context, fs: FileSystem) -> None:  # noqa: ARG001
+    template_config = load_template_config(ctx.zenit_root, ctx.template)
+    active_configs = [get_addon(a) for a in ctx.addons]
+    contributions = collect_all(template_config, active_configs)
+    if not contributions.compose_services and not contributions.compose_volumes:
+        return
+    compose_path = ctx.project_dir / "compose.yml"
+    if not compose_path.exists():
+        return
+    merge_compose(
+        ctx, fs, contributions.compose_services, contributions.compose_volumes
+    )
 
 
 def can_apply(project_dir: Path, lockfile: ZenitLockfile) -> str | None:

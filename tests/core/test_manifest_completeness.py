@@ -125,11 +125,8 @@ def _scaffold(tmp_path: Path, name: str, template: str, addons: list[str]) -> Pa
 
     manifest = read_manifest(project_dir)
     string_env = make_env()
-    docker_active = "docker" in addons
     for addon_cfg in selected_addon_configs:
-        record_addon_manifest_entries(
-            manifest, addon_cfg, string_env, render_vars, docker_active=docker_active
-        )
+        record_addon_manifest_entries(manifest, addon_cfg, string_env, render_vars)
     write_manifest(project_dir, manifest)
 
     write_lockfile(project_dir, template, addons)

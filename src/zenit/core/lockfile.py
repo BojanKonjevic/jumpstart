@@ -8,7 +8,7 @@ Format
 ------
     [project]
     template = "fastapi"
-    addons = ["docker", "redis"]
+    addons = ["redis"]
     zenit_version = "1.0.1"
     schema_version = 2
 

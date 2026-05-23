@@ -25,7 +25,6 @@ Normalisation contract
 
 from __future__ import annotations
 
-import functools
 import hashlib
 import re
 import sys
@@ -57,7 +56,6 @@ MANIFEST_SCHEMA_VERSION = 2
 # ── Public API ────────────────────────────────────────────────────────────────
 
 
-@functools.lru_cache(maxsize=2)
 def read_manifest(project_dir: Path) -> Manifest:
     """Read the ``[manifest]`` section from *project_dir*/.zenit.toml.
 
@@ -92,7 +90,6 @@ def write_manifest(project_dir: Path, manifest: Manifest) -> None:
     Creates the file if it does not exist (though normally ``write_lockfile``
     creates it first at scaffold time).
     """
-    read_manifest.cache_clear()
     path = project_dir / LOCKFILE_NAME
     if path.exists():
         doc = tomlkit.parse(path.read_text(encoding="utf-8"))
@@ -182,18 +179,16 @@ def record_addon_manifest_entries(
     addon_cfg: AddonConfig,
     string_env: Environment,
     render_vars: dict[str, object],
-    docker_active: bool = False,
 ) -> None:
     addon_id = addon_cfg.id
     for ev in addon_cfg.env_vars:
         add_env_entry(manifest, ev.key, source=EntrySource.ADDON, addon=addon_id)
-    if docker_active:
-        for svc in addon_cfg.compose_services:
-            add_compose_service(
-                manifest, svc.name, source=EntrySource.ADDON, addon=addon_id
-            )
-        for vol in addon_cfg.compose_volumes:
-            add_compose_volume(manifest, vol, source=EntrySource.ADDON, addon=addon_id)
+    for svc in addon_cfg.compose_services:
+        add_compose_service(
+            manifest, svc.name, source=EntrySource.ADDON, addon=addon_id
+        )
+    for vol in addon_cfg.compose_volumes:
+        add_compose_volume(manifest, vol, source=EntrySource.ADDON, addon=addon_id)
     for dep in addon_cfg.deps:
         add_dependency(
             manifest,

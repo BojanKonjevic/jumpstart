@@ -5,7 +5,6 @@ from __future__ import annotations
 import sys
 
 from zenit.cli.ui import BOLD, DIM, GREEN, RESET
-from zenit.core._paths import get_zenit_root
 from zenit.templates._load_config import list_templates
 
 from ._keys import tty_available
@@ -100,7 +99,7 @@ def prompt_template(default: str | None = None) -> str:
 def _load_templates_list() -> list[tuple[str, str]]:
     """Load template metadata from TOML files (dynamic fallback)."""
     try:
-        return [(t.id, t.description) for t in list_templates(get_zenit_root())]
+        return [(t.id, t.description) for t in list_templates()]
     except Exception:
         return TEMPLATES
 

@@ -99,9 +99,10 @@ def collect_all(
             continue
 
         raise ZenitError(
-            f"Internal conflict: both '{prev_label}' and '{label}' want "
-            f"to write '{dest}'. "
-            f"Please report this at https://github.com/BojanKonjevic/zenit/issues"
+            f"Conflict: both '{prev_label}' and '{label}' want to write '{dest}'.\n"
+            f"  '{prev_label}' source: {prev_fc.source or 'inline content'}\n"
+            f"  '{label}' source: {fc.source or 'inline content'}\n"
+            f"Fix: remove or rename the conflicting file in one of the addons/templates."
         )
 
     return c

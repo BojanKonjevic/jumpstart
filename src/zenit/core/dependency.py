@@ -7,6 +7,7 @@ ad-hoc ``requires_map`` dicts rebuilt in 6+ locations.
 
 from __future__ import annotations
 
+from collections import deque
 from dataclasses import dataclass, field
 
 from zenit.schema.models import AddonConfig, AddonMeta
@@ -170,11 +171,11 @@ class DependencyGraph:
             deps_in_set = [d for d in self.edges.get(node, []) if d in valid]
             in_degree[node] = len(deps_in_set)
 
-        queue = [node for node in valid if in_degree[node] == 0]
+        queue = deque(node for node in valid if in_degree[node] == 0)
         result: list[str] = []
 
         while queue:
-            node = queue.pop(0)
+            node = queue.popleft()
             result.append(node)
             for consumer in self.reverse.get(node, []):
                 if consumer in valid:

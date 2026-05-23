@@ -77,12 +77,9 @@ def write_test_manifest(
     manifest = read_manifest(project_dir)
     string_env = make_env()
     available = get_available_addons()
-    docker_active = "docker" in addons
     for addon_id in addons:
         cfg = next(c for c in available if c.id == addon_id)
-        record_addon_manifest_entries(
-            manifest, cfg, string_env, render_vars, docker_active=docker_active
-        )
+        record_addon_manifest_entries(manifest, cfg, string_env, render_vars)
     write_manifest(project_dir, manifest)
 
 

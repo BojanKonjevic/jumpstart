@@ -10,7 +10,7 @@ Config file locations (in priority order):
 
 Example zenit.toml:
     default_template = "fastapi"
-    default_addons = ["docker", "github-actions"]
+    default_addons = ["redis", "github-actions"]
 """
 
 from __future__ import annotations

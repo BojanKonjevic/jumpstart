@@ -28,8 +28,8 @@ from zenit.cli.ui import (
     warn,
 )
 from zenit.core._paths import get_zenit_root
-from zenit.core.apply import apply_contributions, merge_compose
-from zenit.core.collect import collect_addon_only, collect_all
+from zenit.core.apply import apply_contributions
+from zenit.core.collect import collect_addon_only
 from zenit.core.context import Context
 from zenit.core.dependency import DependencyGraph
 from zenit.core.deps import inject_deps
@@ -37,8 +37,6 @@ from zenit.core.filesystem import FileSystem, RealFileSystem, RecordingFileSyste
 from zenit.core.justfile import inject_just_recipes
 from zenit.core.lockfile import read_lockfile, write_lockfile
 from zenit.core.manifest import (
-    add_compose_service,
-    add_compose_volume,
     read_manifest,
     record_addon_manifest_entries,
     write_manifest,
@@ -48,7 +46,7 @@ from zenit.core.recipes import _recipe_name
 from zenit.core.render import build_recipe_render_vars, build_render_vars, make_env
 from zenit.core.rollback import addon_or_rollback
 from zenit.schema.exceptions import ZenitError
-from zenit.schema.models import AddonConfig, EntrySource
+from zenit.schema.models import AddonConfig
 from zenit.templates._load_config import load_template_config
 
 
@@ -132,13 +130,11 @@ def _run_add_pipeline(
     # ── Manifest recording ────────────────────────────────────────────────────
     if not ctx.dry_run:
         manifest = read_manifest(project_dir)
-        docker_active = "docker" in ctx.addons
         record_addon_manifest_entries(
             manifest,
             addon_cfg,
             string_env,
             render_vars,
-            docker_active=docker_active,
         )
         write_manifest(project_dir, manifest)
 
@@ -236,15 +232,6 @@ def add_addon(addon_id: str, dry_run: bool = False, yes: bool = False) -> None:
         result = _run_add_pipeline(ctx, fs, addon_cfg)
         write_lockfile(project_dir, template, ctx.addons)
 
-    # ── Backfill compose entries when adding docker ──────────────────
-    if addon_id == "docker" and not dry_run:
-        _backfill_compose_on_docker_add(
-            project_dir=project_dir,
-            template=template,
-            current_addons=ctx.addons,
-            zenit_root=zenit_root,
-        )
-
     # ── Output ────────────────────────────────────────────────────────────────
     print()
     success(f"Addon '{addon_id}' added to '{project_dir.name}'.")
@@ -329,53 +316,3 @@ def add_addon_interactive(dry_run: bool = False, yes: bool = False) -> None:
 
     for addon_id in graph.tsort(set(selected)):
         add_addon(addon_id, dry_run=dry_run, yes=yes)
-
-
-def _backfill_compose_on_docker_add(
-    project_dir: Path,
-    template: str,
-    current_addons: list[str],
-    zenit_root: Path,
-) -> None:
-    """When docker is added to a project with existing addons, backfill their
-    compose services and volumes into both compose.yml and the manifest."""
-    template_config = load_template_config(zenit_root, template)
-    active_configs = [get_addon(a) for a in current_addons]
-
-    contributions = collect_all(template_config, active_configs)
-    if not contributions.compose_services and not contributions.compose_volumes:
-        return
-
-    compose_path = project_dir / "compose.yml"
-    if not compose_path.exists():
-        return
-
-    pkg_name = normalise_pkg_name(project_dir.name)
-    ctx = Context(
-        name=project_dir.name,
-        pkg_name=pkg_name,
-        template=template,
-        addons=current_addons,
-        zenit_root=zenit_root,
-        project_dir=project_dir,
-    )
-    fs = RealFileSystem(project_dir)
-    merge_compose(
-        ctx, fs, contributions.compose_services, contributions.compose_volumes
-    )
-
-    manifest = read_manifest(project_dir)
-    for addon_cfg in active_configs:
-        for svc in addon_cfg.compose_services:
-            add_compose_service(
-                manifest, svc.name, source=EntrySource.ADDON, addon=addon_cfg.id
-            )
-        for vol in addon_cfg.compose_volumes:
-            add_compose_volume(
-                manifest, vol, source=EntrySource.ADDON, addon=addon_cfg.id
-            )
-    for svc in template_config.compose_services:
-        add_compose_service(manifest, svc.name, source=EntrySource.TEMPLATE, addon="")
-    for vol in template_config.compose_volumes:
-        add_compose_volume(manifest, vol, source=EntrySource.TEMPLATE, addon="")
-    write_manifest(project_dir, manifest)

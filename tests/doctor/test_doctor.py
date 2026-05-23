@@ -591,14 +591,14 @@ class TestCheckCompose:
         project_dir = _scaffold(tmp_path, template="blank")
         result = _check_compose(project_dir, self._lockfile(project_dir))
         assert not result.has_errors
-        assert any("docker addon not installed" in i.message for i in _ok(result))
+        assert any("skipping compose check" in i.message for i in _ok(result))
 
     def test_error_when_docker_installed_but_compose_missing(self, tmp_path):
         project_dir = _scaffold(tmp_path, template="blank", addons=["docker"])
         (project_dir / "compose.yml").unlink()
-        result = _check_compose(project_dir, self._lockfile(project_dir))
-        assert result.has_errors
-        assert any("compose.yml" in i.message for i in _errors(result))
+        results = run_doctor(project_dir)
+        all_errors = [i for r in results for i in _errors(r)]
+        assert any("compose.yml" in i.message for i in all_errors)
 
     def test_error_when_compose_corrupt(self, tmp_path):
         project_dir = _scaffold(tmp_path, template="blank", addons=["docker"])
@@ -772,7 +772,7 @@ class TestRunDoctor:
         assert "Dependencies" in categories
         assert "Generated files" in categories
         assert "Addon integrity" in categories
-        assert "Compose" not in categories
+        assert "Compose" in categories
 
     def test_returns_compose_section_when_docker_installed(self, tmp_path):
         project_dir = _scaffold(tmp_path, template="fastapi", addons=["docker"])

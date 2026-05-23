@@ -159,20 +159,16 @@ def scaffold_project(
 
         manifest = read_manifest(project_dir)
         string_env = make_env()
-        docker_active = "docker" in adns
         for addon_cfg in selected_addon_configs:
             record_addon_manifest_entries(
                 manifest,
                 addon_cfg,
                 string_env,
                 render_vars,
-                docker_active=docker_active,
             )
         write_manifest(project_dir, manifest)
 
-        _stamp_template_manifest(
-            project_dir, template_config, docker_active=docker_active
-        )
+        _stamp_template_manifest(project_dir, template_config)
 
     print()
     addon_suffix = (" + " + ", ".join(adns)) if adns else ""
@@ -202,7 +198,6 @@ def scaffold_project(
 def _stamp_template_manifest(
     project_dir: Path,
     template_config: TemplateConfig,
-    docker_active: bool = False,
 ) -> None:
     """Record template-owned entries in the manifest with source='template', addon=''.
 
@@ -219,14 +214,11 @@ def _stamp_template_manifest(
     for ev in template_config.env_vars:
         add_env_entry(manifest, ev.key, source=EntrySource.TEMPLATE, addon="")
 
-    if docker_active:
-        for svc in template_config.compose_services:
-            add_compose_service(
-                manifest, svc.name, source=EntrySource.TEMPLATE, addon=""
-            )
+    for svc in template_config.compose_services:
+        add_compose_service(manifest, svc.name, source=EntrySource.TEMPLATE, addon="")
 
-        for vol in template_config.compose_volumes:
-            add_compose_volume(manifest, vol, source=EntrySource.TEMPLATE, addon="")
+    for vol in template_config.compose_volumes:
+        add_compose_volume(manifest, vol, source=EntrySource.TEMPLATE, addon="")
 
     for dep in template_config.deps:
         pkg = _pkg_name(dep)

@@ -75,9 +75,7 @@ def get_available_addons() -> list[AddonConfig]:
 
     Reimplemented via ``list_addons()`` + ``get_addon()`` for lazy exec.
     """
-    addons = [get_addon(m.id) for m in list_addons()]
-    _validate_addons(addons)
-    return addons
+    return [get_addon(m.id) for m in list_addons()]
 
 
 def _validate_addons(addons: list[AddonConfig]) -> None:

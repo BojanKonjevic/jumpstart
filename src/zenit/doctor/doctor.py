@@ -99,12 +99,11 @@ def run_doctor(project_dir: Path, *, thorough: bool = False) -> list[HealthResul
     )
     results.append(_check_files(project_dir, lockfile, template_config, addon_configs))
     results.append(_check_addon_health(project_dir, lockfile, available_configs))
-    if "docker" in lockfile.addons:
-        results.append(
-            _check_compose(
-                project_dir, lockfile, template_config, addon_configs, contributions
-            )
+    results.append(
+        _check_compose(
+            project_dir, lockfile, template_config, addon_configs, contributions
         )
+    )
     results.append(_check_env(project_dir, lockfile, template_config, contributions))
     results.append(_check_manifest_env(project_dir, manifest))
     results.append(_check_manifest_compose(project_dir, manifest))
@@ -777,13 +776,7 @@ def _check_compose(
 
     compose_path = project_dir / "compose.yml"
     if not compose_path.exists():
-        if "docker" in lockfile.addons:
-            result.error(
-                "compose.yml is missing but docker addon is installed.",
-                hint="Restore compose.yml or re-run 'zenit add docker'.",
-            )
-        else:
-            result.ok("No compose.yml — docker addon not installed.")
+        result.ok("No compose.yml — skipping compose check.")
         return result
 
     try:
