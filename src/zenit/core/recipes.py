@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 
-def _recipe_name(recipe: str) -> str:
+def _recipe_name(recipe: str) -> str | None:
     """Return the bare recipe name (text before the first colon).
 
     Skips leading comment lines so that a recipe like::
@@ -15,11 +15,13 @@ def _recipe_name(recipe: str) -> str:
             uvicorn ...
 
     correctly returns ``"run"``.
+
+    Returns ``None`` when no recipe line is found (comment-only or empty input).
     """
     for line in recipe.strip().splitlines():
         if not line.startswith("#"):
             return line.split(":")[0].strip().split()[0]
-    return ""
+    return None
 
 
 @dataclass
@@ -40,7 +42,13 @@ class RecipeCollection:
 
         An addon recipe is dropped if its name matches a template recipe.
         """
-        template_names = {_recipe_name(r) for r in self.template if r.strip()}
+        template_names = {
+            n
+            for r in self.template
+            if r.strip()
+            for n in (_recipe_name(r),)
+            if n is not None
+        }
         unique_addon = [
             r for r in self.addon if r.strip() and _recipe_name(r) not in template_names
         ]

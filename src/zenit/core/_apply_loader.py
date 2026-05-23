@@ -6,11 +6,18 @@ from pathlib import Path
 
 from zenit.core.context import Context
 from zenit.core.filesystem import FileSystem
+from zenit.schema.exceptions import ZenitError
 
 
 def load_apply(path: Path) -> Callable[[Context, FileSystem], None]:
+    if not path.exists():
+        raise ZenitError(f"Failed to load apply module from '{path}': file not found")
     spec = importlib.util.spec_from_file_location("apply", path)
-    assert spec is not None and spec.loader is not None
+    if spec is None or spec.loader is None:
+        raise ZenitError(
+            f"Failed to load apply module from '{path}': "
+            f"could not find or load the module spec"
+        )
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
     return mod.apply  # type: ignore[no-any-return]

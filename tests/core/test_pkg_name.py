@@ -39,7 +39,8 @@ def test_idempotent() -> None:
 
 
 def test_empty_string() -> None:
-    assert normalise_pkg_name("") == ""
+    with pytest.raises(ZenitError, match="normalised to an empty string"):
+        normalise_pkg_name("")
 
 
 def test_multiple_special_chars() -> None:

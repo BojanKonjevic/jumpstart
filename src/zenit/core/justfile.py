@@ -32,15 +32,18 @@ def inject_just_recipes(project_dir: Path, recipes: list[str]) -> list[str]:
         appended += "\n" + recipe.strip("\n") + "\n"
 
     justfile_path.write_text(appended, encoding="utf-8")
-    return [_recipe_name(r) for r in to_add]
+    return [name for r in to_add if (name := _recipe_name(r)) is not None]
 
 
-def _recipe_name(recipe: str) -> str:
-    """Return the bare recipe name from a recipe block string."""
+def _recipe_name(recipe: str) -> str | None:
+    """Return the bare recipe name from a recipe block string.
+
+    Returns ``None`` when no recipe line is found (comment-only or empty input).
+    """
     for line in recipe.strip().splitlines():
         if not line.startswith("#"):
             return line.split(":")[0].strip().split()[0]
-    return ""
+    return None
 
 
 def _extract_recipe_names(text: str) -> set[str]:

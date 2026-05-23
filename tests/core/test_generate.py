@@ -41,6 +41,18 @@ def test_recipe_name_with_leading_comment_and_args():
     )
 
 
+def test_recipe_name_comment_only():
+    assert _recipe_name("# just a comment\n# another comment") is None
+
+
+def test_recipe_name_empty_string():
+    assert _recipe_name("") is None
+
+
+def test_recipe_name_whitespace_only():
+    assert _recipe_name("   \n  ") is None
+
+
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 

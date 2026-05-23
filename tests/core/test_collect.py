@@ -1,6 +1,9 @@
 """Tests for zenit.assembler — collecting and merging contributions."""
 
+import pytest
+
 from zenit.core.collect import collect_all
+from zenit.schema.exceptions import ZenitError
 from zenit.schema.models import (
     AddonConfig,
     ComposeService,
@@ -135,6 +138,29 @@ def test_collect_all_files_from_multiple_addons():
     )
     assert fc1 in result.files
     assert fc2 in result.files
+
+
+def test_collect_all_dedup_source_vs_content_identical(tmp_path):
+    source_file = tmp_path / "x.py"
+    source_file.write_text("print('hello')", encoding="utf-8")
+    template_fc = FileContribution(dest="x.py", content="print('hello')")
+    addon_fc = FileContribution(dest="x.py", source=str(source_file))
+    collect_all(
+        _template(files=[template_fc]),
+        [_addon(id="myaddon", files=[addon_fc])],
+    )
+
+
+def test_collect_all_dedup_source_vs_content_different(tmp_path):
+    source_file = tmp_path / "x.py"
+    source_file.write_text("print('goodbye')", encoding="utf-8")
+    template_fc = FileContribution(dest="x.py", content="print('hello')")
+    addon_fc = FileContribution(dest="x.py", source=str(source_file))
+    with pytest.raises(ZenitError, match="Internal conflict"):
+        collect_all(
+            _template(files=[template_fc]),
+            [_addon(id="myaddon", files=[addon_fc])],
+        )
 
 
 # ── just_recipes ──────────────────────────────────────────────────────────────

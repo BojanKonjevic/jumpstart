@@ -50,12 +50,12 @@ def test_recipe_name_with_leading_newline():
     assert _recipe_name("\nrun:\n    cmd") == "run"
 
 
-def test_recipe_name_all_comments_returns_empty():
-    assert _recipe_name("# just a comment\n# another comment") == ""
+def test_recipe_name_all_comments_returns_none():
+    assert _recipe_name("# just a comment\n# another comment") is None
 
 
-def test_recipe_name_empty_string_returns_empty():
-    assert _recipe_name("") == ""
+def test_recipe_name_empty_string_returns_none():
+    assert _recipe_name("") is None
 
 
 # ── _extract_recipe_names ─────────────────────────────────────────────────────

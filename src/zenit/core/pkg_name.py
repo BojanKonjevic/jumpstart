@@ -22,7 +22,13 @@ from zenit.schema.exceptions import ZenitError
 def normalise_pkg_name(project_name: str) -> str:
     name = project_name.lower()
     name = re.sub(r"[^a-z0-9_]", "_", name)
-    return name.strip("_")
+    name = name.strip("_")
+    if not name:
+        raise ZenitError(
+            f"Project name '{project_name}' normalised to an empty string. "
+            f"Use at least one letter, digit, or underscore."
+        )
+    return name
 
 
 def _validate_no_path_traversal(dest: str, project_dir: Path) -> None:

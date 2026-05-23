@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 from zenit.core.constants import DEFAULT_DEV_DEPS
@@ -13,6 +14,22 @@ from zenit.schema.models import (
 
 if TYPE_CHECKING:
     from zenit.schema.models import AddonConfig, TemplateConfig
+
+
+def _resolve_content(fc: FileContribution) -> str | None:
+    """Return the literal content of a FileContribution.
+
+    If *fc* has inline ``content``, return it directly.  If *fc* has a
+    ``source`` path, read the file from disk.
+    """
+    if fc.content is not None:
+        return fc.content
+    if fc.source is not None:
+        try:
+            return Path(fc.source).read_text(encoding="utf-8")
+        except OSError:
+            return None
+    return None
 
 
 def collect_all(
@@ -69,6 +86,16 @@ def collect_all(
         if fc.source is not None and fc.source == prev_fc.source:
             continue
         if fc.content is not None and fc.content == prev_fc.content:
+            continue
+
+        # One has source, the other has content — resolve and compare actual text.
+        fc_content = _resolve_content(fc)
+        prev_content = _resolve_content(prev_fc)
+        if (
+            fc_content is not None
+            and prev_content is not None
+            and fc_content == prev_content
+        ):
             continue
 
         raise ZenitError(
