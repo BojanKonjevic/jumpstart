@@ -12,6 +12,7 @@ import libcst as cst
 import pytest
 
 from zenit.core.handlers.locators import (
+    LOCATOR_BEFORE_YIELD,
     LocatorError,
     after_last_class_attribute,
     after_last_import,
@@ -267,7 +268,7 @@ def test_in_function_body_invalid_position() -> None:
 
 def test_locate_dispatches_to_correct_locator() -> None:
     src = "async def lifespan():\n    yield\n"
-    result = locate(_parse(src), "before_yield_in_function", {"function": "lifespan"})
+    result = locate(_parse(src), LOCATOR_BEFORE_YIELD, {"function": "lifespan"})
     assert result == 0
 
 

@@ -20,6 +20,7 @@ from zenit.core._paths import get_zenit_root
 from zenit.core.apply import apply_contributions
 from zenit.core.context import Context
 from zenit.core.filesystem import RealFileSystem
+from zenit.core.handlers.locators import LOCATOR_AFTER_LAST_CLASS_ATTR
 from zenit.core.manifest import fingerprint as _fp
 from zenit.core.manifest import read_manifest
 from zenit.core.render import build_render_vars
@@ -131,7 +132,7 @@ def test_apply_records_python_block_with_all_fields(tmp_path: Path) -> None:
         (
             "settings_fields",
             "src/{{pkg_name}}/settings.py",
-            "after_last_class_attribute",
+            LOCATOR_AFTER_LAST_CLASS_ATTR,
             {"class_name": "Settings"},
         ),
     )
@@ -148,7 +149,7 @@ def test_apply_records_python_block_with_all_fields(tmp_path: Path) -> None:
     assert "-" in block.lines  # e.g. "3-3"
     assert block.fingerprint.startswith("sha256:")
     assert block.fingerprint_normalised.startswith("sha256:")
-    assert block.locator.name == "after_last_class_attribute"
+    assert block.locator.name == LOCATOR_AFTER_LAST_CLASS_ATTR
     assert block.locator.args == {"class_name": "Settings"}
 
 
@@ -173,7 +174,7 @@ def test_apply_fingerprint_matches_written_content(tmp_path: Path) -> None:
         (
             "settings_fields",
             "src/{{pkg_name}}/settings.py",
-            "after_last_class_attribute",
+            LOCATOR_AFTER_LAST_CLASS_ATTR,
             {"class_name": "Settings"},
         ),
     )
@@ -210,7 +211,7 @@ def test_apply_skips_python_block_for_missing_file(tmp_path: Path) -> None:
         (
             "settings_fields",
             "src/{{pkg_name}}/settings.py",
-            "after_last_class_attribute",
+            LOCATOR_AFTER_LAST_CLASS_ATTR,
             {"class_name": "Settings"},
         ),
     )

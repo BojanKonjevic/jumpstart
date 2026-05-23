@@ -17,6 +17,12 @@ from pathlib import Path
 import libcst as cst
 import pytest
 
+from zenit.core.handlers.locators import (
+    LOCATOR_AFTER_LAST_CLASS_ATTR,
+    LOCATOR_AFTER_LAST_IMPORT,
+    LOCATOR_AT_MODULE_END,
+    LOCATOR_BEFORE_YIELD,
+)
 from zenit.core.handlers.python_handler import (
     InjectionError,
     RemovalError,
@@ -34,7 +40,7 @@ def _block(
     file: Path,
     lines: str,
     content: str,
-    locator_name: str = "after_last_import",
+    locator_name: str = LOCATOR_AFTER_LAST_IMPORT,
     locator_args: dict[str, object] | None = None,
     addon: str = "test",
     point: str = "test_point",
@@ -64,7 +70,7 @@ def test_apply_inserts_at_locator_position(tmp_path: Path) -> None:
     # No blank line between imports so insertion is immediately after "import os"
     f = tmp_path / "mod.py"
     f.write_text("import os\nclass Foo:\n    pass\n", encoding="utf-8")
-    apply(f, "import sys\n", "after_last_import", {})
+    apply(f, "import sys\n", LOCATOR_AFTER_LAST_IMPORT, {})
     src = f.read_text()
     lines = src.splitlines()
     # after_last_import: inserts right after "import os"
@@ -82,7 +88,7 @@ def test_apply_returns_correct_line_range(tmp_path: Path) -> None:
     """,
     )
     _, start, end = apply(
-        f, "import sys\nimport re\nimport json\n", "after_last_import", {}
+        f, "import sys\nimport re\nimport json\n", LOCATOR_AFTER_LAST_IMPORT, {}
     )
     assert end - start == 2  # 3 lines → span of 2
 
@@ -95,7 +101,7 @@ def test_apply_single_line_content(tmp_path: Path) -> None:
         import os
     """,
     )
-    _, start, end = apply(f, "import sys\n", "after_last_import", {})
+    _, start, end = apply(f, "import sys\n", LOCATOR_AFTER_LAST_IMPORT, {})
     assert start == end
 
 
@@ -107,7 +113,7 @@ def test_apply_multiline_content(tmp_path: Path) -> None:
         import os
     """,
     )
-    _, start, end = apply(f, "A = 1\nB = 2\nC = 3\n", "at_module_end", {})
+    _, start, end = apply(f, "A = 1\nB = 2\nC = 3\n", LOCATOR_AT_MODULE_END, {})
     assert end - start == 2
 
 
@@ -123,13 +129,13 @@ def test_apply_multiple_injections_same_file(tmp_path: Path) -> None:
     apply(
         f,
         "    debug: bool = False\n",
-        "after_last_class_attribute",
+        LOCATOR_AFTER_LAST_CLASS_ATTR,
         {"class_name": "Settings"},
     )
     apply(
         f,
         "    port: int = 8000\n",
-        "after_last_class_attribute",
+        LOCATOR_AFTER_LAST_CLASS_ATTR,
         {"class_name": "Settings"},
     )
     src = f.read_text()
@@ -146,7 +152,7 @@ def test_apply_raises_injection_error_on_locator_failure(tmp_path: Path) -> None
     """,
     )
     with pytest.raises(InjectionError) as exc_info:
-        apply(f, "pass\n", "before_yield_in_function", {"function": "lifespan"})
+        apply(f, "pass\n", LOCATOR_BEFORE_YIELD, {"function": "lifespan"})
     msg = str(exc_info.value)
     assert "lifespan" in msg
     assert str(f) in msg
@@ -160,7 +166,7 @@ def test_apply_adds_trailing_newline_if_missing(tmp_path: Path) -> None:
         import os
     """,
     )
-    apply(f, "import sys", "after_last_import", {})  # no trailing \n
+    apply(f, "import sys", LOCATOR_AFTER_LAST_IMPORT, {})  # no trailing \n
     src = f.read_text()
     assert "import sys\n" in src
     # File must remain parseable
@@ -249,7 +255,7 @@ def _inject_and_record(tmp_path: Path, injection: str) -> tuple[Path, ManifestBl
         f,
         f"{start}-{end}",
         injection,
-        locator_name="after_last_class_attribute",
+        locator_name=LOCATOR_AFTER_LAST_CLASS_ATTR,
         locator_args={"class_name": "Settings"},
     )
     return f, block
@@ -318,7 +324,7 @@ def test_remove_stage_c_below_threshold_raises(tmp_path: Path) -> None:
         fingerprint=fp,
         fingerprint_normalised=fp_norm,
         locator=LocatorSpec(
-            name="after_last_class_attribute",
+            name=LOCATOR_AFTER_LAST_CLASS_ATTR,
             args={"class_name": "Settings"},
         ),
     )

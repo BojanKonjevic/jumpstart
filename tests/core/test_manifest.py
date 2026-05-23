@@ -12,6 +12,7 @@ import pytest
 import tomlkit
 from jinja2 import Environment
 
+from zenit.core.handlers.locators import LOCATOR_AFTER_LAST_CLASS_ATTR
 from zenit.core.manifest import (
     MANIFEST_SCHEMA_VERSION,
     add_compose_service,
@@ -50,7 +51,7 @@ def _block(addon: str = "redis", point: str = "settings_fields") -> ManifestBloc
         fingerprint="sha256:aabbcc",
         fingerprint_normalised="sha256:ddeeff",
         locator=LocatorSpec(
-            name="after_last_class_attribute",
+            name=LOCATOR_AFTER_LAST_CLASS_ATTR,
             args={"class_name": "Settings"},
         ),
     )
@@ -119,7 +120,7 @@ def test_roundtrip_full_manifest(tmp_path: Path) -> None:
     assert result.python_blocks[0].addon == "redis"
     assert result.python_blocks[0].point == "settings_fields"
     assert result.python_blocks[0].locator == LocatorSpec(
-        name="after_last_class_attribute",
+        name=LOCATOR_AFTER_LAST_CLASS_ATTR,
         args={"class_name": "Settings"},
     )
     assert result.python_blocks[1].addon == "sentry"

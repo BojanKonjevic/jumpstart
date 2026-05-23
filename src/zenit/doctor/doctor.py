@@ -16,6 +16,7 @@ from zenit.addons._registry import get_available_addons
 from zenit.cli.ui import BOLD, DIM, GREEN, RED, RESET, YELLOW
 from zenit.core._paths import get_zenit_root
 from zenit.core.collect import collect_all
+from zenit.core.constants import _RECIPE_NAME_RE
 from zenit.core.lockfile import SCHEMA_VERSION, ZenitLockfile, read_lockfile
 from zenit.core.manifest import _pkg_name, read_manifest
 from zenit.core.pkg_name import normalise_pkg_name, resolve_dest_placeholder
@@ -300,20 +301,17 @@ def _check_manifest_deps(
         )
         return result
 
-    def _pkg(dep: str) -> str:
-        return re.split(r"[>=<!,; \[]", dep)[0].lower().replace("-", "_")
-
     raw_deps: list[str] = data.get("project", {}).get("dependencies", [])
     dev_group: list[str] = data.get("dependency-groups", {}).get("dev", []) or data.get(
         "project", {}
     ).get("optional-dependencies", {}).get("dev", [])
 
-    installed = {_pkg(d) for d in raw_deps}
-    installed_dev = {_pkg(d) for d in dev_group}
+    installed = {_pkg_name(d) for d in raw_deps}
+    installed_dev = {_pkg_name(d) for d in dev_group}
 
     for dep in manifest.dependencies:
         bucket = installed_dev if dep.dev else installed
-        if _pkg(dep.package) not in bucket:
+        if _pkg_name(dep.package) not in bucket:
             kind = "dev " if dep.dev else ""
             result.error(
                 f"Manifest {kind}dependency '{dep.package}' "
@@ -347,8 +345,7 @@ def _check_manifest_recipes(
         return result
 
     text = justfile_path.read_text(encoding="utf-8")
-    recipe_name_re = re.compile(r"^([a-zA-Z0-9_-]+)\s*:", re.MULTILINE)
-    existing_names = set(recipe_name_re.findall(text))
+    existing_names = set(_RECIPE_NAME_RE.findall(text))
 
     for entry in manifest.just_recipes:
         if entry.name not in existing_names:

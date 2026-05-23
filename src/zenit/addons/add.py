@@ -15,6 +15,7 @@ from zenit.cli.ui import (
     DIM,
     GREEN,
     RESET,
+    abort,
     addon_summary,
     bullet_list,
     dry_dep,
@@ -209,8 +210,7 @@ def add_addon(addon_id: str, dry_run: bool = False, yes: bool = False) -> None:
         try:
             raw = input(f"  Proceed? {DIM}[Y/n]{RESET}  ").strip().lower()
         except (EOFError, KeyboardInterrupt):
-            print()
-            raise typer.Exit(0) from None
+            abort()
         if raw not in ("", "y", "yes"):
             warn("Aborted.")
             raise typer.Exit(0)

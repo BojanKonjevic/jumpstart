@@ -1,5 +1,10 @@
 from pathlib import Path
 
+from zenit.addons._preflight import (
+    reject_existing_file,
+    reject_existing_in_env,
+    require_src_layout,
+)
 from zenit.core.lockfile import ZenitLockfile
 from zenit.core.pkg_name import normalise_pkg_name
 from zenit.doctor.doctor import HealthIssue, Severity
@@ -54,23 +59,15 @@ def can_apply(project_dir: Path, lockfile: ZenitLockfile) -> str | None:
     pkg_name = normalise_pkg_name(project_dir.name)
     template = lockfile.template
 
-    if not (project_dir / "src").is_dir():
-        return (
-            "No src/ directory found — sentry addon expects a src layout.\n"
-            "    Ensure your package lives under src/<pkg_name>/."
-        )
+    reason = require_src_layout(project_dir, "sentry")
+    if reason:
+        return reason
 
-    # Don't overwrite an existing sentry integration file.
     sentry_file = project_dir / "src" / pkg_name / "integrations" / "sentry.py"
-    if sentry_file.exists():
-        return (
-            f"{sentry_file.relative_to(project_dir)} already exists.\n"
-            "    Remove it first if you want zenit to generate a fresh one:\n"
-            f"      rm {sentry_file.relative_to(project_dir)}"
-        )
+    reason = reject_existing_file(sentry_file, project_dir)
+    if reason:
+        return reason
 
-    # Check the file being patched for any existing sentry_sdk usage.
-    # A manual sentry_sdk.init() call would conflict with the generated init_sentry().
     if template == "fastapi":
         target = project_dir / "src" / pkg_name / "lifecycle.py"
         if not target.exists():
@@ -100,17 +97,7 @@ def can_apply(project_dir: Path, lockfile: ZenitLockfile) -> str | None:
                 "    Remove the existing sentry_sdk references from main.py first."
             )
 
-    # Check for SENTRY_DSN in env files — a strong signal sentry is already configured.
-    for env_file in (".env", ".env.example"):
-        path = project_dir / env_file
-        if path.exists() and "SENTRY_DSN" in path.read_text(encoding="utf-8"):
-            return (
-                f"SENTRY_DSN is already defined in {env_file}.\n"
-                "    zenit won't add a duplicate. Remove it first if you want zenit to manage it:\n"
-                f"      Remove the SENTRY_DSN line from {env_file}"
-            )
-
-    return None
+    return reject_existing_in_env(project_dir, "SENTRY_DSN")
 
 
 def health_check(project_dir: Path, lockfile: ZenitLockfile) -> list[HealthIssue]:

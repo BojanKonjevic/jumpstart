@@ -1,5 +1,6 @@
 from pathlib import Path
 
+from zenit.addons._preflight import require_src_layout
 from zenit.core.lockfile import ZenitLockfile
 from zenit.core.pkg_name import normalise_pkg_name
 from zenit.doctor.doctor import HealthIssue, Severity
@@ -82,11 +83,9 @@ config = AddonConfig(
 def can_apply(project_dir: Path, lockfile: ZenitLockfile) -> str | None:
     pkg_name = normalise_pkg_name(project_dir.name)
 
-    if not (project_dir / "src").is_dir():
-        return (
-            "No src/ directory found — celery addon expects a src layout.\n"
-            "    Ensure your package lives under src/<pkg_name>/."
-        )
+    reason = require_src_layout(project_dir, "celery")
+    if reason:
+        return reason
 
     # Don't overwrite existing tasks directory contents.
     tasks_dir = project_dir / "src" / pkg_name / "tasks"

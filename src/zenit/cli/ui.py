@@ -38,6 +38,11 @@ _HIDE_CURSOR = "\033[?25l"
 _SHOW_CURSOR = "\033[?25h"
 
 
+def abort() -> None:
+    print()
+    raise SystemExit(0)
+
+
 def step(msg: str) -> None:
     print(f"\n{BOLD}{MAGENTA}▸{RESET} {msg}")
 

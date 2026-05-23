@@ -33,6 +33,17 @@ from typing import Any
 
 import libcst as cst
 
+# ── Public constants ──────────────────────────────────────────────────────────
+
+LOCATOR_AFTER_LAST_CLASS_ATTR = "after_last_class_attribute"
+LOCATOR_AFTER_LAST_IMPORT = "after_last_import"
+LOCATOR_AT_FILE_END = "at_file_end"
+LOCATOR_BEFORE_RETURN = "before_return_in_function"
+LOCATOR_BEFORE_YIELD = "before_yield_in_function"
+LOCATOR_AFTER_STATEMENT_MATCHING = "after_statement_matching"
+LOCATOR_AT_MODULE_END = "at_module_end"
+LOCATOR_IN_FUNCTION_BODY = "in_function_body"
+
 # ── Public exception ──────────────────────────────────────────────────────────
 
 
@@ -286,12 +297,12 @@ def _is_docstring(stmt: cst.BaseStatement) -> bool:
 
 
 _REGISTRY: dict[str, Callable[..., int]] = {
-    "before_yield_in_function": before_yield_in_function,
-    "after_last_class_attribute": after_last_class_attribute,
-    "after_last_import": after_last_import,
-    "after_statement_matching": after_statement_matching,
-    "before_return_in_function": before_return_in_function,
-    "at_module_end": at_module_end,
-    "at_file_end": at_file_end,
-    "in_function_body": in_function_body,
+    LOCATOR_BEFORE_YIELD: before_yield_in_function,
+    LOCATOR_AFTER_LAST_CLASS_ATTR: after_last_class_attribute,
+    LOCATOR_AFTER_LAST_IMPORT: after_last_import,
+    LOCATOR_AFTER_STATEMENT_MATCHING: after_statement_matching,
+    LOCATOR_BEFORE_RETURN: before_return_in_function,
+    LOCATOR_AT_MODULE_END: at_module_end,
+    LOCATOR_AT_FILE_END: at_file_end,
+    LOCATOR_IN_FUNCTION_BODY: in_function_body,
 }

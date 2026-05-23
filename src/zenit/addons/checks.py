@@ -36,6 +36,29 @@ from zenit.schema.models import AddonConfig
 from zenit.templates._load_config import load_template_config
 
 
+def _read_lockfile_and_validate(
+    project_dir: Path,
+    addon_id: str,
+    available: list[AddonConfig],
+    command: str,
+) -> ZenitLockfile:
+    lockfile = read_lockfile(project_dir)
+    if lockfile is None:
+        raise ZenitError(
+            f"No .zenit.toml found. "
+            f"'zenit {command}' only works in projects scaffolded by zenit."
+        )
+    if not lockfile.template:
+        raise ZenitError(
+            ".zenit.toml exists but has no template field — it may be corrupt."
+        )
+    addon_ids = {cfg.id for cfg in available}
+    if addon_id not in addon_ids:
+        known = ", ".join(sorted(addon_ids))
+        raise ZenitError(f"Unknown addon '{addon_id}'. Available addons: {known}")
+    return lockfile
+
+
 def check_can_add(
     project_dir: Path,
     addon_id: str,
@@ -49,23 +72,7 @@ def check_can_add(
     Raises ZenitError with a clear message on any failure — the caller
     just needs to print it and exit.
     """
-    # ── lockfile ──────────────────────────────────────────────────────────────
-    lockfile = read_lockfile(project_dir)
-    if lockfile is None:
-        raise ZenitError(
-            "No .zenit.toml found. "
-            "'zenit add' only works in projects scaffolded by zenit."
-        )
-    if not lockfile.template:
-        raise ZenitError(
-            ".zenit.toml exists but has no template field — it may be corrupt."
-        )
-
-    # ── addon exists ──────────────────────────────────────────────────────────
-    addon_ids = {cfg.id for cfg in available}
-    if addon_id not in addon_ids:
-        known = ", ".join(sorted(addon_ids))
-        raise ZenitError(f"Unknown addon '{addon_id}'. Available addons: {known}")
+    lockfile = _read_lockfile_and_validate(project_dir, addon_id, available, "add")
 
     # ── not already installed ─────────────────────────────────────────────────
     if addon_id in lockfile.addons:
@@ -122,23 +129,7 @@ def check_can_remove(
 
     Raises ZenitError with a clear message on any failure.
     """
-    # ── lockfile ──────────────────────────────────────────────────────────────
-    lockfile = read_lockfile(project_dir)
-    if lockfile is None:
-        raise ZenitError(
-            "No .zenit.toml found. "
-            "'zenit remove' only works in projects scaffolded by zenit."
-        )
-    if not lockfile.template:
-        raise ZenitError(
-            ".zenit.toml exists but has no template field — it may be corrupt."
-        )
-
-    # ── addon exists ──────────────────────────────────────────────────────────
-    addon_ids = {cfg.id for cfg in available}
-    if addon_id not in addon_ids:
-        known = ", ".join(sorted(addon_ids))
-        raise ZenitError(f"Unknown addon '{addon_id}'. Available addons: {known}")
+    lockfile = _read_lockfile_and_validate(project_dir, addon_id, available, "remove")
 
     # ── is actually installed ─────────────────────────────────────────────────
     if addon_id not in lockfile.addons:

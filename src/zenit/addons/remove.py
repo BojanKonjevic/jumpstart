@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import re
 import sys
 from collections.abc import Mapping
 from pathlib import Path
@@ -20,6 +19,7 @@ from zenit.cli.ui import (
     DIM,
     RED,
     RESET,
+    abort,
     addon_summary,
     bullet_list,
     dry_header,
@@ -34,12 +34,13 @@ from zenit.core.constants import _RECIPE_NAME_RE
 from zenit.core.handlers import HandlerDispatcher
 from zenit.core.lockfile import ZenitLockfile, read_lockfile, write_lockfile
 from zenit.core.manifest import (
-    fingerprint as _fingerprint,
-)
-from zenit.core.manifest import (
+    _pkg_name,
     read_manifest,
     remove_blocks_for_addon,
     write_manifest,
+)
+from zenit.core.manifest import (
+    fingerprint as _fingerprint,
 )
 from zenit.core.pkg_name import normalise_pkg_name, resolve_dest_placeholder
 from zenit.schema.exceptions import ZenitError
@@ -136,8 +137,7 @@ def remove_addon(
                     .lower()
                 )
             except (EOFError, KeyboardInterrupt):
-                print()
-                raise typer.Exit(0) from None
+                abort()
             if raw not in ("y", "yes"):
                 warn("Aborted.")
                 raise typer.Exit(0)
@@ -148,8 +148,7 @@ def remove_addon(
         try:
             raw = input(f"  Proceed? {DIM}[Y/n]{RESET}  ").strip().lower()
         except (EOFError, KeyboardInterrupt):
-            print()
-            raise typer.Exit(0) from None
+            abort()
         if raw not in ("", "y", "yes"):
             warn("Aborted.")
             raise typer.Exit(0)
@@ -420,9 +419,6 @@ def _remove_deps(
 
     doc = tomlkit.parse(pyproject_path.read_text(encoding="utf-8"))
 
-    def _normalise(dep: str) -> str:
-        return re.split(r"[>=<!,; \[]", dep)[0].lower().replace("-", "_")
-
     deps_to_remove = {
         d.package for d in manifest.dependencies if d.addon == addon_id and not d.dev
     }
@@ -437,7 +433,7 @@ def _remove_deps(
     if isinstance(project_deps, Array):
         to_remove = []
         for d in project_deps:
-            if _normalise(str(d)) in deps_to_remove:
+            if _pkg_name(str(d)) in deps_to_remove:
                 removed.append(str(d))
             else:
                 to_remove.append(d)
@@ -454,7 +450,7 @@ def _remove_deps(
     if isinstance(dev_group, (list, Array)):
         new_dev = []
         for d in dev_group:
-            if _normalise(str(d)) in dev_deps_to_remove:
+            if _pkg_name(str(d)) in dev_deps_to_remove:
                 removed_dev.append(str(d))
             else:
                 new_dev.append(d)

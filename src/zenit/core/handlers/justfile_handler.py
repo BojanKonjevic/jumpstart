@@ -3,7 +3,6 @@ from __future__ import annotations
 from pathlib import Path
 
 from zenit.core.handlers.base import FileHandler
-from zenit.schema.models import ManifestBlock
 
 
 class JustfileHandler(FileHandler):
@@ -19,14 +18,6 @@ class JustfileHandler(FileHandler):
         locator_name: str,
         locator_args: dict[str, object],
     ) -> tuple[str, int, int]:
-        source = file.read_text(encoding="utf-8") if file.exists() else ""
-        lines = source.splitlines(keepends=True)
-
-        content_lines = content.splitlines(keepends=True)
-        if content_lines and not content_lines[-1].endswith("\n"):
-            content_lines[-1] += "\n"
-
-        # Duplicate-skip: check if any recipe name from content already exists
         def _recipe_names(ls: list[str]) -> set[str]:
             names: set[str] = set()
             for ln in ls:
@@ -42,34 +33,9 @@ class JustfileHandler(FileHandler):
                         names.add(name)
             return names
 
-        existing_recipes = _recipe_names(lines)
-        incoming_recipes = _recipe_names(content_lines)
-        if incoming_recipes & existing_recipes:
-            end = len(lines)
-            return source, end, end
+        def _dedup(lines: list[str], content_lines: list[str]) -> bool:
+            existing_recipes = _recipe_names(lines)
+            incoming_recipes = _recipe_names(content_lines)
+            return bool(incoming_recipes & existing_recipes)
 
-        if lines and not lines[-1].endswith("\n"):
-            lines[-1] += "\n"
-
-        start_line = len(lines) + 1
-        end_line = start_line + len(content_lines) - 1
-
-        new_source = "".join(lines + content_lines)
-        file.write_text(new_source, encoding="utf-8")
-        return new_source, start_line, end_line
-
-    def remove(self, file: Path, block: ManifestBlock) -> None:
-        if not file.exists():
-            return
-        source = file.read_text(encoding="utf-8")
-        lines = source.splitlines(keepends=True)
-
-        start_str, end_str = block.lines.split("-")
-        s = int(start_str) - 1
-        e = int(end_str) - 1
-
-        if e >= len(lines):
-            return
-
-        new_lines = lines[:s] + lines[e + 1 :]
-        file.write_text("".join(new_lines), encoding="utf-8")
+        return self._append_text(file, content, dedup_check=_dedup)

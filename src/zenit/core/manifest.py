@@ -270,6 +270,23 @@ def _normalise(code: str) -> str:
 # ── TOML encode / decode ──────────────────────────────────────────────────────
 
 
+def _encode_section(
+    tbl: tomlkit.items.Table,
+    items: list[Any],
+    section_name: str,
+    field_map: list[tuple[str, str]],
+) -> None:
+    if not items:
+        return
+    arr = tomlkit.aot()
+    for item in items:
+        entry = tomlkit.table()
+        for toml_key, attr_name in field_map:
+            entry.add(toml_key, getattr(item, attr_name))
+        arr.append(entry)
+    tbl.add(section_name, arr)
+
+
 def _encode_manifest(m: Manifest) -> tomlkit.items.Table:
     tbl = tomlkit.table()
 
@@ -290,57 +307,39 @@ def _encode_manifest(m: Manifest) -> tomlkit.items.Table:
             arr.append(item)
         tbl.add("python_blocks", arr)
 
-    if m.env:
-        arr = tomlkit.aot()
-        for e in m.env:
-            item = tomlkit.table()
-            item.add("key", e.key)
-            item.add("source", str(e.source))
-            item.add("addon", e.addon)
-            arr.append(item)
-        tbl.add("env", arr)
-
-    if m.compose_services:
-        arr = tomlkit.aot()
-        for s in m.compose_services:
-            item = tomlkit.table()
-            item.add("name", s.name)
-            item.add("source", str(s.source))
-            item.add("addon", s.addon)
-            arr.append(item)
-        tbl.add("compose_services", arr)
-
-    if m.compose_volumes:
-        arr = tomlkit.aot()
-        for v in m.compose_volumes:
-            item = tomlkit.table()
-            item.add("name", v.name)
-            item.add("source", str(v.source))
-            item.add("addon", v.addon)
-            arr.append(item)
-        tbl.add("compose_volumes", arr)
-
-    if m.dependencies:
-        arr = tomlkit.aot()
-        for d in m.dependencies:
-            item = tomlkit.table()
-            item.add("package", d.package)
-            item.add("spec", d.spec)
-            item.add("source", str(d.source))
-            item.add("addon", d.addon)
-            item.add("dev", d.dev)
-            arr.append(item)
-        tbl.add("dependencies", arr)
-
-    if m.just_recipes:
-        arr = tomlkit.aot()
-        for r in m.just_recipes:
-            item = tomlkit.table()
-            item.add("name", r.name)
-            item.add("source", str(r.source))
-            item.add("addon", r.addon)
-            arr.append(item)
-        tbl.add("just_recipes", arr)
+    _encode_section(
+        tbl, m.env, "env", [("key", "key"), ("source", "source"), ("addon", "addon")]
+    )
+    _encode_section(
+        tbl,
+        m.compose_services,
+        "compose_services",
+        [("name", "name"), ("source", "source"), ("addon", "addon")],
+    )
+    _encode_section(
+        tbl,
+        m.compose_volumes,
+        "compose_volumes",
+        [("name", "name"), ("source", "source"), ("addon", "addon")],
+    )
+    _encode_section(
+        tbl,
+        m.dependencies,
+        "dependencies",
+        [
+            ("package", "package"),
+            ("spec", "spec"),
+            ("source", "source"),
+            ("addon", "addon"),
+            ("dev", "dev"),
+        ],
+    )
+    _encode_section(
+        tbl,
+        m.just_recipes,
+        "just_recipes",
+        [("name", "name"), ("source", "source"), ("addon", "addon")],
+    )
 
     return tbl
 
@@ -351,6 +350,29 @@ def _parse_source(raw: str) -> EntrySource:
         return EntrySource(raw)
     except ValueError:
         return EntrySource.TEMPLATE
+
+
+type _FieldMapEntry = tuple[
+    str, str, Any, Any
+]  # toml_key, attr_name, default, transform
+
+
+def _decode_section(
+    raw: dict[str, Any],
+    section_name: str,
+    model_cls: type[Any],
+    field_map: list[_FieldMapEntry],
+) -> list[Any]:
+    result: list[Any] = []
+    for item in raw.get(section_name, []):
+        kwargs: dict[str, Any] = {}
+        for toml_key, attr_name, default, transform in field_map:
+            val = item.get(toml_key, default)
+            if transform is not None:
+                val = transform(val)
+            kwargs[attr_name] = val
+        result.append(model_cls(**kwargs))
+    return result
 
 
 def _decode_manifest(raw: dict[str, Any]) -> Manifest:
@@ -373,51 +395,57 @@ def _decode_manifest(raw: dict[str, Any]) -> Manifest:
             )
         )
 
-    for e in raw.get("env", []):
-        m.env.append(
-            EnvEntry(
-                key=e.get("key", ""),
-                source=_parse_source(e.get("source", "")),
-                addon=e.get("addon", ""),
-            )
-        )
-
-    for s in raw.get("compose_services", []):
-        m.compose_services.append(
-            OwnedEntry(
-                name=s.get("name", ""),
-                source=_parse_source(s.get("source", "")),
-                addon=s.get("addon", ""),
-            )
-        )
-
-    for v in raw.get("compose_volumes", []):
-        m.compose_volumes.append(
-            OwnedEntry(
-                name=v.get("name", ""),
-                source=_parse_source(v.get("source", "")),
-                addon=v.get("addon", ""),
-            )
-        )
-
-    for d in raw.get("dependencies", []):
-        m.dependencies.append(
-            DependencyEntry(
-                package=d.get("package", ""),
-                spec=d.get("spec", ""),
-                source=_parse_source(d.get("source", "")),
-                addon=d.get("addon", ""),
-                dev=bool(d.get("dev", False)),
-            )
-        )
-
-    for r in raw.get("just_recipes", []):
-        m.just_recipes.append(
-            OwnedEntry(
-                name=r.get("name", ""),
-                source=_parse_source(r.get("source", "")),
-                addon=r.get("addon", ""),
-            )
-        )
+    m.env = _decode_section(
+        raw,
+        "env",
+        EnvEntry,
+        [
+            ("key", "key", "", None),
+            ("source", "source", "", _parse_source),
+            ("addon", "addon", "", None),
+        ],
+    )
+    m.compose_services = _decode_section(
+        raw,
+        "compose_services",
+        OwnedEntry,
+        [
+            ("name", "name", "", None),
+            ("source", "source", "", _parse_source),
+            ("addon", "addon", "", None),
+        ],
+    )
+    m.compose_volumes = _decode_section(
+        raw,
+        "compose_volumes",
+        OwnedEntry,
+        [
+            ("name", "name", "", None),
+            ("source", "source", "", _parse_source),
+            ("addon", "addon", "", None),
+        ],
+    )
+    m.dependencies = _decode_section(
+        raw,
+        "dependencies",
+        DependencyEntry,
+        [
+            ("package", "package", "", None),
+            ("spec", "spec", "", None),
+            ("source", "source", "", _parse_source),
+            ("addon", "addon", "", None),
+            ("dev", "dev", False, bool),
+        ],
+    )
+    m.just_recipes = _decode_section(
+        raw,
+        "just_recipes",
+        OwnedEntry,
+        [
+            ("name", "name", "", None),
+            ("source", "source", "", _parse_source),
+            ("addon", "addon", "", None),
+        ],
+    )
 
     return m

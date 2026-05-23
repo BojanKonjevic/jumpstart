@@ -3,7 +3,6 @@ from __future__ import annotations
 from pathlib import Path
 
 from zenit.core.handlers.base import FileHandler
-from zenit.schema.models import ManifestBlock
 
 
 class EnvHandler(FileHandler):
@@ -26,7 +25,6 @@ class EnvHandler(FileHandler):
         if content_lines and not content_lines[-1].endswith("\n"):
             content_lines[-1] += "\n"
 
-        # skip lines already present (duplicate-safe)
         existing_keys = {
             ln.split("=")[0].strip()
             for ln in lines
@@ -37,7 +35,6 @@ class EnvHandler(FileHandler):
         ]
 
         if not new_lines:
-            # nothing to add — return current end as the "block"
             end = len(lines)
             return source, end, end
 
@@ -50,19 +47,3 @@ class EnvHandler(FileHandler):
         new_source = "".join(lines + new_lines)
         file.write_text(new_source, encoding="utf-8")
         return new_source, start_line, end_line
-
-    def remove(self, file: Path, block: ManifestBlock) -> None:
-        if not file.exists():
-            return
-        source = file.read_text(encoding="utf-8")
-        lines = source.splitlines(keepends=True)
-
-        start_str, end_str = block.lines.split("-")
-        s = int(start_str) - 1
-        e = int(end_str) - 1
-
-        if e >= len(lines):
-            return
-
-        new_lines = lines[:s] + lines[e + 1 :]
-        file.write_text("".join(new_lines), encoding="utf-8")

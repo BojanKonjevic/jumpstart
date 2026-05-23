@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from collections.abc import Callable
 from pathlib import Path
 
 from zenit.schema.models import ManifestBlock
@@ -21,8 +22,45 @@ class FileHandler(ABC):
         locator_args: dict[str, object],
     ) -> tuple[str, int, int]: ...
 
-    @abstractmethod
-    def remove(self, file: Path, block: ManifestBlock) -> None: ...
+    def remove(self, file: Path, block: ManifestBlock) -> None:
+        if not file.exists():
+            return
+        source = file.read_text(encoding="utf-8")
+        lines = source.splitlines(keepends=True)
+        start_str, end_str = block.lines.split("-")
+        s = int(start_str) - 1
+        e = int(end_str) - 1
+        if e >= len(lines):
+            return
+        new_lines = lines[:s] + lines[e + 1 :]
+        file.write_text("".join(new_lines), encoding="utf-8")
+
+    def _append_text(
+        self,
+        file: Path,
+        content: str,
+        dedup_check: Callable[[list[str], list[str]], bool] | None = None,
+    ) -> tuple[str, int, int]:
+        source = file.read_text(encoding="utf-8") if file.exists() else ""
+        lines = source.splitlines(keepends=True)
+
+        content_lines = content.splitlines(keepends=True)
+        if content_lines and not content_lines[-1].endswith("\n"):
+            content_lines[-1] += "\n"
+
+        if dedup_check is not None and dedup_check(lines, content_lines):
+            end = len(lines)
+            return source, end, end
+
+        if lines and not lines[-1].endswith("\n"):
+            lines[-1] += "\n"
+
+        start_line = len(lines) + 1
+        end_line = start_line + len(content_lines) - 1
+
+        new_source = "".join(lines + content_lines)
+        file.write_text(new_source, encoding="utf-8")
+        return new_source, start_line, end_line
 
 
 class HandlerDispatcher:

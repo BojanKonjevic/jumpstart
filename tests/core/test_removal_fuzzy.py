@@ -16,6 +16,7 @@ from pathlib import Path
 import libcst as cst
 import pytest
 
+from zenit.core.handlers.locators import LOCATOR_AFTER_LAST_CLASS_ATTR
 from zenit.core.handlers.python_handler import (
     FUZZY_WINDOW_LINES,
     RemovalError,
@@ -33,7 +34,7 @@ def _write(path: Path, text: str) -> None:
     path.write_text(textwrap.dedent(text), encoding="utf-8")
 
 
-_DEFAULT_LOCATOR = "after_last_class_attribute"
+_DEFAULT_LOCATOR = LOCATOR_AFTER_LAST_CLASS_ATTR
 _DEFAULT_LOCATOR_ARGS: dict[str, object] = {"class_name": "Settings"}
 
 

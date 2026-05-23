@@ -1,5 +1,14 @@
 from pathlib import Path
 
+from zenit.core.handlers.locators import (
+    LOCATOR_AFTER_LAST_CLASS_ATTR,
+    LOCATOR_AFTER_LAST_IMPORT,
+    LOCATOR_AFTER_STATEMENT_MATCHING,
+    LOCATOR_AT_FILE_END,
+    LOCATOR_AT_MODULE_END,
+    LOCATOR_BEFORE_YIELD,
+    LOCATOR_IN_FUNCTION_BODY,
+)
 from zenit.schema.models import (
     EnvVar,
     FileContribution,
@@ -18,21 +27,21 @@ config = TemplateConfig(
         "settings_fields": InjectionPoint(
             file="src/{{pkg_name}}/settings.py",
             locator=LocatorSpec(
-                name="after_last_class_attribute",
+                name=LOCATOR_AFTER_LAST_CLASS_ATTR,
                 args={"class_name": "Settings"},
             ),
         ),
         "lifespan_startup": InjectionPoint(
             file="src/{{pkg_name}}/lifecycle.py",
             locator=LocatorSpec(
-                name="before_yield_in_function",
+                name=LOCATOR_BEFORE_YIELD,
                 args={"function": "lifespan"},
             ),
         ),
         "lifespan_shutdown": InjectionPoint(
             file="src/{{pkg_name}}/lifecycle.py",
             locator=LocatorSpec(
-                name="in_function_body",
+                name=LOCATOR_IN_FUNCTION_BODY,
                 args={
                     "function": "lifespan",
                     "anchor_pattern": r"yield",
@@ -43,36 +52,36 @@ config = TemplateConfig(
         "lifespan_imports": InjectionPoint(
             file="src/{{pkg_name}}/lifecycle.py",
             locator=LocatorSpec(
-                name="after_last_import",
+                name=LOCATOR_AFTER_LAST_IMPORT,
                 args={},
             ),
         ),
         "env_vars": InjectionPoint(
             file=".env",
-            locator=LocatorSpec(name="at_file_end", args={}),
+            locator=LocatorSpec(name=LOCATOR_AT_FILE_END, args={}),
         ),
         "router_imports": InjectionPoint(
             file="src/{{pkg_name}}/api/router.py",
-            locator=LocatorSpec(name="after_last_import", args={}),
+            locator=LocatorSpec(name=LOCATOR_AFTER_LAST_IMPORT, args={}),
         ),
         "router_includes": InjectionPoint(
             file="src/{{pkg_name}}/api/router.py",
             locator=LocatorSpec(
-                name="after_statement_matching",
+                name=LOCATOR_AFTER_STATEMENT_MATCHING,
                 args={"pattern": r"router\.include_router\("},
             ),
         ),
         "test_imports": InjectionPoint(
             file="tests/conftest.py",
-            locator=LocatorSpec(name="after_last_import", args={}),
+            locator=LocatorSpec(name=LOCATOR_AFTER_LAST_IMPORT, args={}),
         ),
         "test_fixtures": InjectionPoint(
             file="tests/conftest.py",
-            locator=LocatorSpec(name="at_module_end", args={}),
+            locator=LocatorSpec(name=LOCATOR_AT_MODULE_END, args={}),
         ),
         "exceptions": InjectionPoint(
             file="src/{{pkg_name}}/exceptions.py",
-            locator=LocatorSpec(name="at_module_end", args={}),
+            locator=LocatorSpec(name=LOCATOR_AT_MODULE_END, args={}),
         ),
     },
     dirs=[

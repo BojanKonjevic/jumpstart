@@ -9,7 +9,18 @@ from typing import TYPE_CHECKING
 import libcst as cst
 
 from zenit.core.handlers.base import FileHandler
-from zenit.core.handlers.locators import LocatorError, locate
+from zenit.core.handlers.locators import (
+    LOCATOR_AFTER_LAST_CLASS_ATTR,
+    LOCATOR_AFTER_LAST_IMPORT,
+    LOCATOR_AFTER_STATEMENT_MATCHING,
+    LOCATOR_AT_FILE_END,
+    LOCATOR_AT_MODULE_END,
+    LOCATOR_BEFORE_RETURN,
+    LOCATOR_BEFORE_YIELD,
+    LOCATOR_IN_FUNCTION_BODY,
+    LocatorError,
+    locate,
+)
 from zenit.core.manifest import _normalise as _manifest_normalise
 from zenit.core.manifest import fingerprint as _fingerprint
 from zenit.schema.exceptions import ZenitError
@@ -57,14 +68,14 @@ def _locate_line(
         return 0
 
     if locator_name in (
-        "after_last_import",
-        "after_statement_matching",
-        "at_module_end",
-        "at_file_end",
+        LOCATOR_AFTER_LAST_IMPORT,
+        LOCATOR_AFTER_STATEMENT_MATCHING,
+        LOCATOR_AT_MODULE_END,
+        LOCATOR_AT_FILE_END,
     ):
         return _split_for(module.body, insert_index)
 
-    if locator_name == "after_last_class_attribute":
+    if locator_name == LOCATOR_AFTER_LAST_CLASS_ATTR:
         class_name = str(locator_args.get("class_name", ""))
         for node in module.body:
             if isinstance(node, cst.ClassDef) and node.name.value == class_name:
@@ -75,9 +86,9 @@ def _locate_line(
         )
 
     if locator_name in (
-        "before_yield_in_function",
-        "before_return_in_function",
-        "in_function_body",
+        LOCATOR_BEFORE_YIELD,
+        LOCATOR_BEFORE_RETURN,
+        LOCATOR_IN_FUNCTION_BODY,
     ):
         fn_name = str(locator_args.get("function", ""))
         for node in module.body:

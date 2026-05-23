@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import sys
 
-from zenit.cli.ui import BOLD, CYAN, DIM, GREEN, RESET, YELLOW, warn
+from zenit.cli.ui import BOLD, CYAN, DIM, GREEN, RESET, YELLOW, abort, warn
 from zenit.schema.models import AddonConfig
 
 from ._keys import tty_available
@@ -447,8 +447,7 @@ def _fallback_multi(
                 + "]: "
             ).strip()
         except (EOFError, KeyboardInterrupt):
-            print()
-            sys.exit(0)
+            abort()
 
         if not raw:
             return _build_defaults()
@@ -536,8 +535,7 @@ def _fallback_multi_addon(
                 "  Addons [space-separated numbers or names, or enter to cancel]: "
             ).strip()
         except (EOFError, KeyboardInterrupt):
-            print()
-            sys.exit(0)
+            abort()
 
         if not raw:
             return []

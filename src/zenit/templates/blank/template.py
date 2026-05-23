@@ -1,5 +1,10 @@
 from pathlib import Path
 
+from zenit.core.handlers.locators import (
+    LOCATOR_AFTER_LAST_CLASS_ATTR,
+    LOCATOR_AT_FILE_END,
+    LOCATOR_BEFORE_RETURN,
+)
 from zenit.schema.models import (
     FileContribution,
     InjectionPoint,
@@ -17,18 +22,18 @@ config = TemplateConfig(
         "main_startup": InjectionPoint(
             file="src/{{pkg_name}}/main.py",
             locator=LocatorSpec(
-                name="before_return_in_function",
+                name=LOCATOR_BEFORE_RETURN,
                 args={"function": "main"},
             ),
         ),
         "env_vars": InjectionPoint(
             file=".env",
-            locator=LocatorSpec(name="at_file_end", args={}),
+            locator=LocatorSpec(name=LOCATOR_AT_FILE_END, args={}),
         ),
         "settings_fields": InjectionPoint(
             file="src/{{pkg_name}}/settings.py",
             locator=LocatorSpec(
-                name="after_last_class_attribute",
+                name=LOCATOR_AFTER_LAST_CLASS_ATTR,
                 args={"class_name": "Settings"},
             ),
         ),

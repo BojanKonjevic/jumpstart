@@ -5,7 +5,7 @@ from __future__ import annotations
 import sys
 from collections.abc import Callable
 
-from zenit.cli.ui import BOLD, CYAN, DIM, GREEN, MAGENTA, RESET, YELLOW, warn
+from zenit.cli.ui import BOLD, CYAN, DIM, GREEN, MAGENTA, RESET, YELLOW, abort, warn
 
 from ._keys import read_key
 
@@ -258,8 +258,7 @@ def run_fallback(
         try:
             raw = input(f"  {prompt_text} [{hint}]: ").strip().lower()
         except (EOFError, KeyboardInterrupt):
-            print()
-            sys.exit(0)
+            abort()
 
         if not raw:
             if default_name:
