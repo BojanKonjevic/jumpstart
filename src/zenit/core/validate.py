@@ -7,6 +7,7 @@ from pathlib import Path
 import typer
 
 from zenit.cli.ui import error, info
+from zenit.core.dependency import DependencyGraph
 from zenit.schema.models import AddonConfig
 
 
@@ -82,12 +83,12 @@ def validate_addon_deps(
 ) -> None:
     """Abort with exit code 1 if any selected addon's requirements are missing
     or if an addon is incompatible with the selected template."""
-    requires_map = {cfg.id: cfg.requires for cfg in available}
+    graph = DependencyGraph.build(available)
     conflicts_map = {cfg.id: cfg.conflicts_with for cfg in available}
     templates_map = {cfg.id: cfg.templates for cfg in available}
 
+    # Template-compatibility check (before dep check — better error messages).
     for addon in addons:
-        # Template-compatibility check.
         allowed_templates = templates_map.get(addon, [])
         if allowed_templates and template and template not in allowed_templates:
             allowed_str = ", ".join(allowed_templates)
@@ -97,13 +98,23 @@ def validate_addon_deps(
             )
             raise typer.Exit(1)
 
-        # Dependency check.
-        for req in requires_map.get(addon, []):
-            if req not in addons:
-                error(f"Addon '{addon}' requires '{req}', but it wasn't selected.")
-                raise typer.Exit(1)
+    # Transitive dependency check (all deps of deps).
+    all_required = graph.closure(set(addons))
+    missing = sorted(all_required - set(addons))
+    if missing:
+        for dep in missing:
+            consumers = graph.dependents(dep) & set(addons)
+            if consumers:
+                for consumer in sorted(consumers):
+                    error(
+                        f"Addon '{consumer}' requires '{dep}', but it wasn't selected."
+                    )
+            else:
+                error(f"Addon '{dep}' is required but wasn't selected.")
+        raise typer.Exit(1)
 
-        # Conflict check.
+    # Conflict check.
+    for addon in addons:
         for conflict in conflicts_map.get(addon, []):
             if conflict in addons:
                 error(f"Addon '{addon}' conflicts with '{conflict}'.")

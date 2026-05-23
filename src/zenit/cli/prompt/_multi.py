@@ -5,6 +5,7 @@ from __future__ import annotations
 import sys
 
 from zenit.cli.ui import BOLD, CYAN, DIM, GREEN, RESET, YELLOW, abort, warn
+from zenit.core.dependency import DependencyGraph, DependencySpec
 from zenit.schema.models import AddonConfig
 
 from ._keys import tty_available
@@ -25,6 +26,17 @@ from ._render import (
     run_tui,
     show_cursor,
 )
+
+
+def _build_graph(requires_map: dict[str, list[str]]) -> DependencyGraph:
+    """Build a DependencyGraph from a flat requires_map for use in TUI."""
+    nodes = {name: DependencySpec(id=name) for name in requires_map}
+    edges = dict(requires_map)
+    reverse: dict[str, list[str]] = {}
+    for name, deps in requires_map.items():
+        for dep in deps:
+            reverse.setdefault(dep, []).append(name)
+    return DependencyGraph(nodes=nodes, edges=edges, reverse=reverse)
 
 
 def _render_multi(
@@ -210,6 +222,7 @@ def _tui_multi(
     reserve_lines(n_items + 2)
     clear_lines(n_items + 2)
 
+    graph = _build_graph(requires_map)
     cursor = 0
     search_query = ""
     filtered_indices_list = filter_indices(items, search_query)
@@ -223,9 +236,10 @@ def _tui_multi(
         locked = set(always_locked)
         for sel_idx in selected:
             sel_name = items[sel_idx][0]
-            for req in requires_map.get(sel_name, []):
-                if req in name_to_idx:
-                    locked.add(name_to_idx[req])
+            for dep in graph.edges.get(sel_name, []):
+                idx = name_to_idx.get(dep)
+                if idx is not None and idx not in always_locked:
+                    locked.add(idx)
         return locked
 
     def _compute_unavailable() -> set[int]:
@@ -239,11 +253,9 @@ def _tui_multi(
                     unavail.add(idx)
                     continue
 
-            for other_idx, (other_name, _) in enumerate(items):
-                if (
-                    name in requires_map.get(other_name, [])
-                    and other_idx not in selected
-                ):
+            for consumer in graph.dependents(name):
+                consumer_idx = name_to_idx.get(consumer)
+                if consumer_idx is not None and consumer_idx not in selected:
                     unavail.add(idx)
                     break
         return unavail
@@ -318,25 +330,24 @@ def _tui_multi(
                 if orig_idx in always_locked:
                     flash = f"{item_name} is required by the template"
                 else:
-                    dependents = [
-                        items[i][0]
-                        for i in selected
-                        if item_name in requires_map.get(items[i][0], [])
-                    ]
-                    flash = f"{item_name} is required by {', '.join(dependents)}"
+                    dep_names = sorted(
+                        n
+                        for n in graph.dependents(item_name)
+                        if n in name_to_idx and name_to_idx[n] in selected
+                    )
+                    flash = f"{item_name} is required by {', '.join(dep_names)}"
             elif orig_idx in selected:
                 selected.discard(orig_idx)
-                for i, (name, _) in enumerate(items):
-                    if (
-                        item_name in requires_map.get(name, [])
-                        and i not in always_locked
-                    ):
-                        selected.discard(i)
+                for dep_name in graph.dependents(item_name):
+                    dep_idx = name_to_idx.get(dep_name)
+                    if dep_idx is not None and dep_idx not in always_locked:
+                        selected.discard(dep_idx)
             else:
                 selected.add(orig_idx)
-                for req in requires_map.get(item_name, []):
-                    if req in name_to_idx:
-                        selected.add(name_to_idx[req])
+                for dep in graph.closure({item_name}):
+                    dep_idx = name_to_idx.get(dep)
+                    if dep_idx is not None and dep_idx != orig_idx:
+                        selected.add(dep_idx)
         elif key in ("\r", "\n"):
             return _DONE
         elif key == "\x1b":

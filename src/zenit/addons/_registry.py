@@ -2,8 +2,10 @@
 
 import functools
 import importlib.util
+import sys
 from pathlib import Path
 
+from zenit.core.dependency import DependencyGraph
 from zenit.schema.models import AddonConfig, AddonHooks
 
 _HERE = Path(__file__).parent.absolute()
@@ -32,4 +34,16 @@ def get_available_addons() -> list[AddonConfig]:
         )
         cfg._module = hooks
         addons.append(cfg)
+
+    _validate_addons(addons)
     return addons
+
+
+def _validate_addons(addons: list[AddonConfig]) -> None:
+    """Check all registered addons for cycles / missing deps; warn on failure."""
+    graph = DependencyGraph.build(addons)
+    errors = graph.validate()
+    if errors:
+        for err in errors:
+            msg = f"[addon registry] {err.message}"
+            print(msg, file=sys.stderr)

@@ -30,6 +30,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from zenit.core._paths import get_zenit_root
+from zenit.core.dependency import DependencyGraph
 from zenit.core.lockfile import ZenitLockfile, read_lockfile
 from zenit.schema.exceptions import ZenitError
 from zenit.schema.models import AddonConfig
@@ -90,8 +91,10 @@ def check_can_add(
             f"but this project uses '{lockfile.template}'."
         )
 
-    # ── dependency addons are installed ───────────────────────────────────────
-    missing_deps = [r for r in cfg.requires if r not in lockfile.addons]
+    # ── dependency addons are installed (transitive) ──────────────────────────
+    graph = DependencyGraph.build(available)
+    all_deps = graph.closure({addon_id}) - {addon_id}
+    missing_deps = sorted(d for d in all_deps if d not in lockfile.addons)
     if missing_deps:
         missing_str = ", ".join(missing_deps)
         raise ZenitError(
@@ -138,15 +141,11 @@ def check_can_remove(
             "If you removed it manually, edit .zenit.toml to reflect the current state."
         )
 
-    # ── no other installed addon depends on this one ──────────────────────────
-    requires_map = {cfg.id: cfg.requires for cfg in available}
-    dependents = [
-        other_id
-        for other_id in lockfile.addons
-        if other_id != addon_id and addon_id in requires_map.get(other_id, [])
-    ]
-    if dependents:
-        dep_str = ", ".join(dependents)
+    # ── no other installed addon depends on this one (transitive) ─────────────
+    graph = DependencyGraph.build(available)
+    all_dependents = graph.dependents(addon_id) & set(lockfile.addons)
+    if all_dependents:
+        dep_str = ", ".join(sorted(all_dependents))
         raise ZenitError(
             f"Cannot remove '{addon_id}' — it is required by: {dep_str}. "
             f"Remove {dep_str} first."

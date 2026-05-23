@@ -31,6 +31,7 @@ from zenit.core._paths import get_zenit_root
 from zenit.core.apply import apply_contributions, merge_compose
 from zenit.core.collect import collect_addon_only, collect_all
 from zenit.core.context import Context
+from zenit.core.dependency import DependencyGraph
 from zenit.core.deps import inject_deps
 from zenit.core.filesystem import FileSystem, RealFileSystem, RecordingFileSystem
 from zenit.core.justfile import inject_just_recipes
@@ -290,7 +291,7 @@ def add_addon_interactive(dry_run: bool = False, yes: bool = False) -> None:
         raise typer.Exit(1)
 
     available = get_available_addons()
-    requires_map = {cfg.id: cfg.requires for cfg in available}
+    graph = DependencyGraph.build(available)
 
     already_installed = set(lockfile.addons)
     if already_installed:
@@ -298,6 +299,7 @@ def add_addon_interactive(dry_run: bool = False, yes: bool = False) -> None:
             f"\n  {DIM}Already installed: {', '.join(sorted(already_installed))}{RESET}"
         )
 
+    requires_map = {cfg.id: cfg.requires for cfg in available}
     items = []
 
     for addon in available:
@@ -323,7 +325,7 @@ def add_addon_interactive(dry_run: bool = False, yes: bool = False) -> None:
         print()
         return
 
-    for addon_id in sorted(selected, key=lambda a: len(requires_map.get(a, []))):
+    for addon_id in graph.tsort(set(selected)):
         add_addon(addon_id, dry_run=dry_run, yes=yes)
 
 

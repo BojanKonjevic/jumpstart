@@ -31,6 +31,7 @@ from zenit.cli.ui import (
 )
 from zenit.core._paths import get_zenit_root
 from zenit.core.constants import _RECIPE_NAME_RE
+from zenit.core.dependency import DependencyGraph
 from zenit.core.handlers import HandlerDispatcher
 from zenit.core.lockfile import ZenitLockfile, read_lockfile, write_lockfile
 from zenit.core.manifest import (
@@ -597,6 +598,7 @@ def remove_addon_interactive(dry_run: bool = False, yes: bool = False) -> None:
         raise typer.Exit(1)
 
     available = get_available_addons()
+    graph = DependencyGraph.build(available)
     installed = [cfg for cfg in available if cfg.id in lockfile.addons]
 
     requires_map = {cfg.id: cfg.requires for cfg in available}
@@ -630,11 +632,7 @@ def remove_addon_interactive(dry_run: bool = False, yes: bool = False) -> None:
         raise typer.Exit(0)
 
     # Process dependents before their dependencies (leaves first).
-    def _dep_order(a: str) -> int:
-        deps = requires_map.get(a, [])
-        return -len(deps)
-
-    for addon_id in sorted(selected, key=_dep_order):
+    for addon_id in graph.tsort_reverse(set(selected)):
         try:
             remove_addon(addon_id, dry_run=dry_run, yes=yes, project_dir=project_dir)
         except ZenitError as exc:

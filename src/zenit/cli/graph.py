@@ -10,6 +10,7 @@ if TYPE_CHECKING:
     from zenit.schema.models import AddonConfig
 
 from zenit.cli.ui import BOLD, CYAN, DIM, GREEN, RESET
+from zenit.core.dependency import DependencyGraph
 
 
 @dataclass
@@ -27,10 +28,7 @@ def build_tree(
     depth_limit: int = 20,
 ) -> list[TreeNode]:
     addon_map = {a.id: a for a in addons}
-    required_by: dict[str, list[str]] = {}
-    for addon in addons:
-        for req in addon.requires:
-            required_by.setdefault(req, []).append(addon.id)
+    graph = DependencyGraph.build(list(addons))
 
     if reverse:
         roots = [a for a in addons if a.requires]
@@ -61,7 +59,7 @@ def build_tree(
     forest = []
     for root in roots:
         node = _build_node(
-            root, 0, installed_ids, required_by, addon_map, set(), depth_limit
+            root, 0, installed_ids, graph.reverse, addon_map, set(), depth_limit
         )
         forest.append(node)
     return forest
@@ -229,11 +227,7 @@ def render_json(
     project_dir: str | None = None,
     template: str | None = None,
 ) -> str:
-    required_by: dict[str, list[str]] = {}
-    for addon in all_addons:
-        for req in addon.requires:
-            required_by.setdefault(req, []).append(addon.id)
-
+    graph = DependencyGraph.build(list(all_addons))
     addons_list: list[dict[str, object]] = []
     for addon in all_addons:
         addons_list.append(
@@ -241,7 +235,7 @@ def render_json(
                 "id": addon.id,
                 "installed": addon.id in installed_ids,
                 "requires": list(addon.requires),
-                "required_by": sorted(required_by.get(addon.id, [])),
+                "required_by": sorted(graph.reverse.get(addon.id, [])),
             }
         )
 
