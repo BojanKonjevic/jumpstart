@@ -33,12 +33,12 @@ app = typer.Typer(
     name="zenit",
     add_completion=False,
     pretty_exceptions_enable=False,
-    no_args_is_help=True,
 )
 
 
-@app.callback()
+@app.callback(invoke_without_command=True)
 def main_callback(
+    ctx: typer.Context,
     version: Annotated[
         bool,
         typer.Option("--version", help="Show the version and exit"),
@@ -47,6 +47,9 @@ def main_callback(
     """Scaffold Python projects from a template with optional addons."""
     if version:
         print(get_version("zenit"))
+        raise typer.Exit()
+    if ctx.invoked_subcommand is None:
+        print(ctx.get_help())
         raise typer.Exit()
 
 
