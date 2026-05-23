@@ -23,11 +23,11 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: npm
+          cache: pnpm
 
-      - run: npm ci
+      - run: corepack enable && pnpm install --frozen-lockfile
 
-      - run: npm run docs:build
+      - run: pnpm run docs:build
 
       - name: Assemble site
         run: |

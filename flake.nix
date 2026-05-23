@@ -16,6 +16,18 @@
       python = pkgs.python312;
     in {
       devShells.default = pkgs.mkShell {
+        packages = with pkgs; [
+          docker
+          python312
+          uv
+          ruff
+          mypy
+          just
+          redis
+          pnpm
+          nodejs
+        ];
+
         shellHook = ''
           export UV_PYTHON_DOWNLOADS=never
           export UV_PYTHON="${python}/bin/python3"

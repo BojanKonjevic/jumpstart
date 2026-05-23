@@ -25,8 +25,9 @@ htmlcov/
 # Nix result symlink (if you ever nix build)
 result
 
-#npm
+# pnpm / node
 node_modules
+pnpm-lock.yaml
 
 #Vitepress cache
 **/.vitepress/cache/
