@@ -382,6 +382,88 @@ def cmd_doctor(
     print()
 
 
+@app.command("graph")
+def cmd_graph(
+    all_: Annotated[
+        bool,
+        typer.Option("--all", "-a", help="Show all available addons"),
+    ] = False,
+    reverse: Annotated[
+        bool,
+        typer.Option("--reverse", "-r", help="Show who depends on each addon"),
+    ] = False,
+    dot: Annotated[
+        bool,
+        typer.Option("--dot", help="Output Graphviz DOT format"),
+    ] = False,
+    json: Annotated[
+        bool,
+        typer.Option("--json", help="Output JSON"),
+    ] = False,
+) -> None:
+    """Show the addon dependency graph."""
+    from zenit.addons._registry import get_available_addons
+    from zenit.cli.graph import build_tree, render_dot, render_json, render_terminal
+    from zenit.core.lockfile import read_lockfile
+
+    project_dir = Path.cwd()
+    lockfile = read_lockfile(project_dir)
+    all_addons = get_available_addons()
+
+    installed_ids: set[str] = set(lockfile.addons) if lockfile is not None else set()
+
+    if all_:
+        displayed_addons = all_addons
+    elif lockfile is not None:
+        displayed_addons = [a for a in all_addons if a.id in installed_ids]
+    else:
+        from zenit.cli.ui import error
+
+        error("No .zenit.toml found. Use --all to see the full ecosystem.")
+        raise typer.Exit(1)
+
+    if not displayed_addons:
+        from zenit.cli.ui import info
+
+        info("No addons to show.")
+        raise typer.Exit()
+
+    forest = build_tree(
+        displayed_addons,
+        installed_ids=installed_ids,
+        reverse=reverse,
+    )
+
+    if dot:
+        print(render_dot(forest), end="")
+        return
+
+    if json:
+        print(
+            render_json(
+                forest,
+                installed_ids=installed_ids,
+                all_addons=all_addons,
+                project_name=project_dir.name if lockfile is not None else None,
+                project_dir=str(project_dir) if lockfile is not None else None,
+                template=lockfile.template if lockfile is not None else None,
+            ),
+            end="",
+        )
+        return
+
+    print(
+        render_terminal(
+            forest,
+            installed_ids=installed_ids,
+            project_name=project_dir.name if lockfile is not None else None,
+            project_dir=str(project_dir) if lockfile is not None else None,
+            reverse=reverse,
+        ),
+        end="",
+    )
+
+
 def main() -> None:
     app()
 
