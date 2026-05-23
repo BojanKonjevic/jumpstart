@@ -31,7 +31,7 @@ config = AddonConfig(
         EnvVar(key="SENTRY_DSN", default=""),
         EnvVar(key="SENTRY_ENVIRONMENT", default="development"),
     ],
-    deps=["sentry-sdk[fastapi]"],
+    deps=["sentry-sdk[fastapi]", "python-dotenv"],
     just_recipes=[
         "# print sentry-sdk version\nsentry-check:\n    uv run python -c \"import sentry_sdk; print('sentry-sdk', sentry_sdk.VERSION)\"",
         "# check whether SENTRY_DSN is set\nsentry-test:\n    uv run python -c \"from (( pkg_name )).integrations.sentry import init_sentry; import os; init_sentry(); print('Sentry DSN:', os.environ.get('SENTRY_DSN') or 'not set')\"",
@@ -49,6 +49,7 @@ config = AddonConfig(
         ),
         Injection(
             point="settings_fields",
+            templates=["fastapi"],
             content='    sentry_dsn: str = ""\n    sentry_environment: str = "development"',
         ),
     ],

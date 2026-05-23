@@ -2,6 +2,7 @@ from pathlib import Path
 
 from zenit.schema.models import (
     AddonConfig,
+    EnvVar,
     FileContribution,
     Injection,
 )
@@ -60,12 +61,20 @@ config = AddonConfig(
     dev_deps=[
         "aiosqlite",
     ],
+    env_vars=[
+        EnvVar(key="DATABASE_URL", default="sqlite+aiosqlite:///./dev.db"),
+    ],
     just_recipes=[
         '# generate a new alembic migration\nmigrate msg="":\n    uv run alembic revision --autogenerate -m "{{msg}}"',
         "# apply all pending migrations\nupgrade:\n    uv run alembic upgrade head",
         "# roll back one migration\ndowngrade:\n    uv run alembic downgrade -1",
     ],
     injections=[
+        Injection(
+            point="settings_fields",
+            templates=["fastapi"],
+            content='[% if "postgres" not in addons %]\n    database_url: str = "sqlite+aiosqlite:///./dev.db"\n[% endif %]',
+        ),
         Injection(
             point="lifespan_imports",
             content="\nfrom .db.session import engine",

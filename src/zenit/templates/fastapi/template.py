@@ -161,8 +161,6 @@ config = TemplateConfig(
         "fastapi",
         "uvicorn[standard]",
         "pydantic-settings",
-        "email-validator",
-        "python-multipart",
     ],
     dev_deps=[],
     just_recipes=[

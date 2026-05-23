@@ -297,9 +297,14 @@ def _undo_injections_physical(
 
     dispatcher = HandlerDispatcher()
 
-    for block in list(manifest.python_blocks):
-        if block.addon != addon_id:
-            continue
+    # Remove blocks from bottom to top within each file so that earlier
+    # removals don't shift the line numbers of blocks still to be removed.
+    blocks = sorted(
+        [b for b in manifest.python_blocks if b.addon == addon_id],
+        key=lambda b: (b.file, -int(b.lines.split("-")[0])),
+    )
+
+    for block in blocks:
         file_path = project_dir / block.file
         if not file_path.exists():
             print(

@@ -1,5 +1,11 @@
 from pathlib import Path
 
+from zenit.addons._preflight import (
+    reject_existing_file,
+    reject_existing_in_env,
+    require_src_layout,
+)
+from zenit.core.lockfile import ZenitLockfile
 from zenit.schema.models import (
     AddonConfig,
     ComposeService,
@@ -26,7 +32,7 @@ config = AddonConfig(
             image="postgres:16",
             environment={"POSTGRES_PASSWORD": "postgres"},
             ports=["5432:5432"],
-            volumes=["./.pgdata:/var/lib/postgresql/data"],
+            volumes=["pgdata:/var/lib/postgresql/data"],
             healthcheck={
                 "test": ["CMD-SHELL", "pg_isready -U postgres"],
                 "interval": "5s",
@@ -35,7 +41,7 @@ config = AddonConfig(
             },
         ),
     ],
-    compose_volumes=[".pgdata"],
+    compose_volumes=["pgdata"],
     env_vars=[
         EnvVar(
             key="DATABASE_URL",
@@ -44,6 +50,7 @@ config = AddonConfig(
     ],
     deps=[
         "asyncpg",
+        "python-dotenv",
     ],
     just_recipes=[
         '[% if "docker" in addons %]# wait until postgres is ready\nwait-db:\n    uv run python scripts/wait_db.py\n[% endif %]',
@@ -53,7 +60,21 @@ config = AddonConfig(
     injections=[
         Injection(
             point="settings_fields",
+            templates=["fastapi"],
             content='    database_url: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/(( pkg_name ))"',
         ),
     ],
 )
+
+
+def can_apply(project_dir: Path, lockfile: ZenitLockfile) -> str | None:
+    reason = require_src_layout(project_dir, "postgres")
+    if reason:
+        return reason
+
+    wait_script = project_dir / "scripts" / "wait_db.py"
+    reason = reject_existing_file(wait_script, project_dir)
+    if reason:
+        return reason
+
+    return reject_existing_in_env(project_dir, "DATABASE_URL")

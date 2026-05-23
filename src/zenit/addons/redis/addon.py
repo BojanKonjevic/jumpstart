@@ -53,7 +53,7 @@ config = AddonConfig(
     env_vars=[
         EnvVar(key="REDIS_URL", default="redis://localhost:6379/0"),
     ],
-    deps=["redis>=5", "hiredis"],
+    deps=["redis>=5", "hiredis", "python-dotenv"],
     dev_deps=["fakeredis"],
     just_recipes=[
         '[% if "docker" in addons %]# start redis\nredis-up:\n    docker compose up -d redis\n[% endif %]',
@@ -63,7 +63,18 @@ config = AddonConfig(
     injections=[
         Injection(
             point="settings_fields",
+            templates=["fastapi"],
             content='    redis_url: str = "redis://localhost:6379/0"',
+        ),
+        Injection(
+            point="lifespan_imports",
+            templates=["fastapi"],
+            content="\nfrom .integrations.redis import close_redis",
+        ),
+        Injection(
+            point="lifespan_shutdown",
+            templates=["fastapi"],
+            content="    await close_redis()",
         ),
     ],
 )

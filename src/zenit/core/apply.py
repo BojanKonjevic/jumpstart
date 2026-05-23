@@ -113,7 +113,17 @@ def apply_contributions(
     manifest = read_manifest(project_dir)
     dispatcher = HandlerDispatcher()
 
-    for inj in contributions.injections:
+    # Sort injections by point + content so that multiple addons
+    # injecting at the same point produce deterministic, reproducible
+    # output regardless of addon discovery order.
+    sorted_injections = sorted(
+        contributions.injections,
+        key=lambda inj: (inj.point, inj.content),
+    )
+
+    prev_point: str | None = None
+
+    for inj in sorted_injections:
         point = injection_points.get(inj.point)
         if point is None:
             continue
@@ -127,7 +137,15 @@ def apply_contributions(
         if not file_path.exists():
             continue
 
-        rendered_content = string_env.from_string(inj.content).render(**render_vars)
+        content = inj.content
+        # Strip the leading \n from non-first injections at the same point
+        # so that multiple related imports (e.g. lifespan_imports) end up
+        # in the same import block instead of being separated by a blank line.
+        if inj.point == prev_point and content.startswith("\n"):
+            content = content[1:]
+        prev_point = inj.point
+
+        rendered_content = string_env.from_string(content).render(**render_vars)
 
         _, start_line, end_line = dispatcher.apply(
             file_path,

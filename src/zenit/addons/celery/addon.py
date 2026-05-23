@@ -52,8 +52,8 @@ config = AddonConfig(
             develop_watch=[{"action": "sync", "path": "./src", "target": "/app/src"}],
         ),
     ],
-    deps=["celery[redis]>=5", "flower"],
-    dev_deps=["pytest-celery"],
+    deps=["celery[redis]>=5"],
+    dev_deps=["pytest-celery", "flower"],
     just_recipes=[
         '[% if "docker" in addons %]'
         "# start celery worker and beat scheduler\n"

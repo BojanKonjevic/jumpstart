@@ -379,7 +379,9 @@ class TestPyprojectFormatPreservation:
         ]
 
     def test_remove_leaves_deps_multiline(self, tmp_path, monkeypatch):
-        project_dir = _scaffold(tmp_path, "myapp", "blank", ["docker", "redis"])
+        project_dir = _scaffold(
+            tmp_path, "myapp", "blank", ["docker", "redis", "sentry"]
+        )
         monkeypatch.chdir(project_dir)
         with suppress_stdin():
             remove_addon("redis", project_dir=project_dir)
@@ -389,7 +391,9 @@ class TestPyprojectFormatPreservation:
             assert line.count('"') == 2, f"Multiple deps on one line: {line!r}"
 
     def test_remove_then_add_deps_still_multiline(self, tmp_path, monkeypatch):
-        project_dir = _scaffold(tmp_path, "myapp", "blank", ["docker", "redis"])
+        project_dir = _scaffold(
+            tmp_path, "myapp", "blank", ["docker", "redis", "sentry"]
+        )
         monkeypatch.chdir(project_dir)
         with suppress_stdin():
             remove_addon("redis", project_dir=project_dir)
@@ -401,7 +405,9 @@ class TestPyprojectFormatPreservation:
             assert line.count('"') == 2, f"Multiple deps collapsed: {line!r}"
 
     def test_readded_dep_is_present_and_on_its_own_line(self, tmp_path, monkeypatch):
-        project_dir = _scaffold(tmp_path, "myapp", "blank", ["docker", "redis"])
+        project_dir = _scaffold(
+            tmp_path, "myapp", "blank", ["docker", "redis", "sentry"]
+        )
         monkeypatch.chdir(project_dir)
         with suppress_stdin():
             remove_addon("redis", project_dir=project_dir)

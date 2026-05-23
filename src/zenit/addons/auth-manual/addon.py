@@ -63,7 +63,10 @@ config = AddonConfig(
     ],
     deps=[
         "bcrypt",
-        "python-jose[cryptography]",
+        "pyjwt[cryptography]",
+        "email-validator",
+        "python-multipart",
+        "python-dotenv",
     ],
     dev_deps=[],
     just_recipes=[
