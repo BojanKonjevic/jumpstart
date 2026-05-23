@@ -13,7 +13,7 @@
   }:
     flake-utils.lib.eachDefaultSystem (system: let
       pkgs = nixpkgs.legacyPackages.${system};
-      python = pkgs.python314;
+      python = pkgs.python312;
     in {
       devShells.default = pkgs.mkShell {
         shellHook = ''

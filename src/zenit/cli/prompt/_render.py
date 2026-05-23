@@ -257,7 +257,7 @@ def run_fallback(
     while True:
         try:
             raw = input(f"  {prompt_text} [{hint}]: ").strip().lower()
-        except EOFError, KeyboardInterrupt:
+        except (EOFError, KeyboardInterrupt):
             print()
             sys.exit(0)
 

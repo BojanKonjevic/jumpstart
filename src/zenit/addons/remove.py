@@ -135,7 +135,7 @@ def remove_addon(
                     .strip()
                     .lower()
                 )
-            except EOFError, KeyboardInterrupt:
+            except (EOFError, KeyboardInterrupt):
                 print()
                 raise typer.Exit(0) from None
             if raw not in ("y", "yes"):
@@ -147,7 +147,7 @@ def remove_addon(
     if sys.stdin.isatty() and not yes:
         try:
             raw = input(f"  Proceed? {DIM}[Y/n]{RESET}  ").strip().lower()
-        except EOFError, KeyboardInterrupt:
+        except (EOFError, KeyboardInterrupt):
             print()
             raise typer.Exit(0) from None
         if raw not in ("", "y", "yes"):
@@ -461,9 +461,9 @@ def _remove_deps(
         if removed_dev:
             dep_groups = doc.get("dependency-groups")
             if isinstance(dep_groups, Mapping) and "dev" in dep_groups:
-                doc["dependency-groups"]["dev"] = new_dev  # type: ignore[index]
+                doc["dependency-groups"]["dev"] = new_dev
             else:
-                doc["project"]["optional-dependencies"]["dev"] = new_dev  # type: ignore[index]
+                doc["project"]["optional-dependencies"]["dev"] = new_dev
 
     if removed or removed_dev:
         pyproject_path.write_text(tomlkit.dumps(doc), encoding="utf-8")

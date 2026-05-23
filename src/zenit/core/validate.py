@@ -61,7 +61,7 @@ def _check_uv() -> list[str]:
                     f"uv {parts[1]} is too old (need >= 0.4).\n"
                     "     Upgrade: uv self update"
                 ]
-    except subprocess.CalledProcessError, ValueError:
+    except (subprocess.CalledProcessError, ValueError):
         pass
     return []
 

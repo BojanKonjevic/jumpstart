@@ -9,11 +9,13 @@ description = "Scaffold your next Python project with one command"
 readme = "README.md"
 license = { file = "LICENSE" }
 authors = [{ name = "Bojan Konjevic", email = "konjevicbojan1@gmail.com" }]
-requires-python = ">=3.14"
+requires-python = ">=3.12"
 dependencies = ["jinja2", "typer>=0.12", "pyyaml", "tomli-w", "tomlkit", "libcst"]
 classifiers = [
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
     "Programming Language :: Python :: 3.14",
     "Programming Language :: Python :: 3 :: Only",
     "Operating System :: OS Independent",
@@ -55,6 +57,7 @@ where = ["src"]
 ]
 
 [tool.ruff]
+target-version = "py312"
 exclude = [
     "src/zenit/addons/**/files",
     "src/zenit/templates/**/files",

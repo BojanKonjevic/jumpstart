@@ -208,7 +208,7 @@ def add_addon(addon_id: str, dry_run: bool = False, yes: bool = False) -> None:
     if sys.stdin.isatty() and not yes:
         try:
             raw = input(f"  Proceed? {DIM}[Y/n]{RESET}  ").strip().lower()
-        except EOFError, KeyboardInterrupt:
+        except (EOFError, KeyboardInterrupt):
             print()
             raise typer.Exit(0) from None
         if raw not in ("", "y", "yes"):

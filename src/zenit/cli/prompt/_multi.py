@@ -398,7 +398,7 @@ def _fallback_multi(
                 + (", or enter for defaults" if has_defaults else ", or leave blank")
                 + "]: "
             ).strip()
-        except EOFError, KeyboardInterrupt:
+        except (EOFError, KeyboardInterrupt):
             print()
             sys.exit(0)
 
@@ -491,7 +491,7 @@ def _fallback_multi_addon(
             raw = input(
                 "  Addons [space-separated numbers or names, or enter to cancel]: "
             ).strip()
-        except EOFError, KeyboardInterrupt:
+        except (EOFError, KeyboardInterrupt):
             print()
             sys.exit(0)
 
