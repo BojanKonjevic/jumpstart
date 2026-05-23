@@ -27,7 +27,6 @@ result
 
 # pnpm / node
 node_modules
-pnpm-lock.yaml
 
 #Vitepress cache
 **/.vitepress/cache/
