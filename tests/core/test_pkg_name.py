@@ -1,10 +1,14 @@
-"""Tests for normalise_pkg_name and resolve_dest_placeholder."""
+"""Tests for normalise_pkg_name, resolve_dest_placeholder, and path traversal."""
 
 from __future__ import annotations
 
 import pytest
 
-from zenit.core.pkg_name import normalise_pkg_name, resolve_dest_placeholder
+from zenit.core.pkg_name import (
+    _validate_no_path_traversal,
+    normalise_pkg_name,
+    resolve_dest_placeholder,
+)
 from zenit.schema.exceptions import ZenitError
 
 # ── normalise_pkg_name ─────────────────────────────────────────────────────────
@@ -98,3 +102,51 @@ def test_resolve_does_not_affect_jinja2_delimiters() -> None:
         resolve_dest_placeholder("src/{{pkg_name}}/(( name )).py", "myapp")
         == "src/myapp/(( name )).py"
     )
+
+
+# ── _validate_no_path_traversal ────────────────────────────────────────────────
+
+
+def test_traversal_rejects_escape_via_parent_dotdot(
+    tmp_path: pytest.TempPathFactory,
+) -> None:  # type: ignore[misc]
+    project_dir = tmp_path / "myapp"
+    project_dir.mkdir()
+    with pytest.raises(ZenitError, match="Path traversal detected"):
+        _validate_no_path_traversal("../../etc/cronjob", project_dir)
+
+
+def test_traversal_rejects_deep_escape(tmp_path: pytest.TempPathFactory) -> None:  # type: ignore[misc]
+    project_dir = tmp_path / "myapp"
+    project_dir.mkdir()
+    with pytest.raises(ZenitError, match="Path traversal detected"):
+        _validate_no_path_traversal("src/../../../../etc/passwd", project_dir)
+
+
+def test_traversal_allows_normal_nested_path(tmp_path: pytest.TempPathFactory) -> None:  # type: ignore[misc]
+    project_dir = tmp_path / "myapp"
+    project_dir.mkdir()
+    _validate_no_path_traversal("src/myapp/sub/deep/file.py", project_dir)
+
+
+def test_traversal_allows_root_file(tmp_path: pytest.TempPathFactory) -> None:  # type: ignore[misc]
+    project_dir = tmp_path / "myapp"
+    project_dir.mkdir()
+    _validate_no_path_traversal("main.py", project_dir)
+
+
+def test_traversal_rejects_after_placeholder_resolution(
+    tmp_path: pytest.TempPathFactory,
+) -> None:  # type: ignore[misc]
+    project_dir = tmp_path / "myapp"
+    project_dir.mkdir()
+    dest = resolve_dest_placeholder("{{pkg_name}}/../../etc", "myapp")
+    with pytest.raises(ZenitError, match="Path traversal detected"):
+        _validate_no_path_traversal(dest, project_dir)
+
+
+def test_traversal_allows_pkg_name_in_path(tmp_path: pytest.TempPathFactory) -> None:  # type: ignore[misc]
+    project_dir = tmp_path / "myapp"
+    project_dir.mkdir()
+    dest = resolve_dest_placeholder("src/{{pkg_name}}/main.py", "myapp")
+    _validate_no_path_traversal(dest, project_dir)

@@ -14,6 +14,7 @@ deliberately do not overlap.
 from __future__ import annotations
 
 import re
+from pathlib import Path
 
 from zenit.schema.exceptions import ZenitError
 
@@ -22,6 +23,26 @@ def normalise_pkg_name(project_name: str) -> str:
     name = project_name.lower()
     name = re.sub(r"[^a-z0-9_]", "_", name)
     return name.strip("_")
+
+
+def _validate_no_path_traversal(dest: str, project_dir: Path) -> None:
+    """Check that *dest* (a path relative to *project_dir*) does not escape.
+
+    Raises
+    ------
+    ZenitError
+        If *dest* resolves to a location outside *project_dir*.
+    """
+    resolved_dest = (project_dir / dest).resolve()
+    resolved_project = project_dir.resolve()
+    try:
+        resolved_dest.relative_to(resolved_project)
+    except ValueError:
+        raise ZenitError(
+            f"Path traversal detected: '{dest}' resolves to '{resolved_dest}', "
+            f"which is outside the project directory '{resolved_project}'. "
+            f"This is a security issue in the template or addon — please report it."
+        ) from None
 
 
 def resolve_dest_placeholder(text: str, pkg_name: str) -> str:

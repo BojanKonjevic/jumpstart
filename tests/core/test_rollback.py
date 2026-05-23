@@ -88,6 +88,29 @@ def test_scaffold_keyboard_interrupt_re_raises(tmp_path):
         raise KeyboardInterrupt
 
 
+def test_cleanup_warns_when_rmtree_fails(tmp_path, monkeypatch):
+    project_dir = tmp_path / "myapp"
+    project_dir.mkdir()
+    (project_dir / "main.py").write_text("x")
+
+    warns = []
+    monkeypatch.setattr("zenit.core.rollback.warn", lambda msg: warns.append(msg))
+
+    def fake_rmtree(*args: object, **kwargs: object) -> None:
+        onerror = kwargs.get("onerror")
+        if onerror:
+            onerror(None, str(project_dir / "main.py"), None)
+
+    monkeypatch.setattr("shutil.rmtree", fake_rmtree)
+
+    from zenit.core.rollback import _cleanup
+
+    _cleanup(project_dir)
+
+    assert len(warns) > 0
+    assert any("manually" in w for w in warns)
+
+
 def test_scaffold_cleanup_when_directory_already_gone(tmp_path):
     # If the directory was already removed inside the block, cleanup should not raise
     project_dir = tmp_path / "myapp"

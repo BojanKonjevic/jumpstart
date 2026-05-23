@@ -16,7 +16,10 @@ from zenit.core.manifest import (
     read_manifest,
     write_manifest,
 )
-from zenit.core.pkg_name import resolve_dest_placeholder
+from zenit.core.pkg_name import (
+    _validate_no_path_traversal,
+    resolve_dest_placeholder,
+)
 from zenit.core.render import make_env
 from zenit.schema.exceptions import ZenitError
 from zenit.schema.models import LocatorSpec, ManifestBlock
@@ -62,7 +65,9 @@ def apply_contributions(
     pkg_name = str(render_vars["pkg_name"])
 
     for d in contributions.dirs:
-        fs.create_dir(resolve_dest_placeholder(d, pkg_name))
+        dest = resolve_dest_placeholder(d, pkg_name)
+        _validate_no_path_traversal(dest, project_dir)
+        fs.create_dir(dest)
 
     # Pre-render {{pkg_name}} placeholders in compose service fields
     for svc in contributions.compose_services:
@@ -83,6 +88,7 @@ def apply_contributions(
 
     for fc in contributions.files:
         dest = resolve_dest_placeholder(fc.dest, pkg_name)
+        _validate_no_path_traversal(dest, project_dir)
         if fc.content is not None:
             if fc.template:
                 rendered = string_env.from_string(fc.content).render(**render_vars)
@@ -132,6 +138,7 @@ def apply_contributions(
             continue
 
         resolved_file = resolve_dest_placeholder(point.file, pkg_name)
+        _validate_no_path_traversal(resolved_file, project_dir)
         file_path = project_dir / resolved_file
 
         if not file_path.exists():

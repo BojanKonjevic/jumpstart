@@ -33,7 +33,23 @@ def scaffold_or_rollback(project_dir: Path) -> Generator[None]:
 def _cleanup(project_dir: Path) -> None:
     if project_dir.exists():
         os.chdir(project_dir.parent)
-        shutil.rmtree(project_dir, ignore_errors=True)
+        failed_paths: list[str] = []
+
+        def _onerror(func: object, path: str, exc_info: object) -> None:
+            failed_paths.append(path)
+
+        shutil.rmtree(project_dir, onerror=_onerror)
+        if failed_paths:
+            warn(
+                f"Failed to remove {len(failed_paths)} item(s) during cleanup.\n"
+                + "\n".join(f"  {p}" for p in failed_paths[:10])
+                + (
+                    f"\n  … and {len(failed_paths) - 10} more"
+                    if len(failed_paths) > 10
+                    else ""
+                )
+                + f"\nPlease remove '{project_dir}' manually:  rm -rf {project_dir}"
+            )
 
 
 @contextmanager
