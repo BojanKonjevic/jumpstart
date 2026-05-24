@@ -34,7 +34,16 @@ from zenit.core.filesystem import atomic_write_text
 # doctor warns the user.  It is intentionally separate from
 # MANIFEST_SCHEMA_VERSION in manifest.py, which gates fingerprint
 # normalisation — those are independent events that should not be coupled.
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
+
+
+@dataclass
+class MigratedMeta:
+    """Metadata about a Copier template migration stored in ``[migrated]``."""
+
+    source: str  # original URL or local path
+    has_tasks: bool  # whether _tasks were present in copier.yml
+    file_paths: list[str] = field(default_factory=list)  # all file paths written
 
 
 @dataclass
@@ -43,13 +52,21 @@ class ZenitLockfile:
     addons: list[str] = field(default_factory=list)
     zenit_version: str = ""
     schema_version: int = 0
+    migrated: MigratedMeta | None = None  # None for non-migrated projects
 
 
-def write_lockfile(project_dir: Path, template: str, addons: list[str]) -> None:
+def write_lockfile(
+    project_dir: Path,
+    template: str,
+    addons: list[str],
+    migrated: MigratedMeta | None = None,
+) -> None:
     """Write the [project] section of .zenit.toml into *project_dir*.
 
     Uses tomlkit round-trip so any other sections already in the file
     (e.g. [manifest]) are preserved exactly.
+
+    If *migrated* is not None, a ``[migrated]`` section is also written.
     """
     try:
         zenit_version = get_version("zenit")
@@ -69,6 +86,13 @@ def write_lockfile(project_dir: Path, template: str, addons: list[str]) -> None:
     project.add("zenit_version", zenit_version)
     project.add("schema_version", SCHEMA_VERSION)
     doc["project"] = project
+
+    if migrated is not None:
+        mig = tomlkit.table()
+        mig.add("source", migrated.source)
+        mig.add("has_tasks", migrated.has_tasks)
+        mig.add("file_paths", list(migrated.file_paths))
+        doc["migrated"] = mig
 
     atomic_write_text(path, tomlkit.dumps(doc))
 
@@ -108,9 +132,21 @@ def read_lockfile(project_dir: Path) -> ZenitLockfile | None:
     if not isinstance(schema_version, int):
         schema_version = 0
 
+    migrated: MigratedMeta | None = None
+    migrated_raw = data.get("migrated")
+    if isinstance(migrated_raw, dict):
+        migrated = MigratedMeta(
+            source=str(migrated_raw.get("source", "")),
+            has_tasks=bool(migrated_raw.get("has_tasks", False)),
+            file_paths=[
+                p for p in migrated_raw.get("file_paths", []) if isinstance(p, str)
+            ],
+        )
+
     return ZenitLockfile(
         template=template,
         addons=addons,
         zenit_version=zenit_version,
         schema_version=schema_version,
+        migrated=migrated,
     )

@@ -52,6 +52,7 @@ class EntrySource(StrEnum):
 
     TEMPLATE = "template"
     ADDON = "addon"
+    MIGRATED = "migrated"
 
 
 # ── Manifest data types (.zenit.toml [manifest] section) ─────────────────────

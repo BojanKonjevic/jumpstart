@@ -12,6 +12,7 @@ from zenit.cli.ui import warn as _warn
 from zenit.core._filenames import COMPOSE_FILE, ENV_FILES
 from zenit.core.filesystem import FileSystem
 from zenit.core.handlers.base import HandlerDispatcher
+from zenit.core.lockfile import read_lockfile
 from zenit.core.manifest import (
     add_python_block,
     fingerprint,
@@ -88,9 +89,22 @@ def apply_contributions(
     string_env = make_env()
     file_envs: dict[Path, jinja2.Environment] = {}
 
+    lockfile = read_lockfile(project_dir)
+
     for fc in contributions.files:
         dest = resolve_dest_placeholder(fc.dest, pkg_name)
         _validate_no_path_traversal(dest, project_dir)
+
+        if (
+            lockfile is not None
+            and lockfile.migrated is not None
+            and dest in lockfile.migrated.file_paths
+        ):
+            _warn(
+                f"'{dest}' was written by the Copier template. "
+                f"Overwriting with addon-provided content."
+            )
+
         if fc.content is not None:
             if fc.template:
                 rendered = string_env.from_string(fc.content).render(**render_vars)

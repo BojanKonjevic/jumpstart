@@ -32,6 +32,7 @@ from zenit.schema.models import (
     AddonConfig,
     Contributions,
     DependencyEntry,
+    EntrySource,
     EnvEntry,
     Manifest,
     ManifestBlock,
@@ -104,6 +105,7 @@ def run_doctor(project_dir: Path, *, thorough: bool = False) -> list[HealthResul
 
     results: list[HealthResult] = []
     results.append(_check_metadata(project_dir))
+    results.append(_check_migration_health(project_dir, lockfile, manifest))
     results.append(_check_manifest_schema(project_dir, lockfile, manifest))
     results.append(
         _check_dependencies(project_dir, lockfile, template_config, contributions)
@@ -501,6 +503,79 @@ def _check_python_integrity(
                     f"Otherwise restore the original block."
                 ),
             )
+
+    return result
+
+
+def _check_migration_health(
+    project_dir: Path,
+    lockfile: ZenitLockfile,
+    manifest: Manifest | None = None,
+) -> HealthResult:
+    """Check migration status for projects created via ``zenit migrate``.
+
+    Reports warnings for unmanaged (MIGRATED-sourced) env vars, compose
+    services, dependencies, and file paths.  Reports an ERROR if the
+    migrated template had ``_tasks`` that were not executed.
+    """
+    result = HealthResult("Migration status")
+
+    if lockfile.migrated is None:
+        result.ok("No migration metadata — project is native.")
+        return result
+
+    if manifest is None:
+        manifest = read_manifest(project_dir)
+
+    migrated_env = [e for e in manifest.env if e.source == EntrySource.MIGRATED]
+    migrated_services = [
+        s for s in manifest.compose_services if s.source == EntrySource.MIGRATED
+    ]
+    migrated_deps = [
+        d for d in manifest.dependencies if d.source == EntrySource.MIGRATED
+    ]
+
+    for entry in migrated_env:
+        result.warn(
+            f"Env var '{entry.key}' is unmanaged (written by Copier template).",
+            hint="Run 'zenit adopt <addon>' to bring it under management.",
+        )
+    for svc in migrated_services:
+        result.warn(
+            f"Compose service '{svc.name}' is unmanaged (written by Copier template).",
+            hint="Run 'zenit adopt <addon>' to bring it under management.",
+        )
+    for dep in migrated_deps:
+        result.warn(
+            f"Dependency '{dep.package}' is unmanaged (written by Copier template).",
+            hint="Run 'zenit adopt <addon>' to bring it under management.",
+        )
+
+    file_count = len(lockfile.migrated.file_paths)
+    result.warn(
+        f"{file_count} files are unmanaged (written by Copier template, "
+        f"not tracked by zenit).",
+        hint="Run 'zenit adopt <addon>' to bring components under management.",
+    )
+
+    if lockfile.migrated.has_tasks:
+        result.error(
+            "This project has pending manual steps from Copier _tasks that "
+            "were not executed automatically.",
+            hint=(
+                "Check the post_apply stub in templates/_common/apply.py "
+                "for the list of commands to run manually."
+            ),
+        )
+
+    result.warn(
+        "This project was migrated from a Copier template. Some content "
+        "is not under zenit's full lifecycle management.",
+        hint=(
+            f"Migrated from: {lockfile.migrated.source}. "
+            "Run 'zenit adopt <addon>' to bring components under management."
+        ),
+    )
 
     return result
 
