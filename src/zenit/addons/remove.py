@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import sys
 from collections.abc import Mapping
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -482,12 +483,91 @@ def _remove_deps(
     return removed, removed_dev
 
 
+@dataclass
+class _JustBlock:
+    """A parsed block from a justfile."""
+
+    kind: str  # "setting", "alias", "attribute", "recipe", "blank", "other"
+    lines: list[str]
+    recipe_name: str = ""  # only for kind == "recipe"
+
+
+def _parse_justfile_blocks(lines: list[str]) -> list[_JustBlock]:
+    """Parse a justfile into a list of ``_JustBlock``.
+
+    Two-pass friendly: each block is self-contained so callers can filter
+    by kind or ``recipe_name`` and reconstruct without line-level heuristics.
+    """
+    blocks: list[_JustBlock] = []
+    i = 0
+    pending_attrs: list[str] = []
+
+    while i < len(lines):
+        line = lines[i]
+        stripped = line.rstrip()
+
+        if not stripped:
+            if pending_attrs:
+                blocks.append(_JustBlock("other", pending_attrs))
+                pending_attrs = []
+            blocks.append(_JustBlock("blank", [line]))
+            i += 1
+
+        elif stripped.startswith("set ") and ":" in stripped:
+            blocks.append(_JustBlock("setting", [line]))
+            i += 1
+
+        elif stripped.startswith("alias ") and ":=" in stripped:
+            blocks.append(_JustBlock("alias", [line]))
+            i += 1
+
+        elif stripped.startswith("[") and stripped.endswith("]"):
+            # Recipe attribute — accumulate until the next recipe header.
+            pending_attrs.append(line)
+            i += 1
+
+        elif not line[0].isspace() and not stripped.startswith("#") and ":" in stripped:
+            # Recipe header
+            m = _RECIPE_NAME_RE.match(stripped)
+            name = m.group(1) if m else ""
+            recipe_lines = pending_attrs + [line]
+            pending_attrs = []
+            i += 1
+            # Consume body (indented lines and blank lines within the body)
+            while i < len(lines):
+                next_line = lines[i]
+                next_stripped = next_line.rstrip()
+                if next_stripped and not next_line[0].isspace():
+                    break
+                recipe_lines.append(next_line)
+                i += 1
+            blocks.append(_JustBlock("recipe", recipe_lines, recipe_name=name))
+
+        elif stripped.startswith("#"):
+            blocks.append(_JustBlock("other", [line]))
+            i += 1
+
+        else:
+            if pending_attrs:
+                blocks.append(_JustBlock("other", pending_attrs))
+                pending_attrs = []
+            blocks.append(_JustBlock("other", [line]))
+            i += 1
+
+    return blocks
+
+
 def _remove_just_recipes(
     project_dir: Path,
     manifest: Manifest,
     addon_id: str,
 ) -> list[str]:
-    """Remove just recipes contributed by this addon from the justfile."""
+    """Remove just recipes contributed by this addon from the justfile.
+
+    Uses a two-pass block parser (``_parse_justfile_blocks``) that correctly
+    handles recipe attributes (``[private]``), aliases, settings, and blank
+    lines — unlike the old whitespace heuristic.
+    """
 
     justfile_path = project_dir / JUSTFILE_NAME
     if not justfile_path.exists():
@@ -499,28 +579,23 @@ def _remove_just_recipes(
 
     text = justfile_path.read_text(encoding="utf-8")
     lines = text.splitlines(keepends=True)
-    new_lines: list[str] = []
-    skip = False
 
-    # NOTE: recipe-header detection uses a whitespace heuristic that works for
-    # zenit-generated justfiles but is fragile against recipe aliases, recipe
-    # attributes, and multiline recipes with inline comments.
-    for line in lines:
-        stripped = line.rstrip()
-        is_recipe_header = (
-            stripped
-            and not stripped.startswith(" ")
-            and not stripped.startswith("\t")
-            and not stripped.startswith("#")
-        )
-        if is_recipe_header:
-            m = _RECIPE_NAME_RE.search(stripped)
-            name = m.group(1) if m else ""
-            skip = name in recipe_names
-        if not skip:
-            new_lines.append(line)
+    blocks = _parse_justfile_blocks(lines)
+    new_blocks = [
+        b for b in blocks if not (b.kind == "recipe" and b.recipe_name in recipe_names)
+    ]
 
-    justfile_path.write_text("".join(new_lines), encoding="utf-8")
+    # Collapse consecutive blank blocks to one
+    result_lines: list[str] = []
+    prev_was_blank = False
+    for block in new_blocks:
+        is_blank = block.kind == "blank"
+        if is_blank and prev_was_blank:
+            continue
+        result_lines.extend(block.lines)
+        prev_was_blank = is_blank
+
+    justfile_path.write_text("".join(result_lines), encoding="utf-8")
     return list(recipe_names)
 
 

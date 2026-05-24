@@ -41,6 +41,7 @@ from zenit.core.validate import (
     check_preflight,
     validate_addon_deps,
     validate_name,
+    validate_template_requires_addons,
 )
 from zenit.schema.models import EntrySource, TemplateConfig
 from zenit.templates._load_config import list_templates, load_template_config
@@ -71,6 +72,18 @@ def validate_addons_exist(addons: list[str]) -> None:
             raise typer.Exit(1)
 
 
+def _warn_if_nested() -> None:
+    """Print a warning if cwd is inside an existing zenit project."""
+    cwd = Path.cwd()
+    for parent in cwd.parents:
+        if (parent / ".zenit.toml").exists():
+            info(
+                f"You are inside an existing zenit project '{parent.name}'. "
+                f"Did you mean to create a sub-project?"
+            )
+            break
+
+
 def scaffold_project(
     name: str,
     dry_run: bool = False,
@@ -82,6 +95,7 @@ def scaffold_project(
     zenit_root = get_zenit_root()
     pkg_name = normalise_pkg_name(name)
 
+    _warn_if_nested()
     validate_name(name, pkg_name)
 
     if not dry_run:
@@ -132,6 +146,7 @@ def scaffold_project(
         load_apply(zenit_root / "templates" / "_common" / "apply.py")(ctx, fs)
 
         template_config = load_template_config(zenit_root, tpl)
+        validate_template_requires_addons(template_config, adns)
         selected_addon_configs = [get_addon(a) for a in adns]
 
         contributions = collect_all(template_config, selected_addon_configs)

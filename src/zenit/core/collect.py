@@ -27,7 +27,7 @@ def _resolve_content(fc: FileContribution) -> str | None:
     if fc.source is not None:
         try:
             return Path(fc.source).read_text(encoding="utf-8")
-        except OSError:
+        except (OSError, UnicodeDecodeError):
             return None
     return None
 
@@ -94,6 +94,14 @@ def collect_all(
         # One has source, the other has content — resolve and compare actual text.
         fc_content = _resolve_content(fc)
         prev_content = _resolve_content(prev_fc)
+        if fc_content is None and prev_content is None:
+            raise ZenitError(
+                f"Conflict: both '{prev_label}' and '{label}' want to write '{dest}', "
+                f"but neither source file can be read.\n"
+                f"  '{prev_label}' source: {prev_fc.source or 'inline content'}\n"
+                f"  '{label}' source: {fc.source or 'inline content'}\n"
+                f"Fix: check that both source files exist and are readable."
+            )
         if (
             fc_content is not None
             and prev_content is not None

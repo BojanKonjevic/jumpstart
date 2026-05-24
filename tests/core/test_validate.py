@@ -121,6 +121,21 @@ def test_validate_name_rejects_stdlib_module_typing(tmp_path, monkeypatch):
     _assert_exits(validate_name, "typing", "typing")
 
 
+def test_validate_name_rejects_python_keyword_class(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    _assert_exits(validate_name, "class", "class")
+
+
+def test_validate_name_rejects_python_keyword_for(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    _assert_exits(validate_name, "for", "for")
+
+
+def test_validate_name_rejects_python_keyword_def(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    _assert_exits(validate_name, "def", "def")
+
+
 # ── validate_addon_deps — acceptance ─────────────────────────────────────────
 
 

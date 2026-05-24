@@ -7,6 +7,7 @@ import importlib.util
 import tomllib
 from pathlib import Path
 
+from zenit.schema.exceptions import ZenitError
 from zenit.schema.models import TemplateConfig, TemplateMeta
 
 _HERE = Path(__file__).parent.absolute()
@@ -50,7 +51,10 @@ def load_template_config(zenit_root: Path, template_id: str) -> TemplateConfig:
     if spec is None or spec.loader is None:
         raise FileNotFoundError(f"template.py not found for template '{template_id}'")
     mod = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(mod)
+    try:
+        spec.loader.exec_module(mod)
+    except Exception as exc:
+        raise ZenitError(f"Failed to load template '{template_id}': {exc}") from exc
     if not hasattr(mod, "config"):
         raise AttributeError(
             f"template.py for '{template_id}' must export a 'config' object"

@@ -50,6 +50,13 @@ from zenit.schema.models import (
     OwnedEntry,
 )
 
+# NOTE: MANIFEST_SCHEMA_VERSION is NEVER written to disk and never read back.
+# It exists purely as a developer-facing annotation that gates fingerprint
+# normalisation (_normalise()).  If you change the normalisation algorithm,
+# bump this constant to signal that existing normalised fingerprints are
+# stale.  It is intentionally separate from SCHEMA_VERSION in lockfile.py,
+# which gates the on-disk .zenit.toml [project] structure — those are
+# independent events that should not be coupled.
 MANIFEST_SCHEMA_VERSION = 2
 
 

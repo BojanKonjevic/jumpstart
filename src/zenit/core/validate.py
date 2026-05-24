@@ -1,3 +1,4 @@
+import keyword
 import re
 import shutil
 import subprocess
@@ -8,7 +9,7 @@ import typer
 
 from zenit.cli.ui import error, info
 from zenit.core.dependency import DependencyGraph
-from zenit.schema.models import AddonMeta
+from zenit.schema.models import AddonMeta, TemplateConfig
 
 
 def validate_name(name: str, pkg_name: str) -> None:
@@ -26,6 +27,11 @@ def validate_name(name: str, pkg_name: str) -> None:
 
     if pkg_name in sys.stdlib_module_names:
         error(f"'{pkg_name}' shadows a Python stdlib module.")
+        info(f"Suggestion: '{name}-app'  or  'my-{name}'")
+        raise typer.Exit(1)
+
+    if keyword.iskeyword(pkg_name):
+        error(f"'{pkg_name}' is a Python keyword.")
         info(f"Suggestion: '{name}-app'  or  'my-{name}'")
         raise typer.Exit(1)
 
@@ -119,3 +125,20 @@ def validate_addon_deps(
             if conflict in addons:
                 error(f"Addon '{addon}' conflicts with '{conflict}'.")
                 raise typer.Exit(1)
+
+
+def validate_template_requires_addons(
+    template_config: TemplateConfig,
+    selected_addons: list[str],
+) -> None:
+    """Abort with exit code 1 if the template requires addons that aren't selected."""
+    missing = [
+        req for req in template_config.requires_addons if req not in selected_addons
+    ]
+    if missing:
+        error(
+            f"Template '{template_config.id}' requires the following addon(s): "
+            f"{', '.join(missing)}."
+        )
+        info(f"Re-run with: -a {' -a '.join(missing)}")
+        raise typer.Exit(1)

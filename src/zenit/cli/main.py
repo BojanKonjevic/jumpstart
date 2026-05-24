@@ -20,12 +20,17 @@ def _parse_addon_list(raw: list[str] | None) -> list[str] | None:
     """Parse addon list from CLI arg — handles repeated ``-a`` and comma-separated values.
 
     Each argument is split by commas, then flattened and stripped.
+    Duplicates are removed while preserving insertion order.
     """
     if raw is None:
         return None
+    seen: set[str] = set()
     result: list[str] = []
     for item in raw:
-        result.extend(p.strip() for p in item.split(",") if p.strip())
+        for p in (p.strip() for p in item.split(",") if p.strip()):
+            if p not in seen:
+                seen.add(p)
+                result.append(p)
     return result if result else None
 
 

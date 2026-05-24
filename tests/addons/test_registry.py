@@ -8,6 +8,7 @@ from textwrap import dedent
 import pytest
 
 from zenit.addons._registry import get_addon, get_available_addons, list_addons
+from zenit.schema.exceptions import ZenitError
 
 # ── list_addons() — metadata only, no exec ────────────────────────────────
 
@@ -104,7 +105,7 @@ def test_get_addon_propagates_import_error(
         """)
     )
     monkeypatch.setattr("zenit.addons._registry._HERE", tmp_path)
-    with pytest.raises(ImportError):
+    with pytest.raises(ZenitError, match="Failed to load addon 'broken_addon'"):
         get_addon("broken_addon")
 
 

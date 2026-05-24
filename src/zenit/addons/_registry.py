@@ -10,6 +10,7 @@ import tomllib
 from pathlib import Path
 
 from zenit.core.dependency import DependencyGraph
+from zenit.schema.exceptions import ZenitError
 from zenit.schema.models import AddonConfig, AddonHooks, AddonMeta
 
 _HERE = Path(__file__).parent.absolute()
@@ -55,7 +56,10 @@ def get_addon(addon_id: str) -> AddonConfig:
         raise FileNotFoundError(f"addon.py not found for '{addon_id}'")
     spec = importlib.util.spec_from_file_location(f"addon_config_{addon_id}", addon_py)
     mod = importlib.util.module_from_spec(spec)  # type: ignore[arg-type]
-    spec.loader.exec_module(mod)  # type: ignore[union-attr]
+    try:
+        spec.loader.exec_module(mod)  # type: ignore[union-attr]
+    except Exception as exc:
+        raise ZenitError(f"Failed to load addon '{addon_id}': {exc}") from exc
     cfg: AddonConfig = mod.config
     hooks = AddonHooks(
         post_apply=getattr(mod, "post_apply", None),

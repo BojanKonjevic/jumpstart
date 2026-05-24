@@ -204,6 +204,10 @@ def prompt_single_addon(
 
 def _fallback_template(default: str | None = None) -> str:
     templates = _load_templates_list()
+    if not templates:
+        from zenit.schema.exceptions import ZenitError
+
+        raise ZenitError("No templates found.")
     print("\n  Select a base template:\n")
     idx = run_fallback(templates, default_name=default, prompt_text="Template")
     if idx is None:
