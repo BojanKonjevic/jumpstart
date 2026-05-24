@@ -16,8 +16,7 @@ import subprocess
 from pathlib import Path
 
 import pytest
-
-from tests.conftest import scaffold_project_at
+from conftest import scaffold_project_at
 
 
 def _uv(*args: str, cwd: Path) -> subprocess.CompletedProcess:
