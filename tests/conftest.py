@@ -83,55 +83,74 @@ def write_test_manifest(
     write_manifest(project_dir, manifest)
 
 
+def scaffold_project_at(
+    project_dir: Path,
+    name: str,
+    template: str,
+    addons: list[str],
+) -> Path:
+    """Scaffold a project into an existing *project_dir*.
+
+    Runs the full pipeline: common files, template + addon contributions,
+    render, generate, manifest, git init/commit, and lockfile.
+    """
+    pkg_name = name.replace("-", "_")
+
+    ctx = Context(
+        name=name,
+        pkg_name=pkg_name,
+        template=template,
+        addons=addons,
+        zenit_root=ZENIT_ROOT,
+        project_dir=project_dir,
+    )
+    fs = RealFileSystem(project_dir)
+
+    load_apply(ZENIT_ROOT / "templates" / "_common" / "apply.py")(ctx, fs)
+
+    available = get_available_addons()
+    template_config = load_template_config(ZENIT_ROOT, template)
+    selected_addon_configs = [cfg for cfg in available if cfg.id in addons]
+
+    contributions = collect_all(template_config, selected_addon_configs)
+
+    render_vars = build_render_vars(
+        name=name,
+        pkg_name=pkg_name,
+        template=template,
+        addons=addons,
+        deps=contributions.deps,
+        dev_deps=contributions.template_dev_deps + contributions.dev_deps,
+    )
+
+    apply_contributions(
+        ctx, fs, contributions, template_config.injection_points, render_vars
+    )
+    generate_all(ctx, fs, contributions)
+    write_test_manifest(project_dir, addons, render_vars)
+    init(project_dir)
+    write_lockfile(project_dir, template, addons)
+
+    return project_dir
+
+
 @pytest.fixture
 def scaffold_project(tmp_path: Path) -> Callable[[str, str, list[str]], Path]:
     """Scaffold a project into a temporary directory and return the project path.
 
-    Runs the full pipeline: common files, template + addon contributions,
-    render, generate, manifest, git init/commit, and lockfile.  The project is
-    placed inside *tmp_path* which is scoped to the individual test function.
+    Runs the full pipeline.  The project is placed inside *tmp_path* which is
+    scoped to the individual test function.
     """
 
     def _scaffold(name: str, template: str, addons: list[str]) -> Path:
         project_dir = tmp_path / name
         project_dir.mkdir(parents=True)
-        pkg_name = name.replace("-", "_")
-
-        ctx = Context(
-            name=name,
-            pkg_name=pkg_name,
-            template=template,
-            addons=addons,
-            zenit_root=ZENIT_ROOT,
-            project_dir=project_dir,
-        )
-        fs = RealFileSystem(project_dir)
-
-        load_apply(ZENIT_ROOT / "templates" / "_common" / "apply.py")(ctx, fs)
-
-        available = get_available_addons()
-        template_config = load_template_config(ZENIT_ROOT, template)
-        selected_addon_configs = [cfg for cfg in available if cfg.id in addons]
-
-        contributions = collect_all(template_config, selected_addon_configs)
-
-        render_vars = build_render_vars(
-            name=name,
-            pkg_name=pkg_name,
-            template=template,
-            addons=addons,
-            deps=contributions.deps,
-            dev_deps=contributions.template_dev_deps + contributions.dev_deps,
-        )
-
-        apply_contributions(
-            ctx, fs, contributions, template_config.injection_points, render_vars
-        )
-        generate_all(ctx, fs, contributions)
-        write_test_manifest(project_dir, addons, render_vars)
-        init(project_dir)
-        write_lockfile(project_dir, template, addons)
-
-        return project_dir
+        return scaffold_project_at(project_dir, name, template, addons)
 
     return _scaffold
+
+
+@pytest.fixture(scope="class")
+def class_tmp_path(tmp_path_factory: pytest.TempPathFactory) -> Path:
+    """Return a temporary directory scoped to the test class."""
+    return tmp_path_factory.mktemp("class-scaffold")

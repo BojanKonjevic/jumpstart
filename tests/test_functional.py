@@ -17,6 +17,8 @@ from pathlib import Path
 
 import pytest
 
+from tests.conftest import scaffold_project_at
+
 
 def _uv(*args: str, cwd: Path) -> subprocess.CompletedProcess:
     """Run a uv command in the given directory and return the result."""
@@ -36,40 +38,43 @@ def _uv(*args: str, cwd: Path) -> subprocess.CompletedProcess:
 
 @pytest.mark.slow
 class TestBlankFunctional:
-    def test_uv_sync_succeeds(self, tmp_path, scaffold_project):
-        project_dir = scaffold_project("myapp", "blank", [])
-        result = _uv("sync", "--quiet", cwd=project_dir)
-        assert result.returncode == 0, f"uv sync failed:\n{result.stderr}"
+    """Scaffolds a blank project once and shares it across test methods.
 
-    def test_pytest_passes(self, tmp_path, scaffold_project):
-        """The generated blank project's test suite must pass out of the box."""
-        project_dir = scaffold_project("myapp", "blank", [])
-        _uv("sync", "--quiet", cwd=project_dir)
-        result = _uv("run", "pytest", "-v", cwd=project_dir)
+    Saves 5 redundant scaffold + uv sync cycles compared to per-function
+    scaffolding.
+    """
+
+    @pytest.fixture(scope="class")
+    def blank_project(self, class_tmp_path: Path) -> Path:
+        project_dir = class_tmp_path / "myapp"
+        project_dir.mkdir(parents=True)
+        scaffold_project_at(project_dir, "myapp", "blank", [])
+        _uv("sync", "--quiet", "--frozen", cwd=project_dir)
+        return project_dir
+
+    def test_uv_sync_succeeds(self, blank_project: Path) -> None:
+        pass
+
+    def test_pytest_passes(self, blank_project: Path) -> None:
+        result = _uv("run", "pytest", "-v", cwd=blank_project)
         assert result.returncode == 0, (
             f"pytest failed in scaffolded blank project:\n"
             f"stdout:\n{result.stdout}\n"
             f"stderr:\n{result.stderr}"
         )
 
-    def test_pytest_output_contains_test_name(self, tmp_path, scaffold_project):
-        project_dir = scaffold_project("myapp", "blank", [])
-        _uv("sync", "--quiet", cwd=project_dir)
-        result = _uv("run", "pytest", "-v", cwd=project_dir)
+    def test_pytest_output_contains_test_name(self, blank_project: Path) -> None:
+        result = _uv("run", "pytest", "-v", cwd=blank_project)
         assert "test_main" in result.stdout
 
-    def test_ruff_check_passes(self, tmp_path, scaffold_project):
-        project_dir = scaffold_project("myapp", "blank", [])
-        _uv("sync", "--quiet", cwd=project_dir)
-        result = _uv("run", "ruff", "check", ".", cwd=project_dir)
+    def test_ruff_check_passes(self, blank_project: Path) -> None:
+        result = _uv("run", "ruff", "check", ".", cwd=blank_project)
         assert result.returncode == 0, (
             f"ruff check failed in scaffolded blank project:\n{result.stdout}\n{result.stderr}"
         )
 
-    def test_ruff_format_check_passes(self, tmp_path, scaffold_project):
-        project_dir = scaffold_project("myapp", "blank", [])
-        _uv("sync", "--quiet", cwd=project_dir)
-        result = _uv("run", "ruff", "format", "--check", ".", cwd=project_dir)
+    def test_ruff_format_check_passes(self, blank_project: Path) -> None:
+        result = _uv("run", "ruff", "format", "--check", ".", cwd=blank_project)
         assert result.returncode == 0, (
             f"ruff format --check failed:\n{result.stdout}\n{result.stderr}"
         )
@@ -77,17 +82,14 @@ class TestBlankFunctional:
     def test_hyphenated_name_pytest_passes(self, tmp_path, scaffold_project):
         """Hyphenated project names convert to underscore pkg — tests must still work."""
         project_dir = scaffold_project("my-cool-app", "blank", [])
-        _uv("sync", "--quiet", cwd=project_dir)
+        _uv("sync", "--quiet", "--frozen", cwd=project_dir)
         result = _uv("run", "pytest", "-v", cwd=project_dir)
         assert result.returncode == 0, (
             f"pytest failed for hyphenated project name:\n{result.stdout}\n{result.stderr}"
         )
 
-    def test_main_module_is_runnable(self, tmp_path, scaffold_project):
-        """python -m myapp must run without errors (it just prints)."""
-        project_dir = scaffold_project("myapp", "blank", [])
-        _uv("sync", "--quiet", cwd=project_dir)
-        result = _uv("run", "python", "-m", "myapp", cwd=project_dir)
+    def test_main_module_is_runnable(self, blank_project: Path) -> None:
+        result = _uv("run", "python", "-m", "myapp", cwd=blank_project)
         assert result.returncode == 0, (
             f"python -m myapp failed:\n{result.stdout}\n{result.stderr}"
         )
@@ -99,23 +101,27 @@ class TestBlankFunctional:
 
 @pytest.mark.slow
 class TestBlankDockerFunctional:
-    def test_uv_sync_succeeds(self, tmp_path, scaffold_project):
-        project_dir = scaffold_project("myapp", "blank", ["docker"])
-        result = _uv("sync", "--quiet", cwd=project_dir)
-        assert result.returncode == 0, f"uv sync failed:\n{result.stderr}"
+    """Scaffolds a blank+docker project once and shares it across test methods."""
 
-    def test_pytest_passes(self, tmp_path, scaffold_project):
-        project_dir = scaffold_project("myapp", "blank", ["docker"])
-        _uv("sync", "--quiet", cwd=project_dir)
-        result = _uv("run", "pytest", "-v", cwd=project_dir)
+    @pytest.fixture(scope="class")
+    def blank_docker_project(self, class_tmp_path: Path) -> Path:
+        project_dir = class_tmp_path / "myapp"
+        project_dir.mkdir(parents=True)
+        scaffold_project_at(project_dir, "myapp", "blank", ["docker"])
+        _uv("sync", "--quiet", "--frozen", cwd=project_dir)
+        return project_dir
+
+    def test_uv_sync_succeeds(self, blank_docker_project: Path) -> None:
+        pass
+
+    def test_pytest_passes(self, blank_docker_project: Path) -> None:
+        result = _uv("run", "pytest", "-v", cwd=blank_docker_project)
         assert result.returncode == 0, (
             f"pytest failed in blank+docker project:\n{result.stdout}\n{result.stderr}"
         )
 
-    def test_ruff_passes(self, tmp_path, scaffold_project):
-        project_dir = scaffold_project("myapp", "blank", ["docker"])
-        _uv("sync", "--quiet", cwd=project_dir)
-        result = _uv("run", "ruff", "check", ".", cwd=project_dir)
+    def test_ruff_passes(self, blank_docker_project: Path) -> None:
+        result = _uv("run", "ruff", "check", ".", cwd=blank_docker_project)
         assert result.returncode == 0, f"ruff failed:\n{result.stdout}"
 
 
@@ -240,7 +246,7 @@ class TestRenderedContentCorrectness:
 class TestMypyFunctional:
     def test_mypy_passes_on_blank(self, tmp_path, scaffold_project):
         project_dir = scaffold_project("myapp", "blank", [])
-        _uv("sync", "--quiet", cwd=project_dir)
+        _uv("sync", "--quiet", "--frozen", cwd=project_dir)
         result = _uv("run", "mypy", "src/", cwd=project_dir)
         assert result.returncode == 0, (
             f"mypy failed on blank project:\n{result.stdout}\n{result.stderr}"
@@ -287,7 +293,7 @@ class TestPlanToolchain:
         lint cleanliness (ruff check).  ruff format --check after ruff format
         confirms idempotence: a second format pass changes nothing.
         """
-        self._uv("sync", "--quiet", cwd=project_dir)
+        self._uv("sync", "--quiet", "--frozen", cwd=project_dir)
 
         if run_pytest:
             result = self._uv("run", "pytest", cwd=project_dir)
@@ -407,5 +413,5 @@ class TestPlanToolchain:
         remove_addon("sentry")
         remove_addon("redis")
 
-        self._uv("sync", "--quiet", cwd=project_dir)
+        self._uv("sync", "--quiet", "--frozen", cwd=project_dir)
         self._assert_doctor_clean(project_dir)

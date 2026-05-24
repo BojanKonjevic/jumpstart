@@ -8,11 +8,11 @@ fix:
     ruff check --fix .
     ruff format .
 test:
-    uv run python -m pytest -v -m "not slow"
+    uv run python -m pytest -n auto -v -m "not slow"
 test-full:
-    uv run python -m pytest -v
+    uv run python -m pytest -n auto -v
 test-cov:
-    uv run python -m pytest --cov=src --cov-report=term-missing -v
+    uv run python -m pytest -n auto --cov=src --cov-report=term-missing -v
 re:
     uv tool install --reinstall .
 publish:
