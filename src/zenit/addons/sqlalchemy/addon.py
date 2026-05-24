@@ -69,6 +69,14 @@ config = AddonConfig(
         "# apply all pending migrations\nupgrade:\n    uv run alembic upgrade head",
         "# roll back one migration\ndowngrade:\n    uv run alembic downgrade -1",
     ],
+    tool_overrides={
+        "mypy": [
+            {
+                "module": ["sqlalchemy.*", "alembic.*"],
+                "ignore_missing_imports": True,
+            },
+        ],
+    },
     injections=[
         Injection(
             point="settings_fields",

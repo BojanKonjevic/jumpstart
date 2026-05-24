@@ -70,13 +70,9 @@ def build_render_vars(
 ) -> dict[str, object]:
     """Build the standard render-variables dict for template rendering.
 
-    ``has_postgres`` and ``has_redis`` are derived from the ``addons`` list
-    so that all rendering code stays in sync without callers having to pass
-    redundant flags.
-
     ``addon_ids`` provides a set of all addon IDs for quick membership checks;
-    new code should prefer ``addon_id in addon_ids`` over ``has_postgres`` /
-    ``has_redis`` (kept for backward compatibility).
+    use ``"postgres" in addon_ids`` / ``"redis" in addon_ids`` to check for
+    specific addons.
 
     ``deps`` and ``dev_deps`` let template files use ``(( deps ))`` and
     ``(( dev_deps ))`` in their content — e.g. to list dependencies in a
@@ -89,8 +85,6 @@ def build_render_vars(
         "pkg_name": pkg_name,
         "template": template,
         "secret_key": secret_key,
-        "has_postgres": "postgres" in addon_list,
-        "has_redis": "redis" in addon_list,
         "addons": addon_list,
         "addon_ids": addon_ids,
         "deps": deps or [],

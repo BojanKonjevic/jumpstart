@@ -16,6 +16,7 @@ from zenit.cli.ui import (
     dry_section,
 )
 from zenit.core._apply_loader import load_apply
+from zenit.core._filenames import JUSTFILE_NAME, PYPROJECT_FILE
 from zenit.core.apply import apply_contributions
 from zenit.core.collect import collect_all
 from zenit.core.context import Context
@@ -23,6 +24,13 @@ from zenit.core.filesystem import RecordingFileSystem
 from zenit.core.generate import generate_all
 from zenit.core.render import build_render_vars
 from zenit.templates._load_config import load_template_config
+
+_DRY_RUN_COMMANDS: list[str] = [
+    "direnv allow",
+    "git init",
+    "git add .",
+    "git commit -m 'Initial commit'",
+]
 
 
 def run_dry(ctx: Context) -> None:
@@ -100,16 +108,11 @@ def run_dry(ctx: Context) -> None:
         dry_dep(dep, "addon")
 
     dry_header("Generated config files")
-    for file_name in ["pyproject.toml", "justfile"]:
+    for file_name in [PYPROJECT_FILE, JUSTFILE_NAME]:
         dry_dep(file_name)
 
     dry_header("Commands that would run")
-    for cmd in [
-        "direnv allow",
-        "git init",
-        "git add .",
-        "git commit -m 'Initial commit'",
-    ]:
+    for cmd in _DRY_RUN_COMMANDS:
         dry_cmd(cmd)
 
     print()

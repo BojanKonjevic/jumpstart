@@ -27,6 +27,7 @@ in_function_body           — inside a named function, before/after an anchor s
 
 from __future__ import annotations
 
+import enum
 import re
 from collections.abc import Callable
 from typing import Any
@@ -43,6 +44,25 @@ LOCATOR_BEFORE_YIELD = "before_yield_in_function"
 LOCATOR_AFTER_STATEMENT_MATCHING = "after_statement_matching"
 LOCATOR_AT_MODULE_END = "at_module_end"
 LOCATOR_IN_FUNCTION_BODY = "in_function_body"
+
+# ── Locator scope metadata ────────────────────────────────────────────────────
+
+
+class LocatorScope(enum.StrEnum):
+    MODULE_BODY = "module_body"
+    CLASS_BODY = "class_body"
+    FUNCTION_BODY = "function_body"
+
+
+def locator(scope: LocatorScope) -> Callable[[Callable[..., int]], Callable[..., int]]:
+    """Decorator that annotates a locator function with its target scope."""
+
+    def wrapper(fn: Callable[..., int]) -> Callable[..., int]:
+        fn.__locator_scope__ = scope  # type: ignore[attr-defined]
+        return fn
+
+    return wrapper
+
 
 # ── Public exception ──────────────────────────────────────────────────────────
 
@@ -77,6 +97,7 @@ def locate(module: cst.Module, spec_name: str, spec_args: dict[str, Any]) -> int
 # ── Locator implementations ───────────────────────────────────────────────────
 
 
+@locator(LocatorScope.FUNCTION_BODY)
 def before_yield_in_function(module: cst.Module, *, function: str) -> int:
     """Return the body index just before the ``yield`` statement in *function*.
 
@@ -105,6 +126,7 @@ def before_yield_in_function(module: cst.Module, *, function: str) -> int:
     )
 
 
+@locator(LocatorScope.CLASS_BODY)
 def after_last_class_attribute(module: cst.Module, *, class_name: str) -> int:
     """Return the index after the last simple attribute in *class_name*'s body.
 
@@ -135,6 +157,7 @@ def after_last_class_attribute(module: cst.Module, *, class_name: str) -> int:
     )
 
 
+@locator(LocatorScope.MODULE_BODY)
 def after_last_import(module: cst.Module) -> int:
     """Return the index after the last import statement at module level."""
     last_import_idx: int = -1
@@ -149,6 +172,7 @@ def after_last_import(module: cst.Module) -> int:
     return last_import_idx + 1
 
 
+@locator(LocatorScope.MODULE_BODY)
 def after_statement_matching(module: cst.Module, *, pattern: str) -> int:
     """Return the index after the first statement whose source matches *pattern*.
 
@@ -166,6 +190,7 @@ def after_statement_matching(module: cst.Module, *, pattern: str) -> int:
     )
 
 
+@locator(LocatorScope.FUNCTION_BODY)
 def before_return_in_function(module: cst.Module, *, function: str) -> int:
     """Return the body index just before the first ``return`` in *function*."""
     for node in module.body:
@@ -186,11 +211,13 @@ def before_return_in_function(module: cst.Module, *, function: str) -> int:
     )
 
 
+@locator(LocatorScope.MODULE_BODY)
 def at_module_end(module: cst.Module) -> int:
     """Return the index that appends at the end of the module body."""
     return len(module.body)
 
 
+@locator(LocatorScope.MODULE_BODY)
 def at_file_end(module: cst.Module) -> int:  # noqa: ARG001
     """Alias for at_module_end — used as the locator name for non-Python append targets.
 
@@ -200,6 +227,7 @@ def at_file_end(module: cst.Module) -> int:  # noqa: ARG001
     return len(module.body)
 
 
+@locator(LocatorScope.FUNCTION_BODY)
 def in_function_body(
     module: cst.Module,
     *,

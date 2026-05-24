@@ -30,6 +30,7 @@ from zenit.cli.ui import (
 from zenit.core._paths import get_zenit_root
 from zenit.core.apply import apply_contributions
 from zenit.core.collect import collect_addon_only
+from zenit.core.constants import _recipe_name
 from zenit.core.context import Context
 from zenit.core.dependency import DependencyGraph
 from zenit.core.deps import inject_deps
@@ -42,7 +43,6 @@ from zenit.core.manifest import (
     write_manifest,
 )
 from zenit.core.pkg_name import normalise_pkg_name
-from zenit.core.recipes import _recipe_name
 from zenit.core.render import build_recipe_render_vars, build_render_vars, make_env
 from zenit.core.rollback import addon_or_rollback
 from zenit.schema.exceptions import ZenitError
@@ -149,10 +149,16 @@ def _run_add_pipeline(
     )
 
 
-def add_addon(addon_id: str, dry_run: bool = False, yes: bool = False) -> None:
+def add_addon(
+    addon_id: str,
+    dry_run: bool = False,
+    yes: bool = False,
+    project_dir: Path | None = None,
+) -> None:
     """Apply a single addon to an existing zenit project."""
 
-    project_dir = Path.cwd()
+    if project_dir is None:
+        project_dir = Path.cwd()
 
     try:
         lockfile = check_can_add(project_dir, addon_id)
@@ -263,10 +269,13 @@ def add_addon(addon_id: str, dry_run: bool = False, yes: bool = False) -> None:
     print()
 
 
-def add_addon_interactive(dry_run: bool = False, yes: bool = False) -> None:
+def add_addon_interactive(
+    dry_run: bool = False, yes: bool = False, project_dir: Path | None = None
+) -> None:
     """Interactive TUI for adding a single addon to an existing project."""
 
-    project_dir = Path.cwd()
+    if project_dir is None:
+        project_dir = Path.cwd()
     lockfile = read_lockfile(project_dir)
 
     if lockfile is None:

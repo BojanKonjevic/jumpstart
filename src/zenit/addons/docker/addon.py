@@ -1,6 +1,7 @@
 from pathlib import Path
 
 from zenit.addons._registry import get_addon
+from zenit.core._filenames import COMPOSE_FILE
 from zenit.core.apply import merge_compose
 from zenit.core.collect import collect_all
 from zenit.core.context import Context
@@ -23,7 +24,7 @@ config = AddonConfig(
             template=True,
         ),
         FileContribution(
-            dest="compose.yml",
+            dest=COMPOSE_FILE,
             source=str(_HERE / "files" / "compose.yml.j2"),
             template=True,
         ),
@@ -41,7 +42,7 @@ config = AddonConfig(
 
 def health_check(project_dir: Path, lockfile: ZenitLockfile) -> list[HealthIssue]:
     issues: list[HealthIssue] = []
-    if not (project_dir / "compose.yml").exists():
+    if not (project_dir / COMPOSE_FILE).exists():
         issues.append(
             HealthIssue(
                 Severity.ERROR,
@@ -63,7 +64,7 @@ def post_apply(ctx: Context, fs: FileSystem) -> None:  # noqa: ARG001
     contributions = collect_all(template_config, active_configs)
     if not contributions.compose_services and not contributions.compose_volumes:
         return
-    compose_path = ctx.project_dir / "compose.yml"
+    compose_path = ctx.project_dir / COMPOSE_FILE
     if not compose_path.exists():
         return
     merge_compose(
@@ -91,7 +92,7 @@ def can_apply(project_dir: Path, lockfile: ZenitLockfile) -> str | None:
             "      rm Dockerfile"
         )
 
-    if (project_dir / "compose.yml").exists():
+    if (project_dir / COMPOSE_FILE).exists():
         return (
             "compose.yml already exists in this directory.\n"
             "    Remove it first if you want zenit to generate one:\n"

@@ -15,11 +15,18 @@ import yaml
 
 from zenit.addons._registry import get_addon, list_addons
 from zenit.cli.ui import BOLD, DIM, GREEN, RED, RESET, YELLOW
+from zenit.core._filenames import (
+    COMMON_FILES,
+    COMPOSE_FILE,
+    ENV_FILES,
+    JUSTFILE_NAME,
+    PYPROJECT_FILE,
+)
 from zenit.core._paths import get_zenit_root
 from zenit.core.collect import collect_all
 from zenit.core.constants import _RECIPE_NAME_RE
 from zenit.core.lockfile import SCHEMA_VERSION, ZenitLockfile, read_lockfile
-from zenit.core.manifest import _pkg_name, read_manifest
+from zenit.core.manifest import _dep_package_name, read_manifest
 from zenit.core.pkg_name import normalise_pkg_name, resolve_dest_placeholder
 from zenit.schema.models import (
     AddonConfig,
@@ -188,7 +195,7 @@ def _check_manifest_env(
         result.ok("No manifest env entries to verify.")
         return result
 
-    for file_name in (".env", ".env.example"):
+    for file_name in ENV_FILES:
         env_path = project_dir / file_name
         if not env_path.exists():
             result.warn(
@@ -230,7 +237,7 @@ def _check_manifest_compose(
         result.ok("No manifest compose entries to verify.")
         return result
 
-    compose_path = project_dir / "compose.yml"
+    compose_path = project_dir / COMPOSE_FILE
     if not compose_path.exists():
         if manifest.compose_services or manifest.compose_volumes:
             result.error(
@@ -287,7 +294,7 @@ def _check_manifest_deps(
         result.ok("No manifest dependencies to verify.")
         return result
 
-    pyproject_path = project_dir / "pyproject.toml"
+    pyproject_path = project_dir / PYPROJECT_FILE
     if not pyproject_path.exists():
         result.error(
             "pyproject.toml is missing — cannot verify manifest dependencies.",
@@ -310,12 +317,12 @@ def _check_manifest_deps(
         "project", {}
     ).get("optional-dependencies", {}).get("dev", [])
 
-    installed = {_pkg_name(d) for d in raw_deps}
-    installed_dev = {_pkg_name(d) for d in dev_group}
+    installed = {_dep_package_name(d) for d in raw_deps}
+    installed_dev = {_dep_package_name(d) for d in dev_group}
 
     for dep in manifest.dependencies:
         bucket = installed_dev if dep.dev else installed
-        if _pkg_name(dep.package) not in bucket:
+        if _dep_package_name(dep.package) not in bucket:
             kind = "dev " if dep.dev else ""
             result.error(
                 f"Manifest {kind}dependency '{dep.package}' "
@@ -340,7 +347,7 @@ def _check_manifest_recipes(
         result.ok("No manifest just-recipes to verify.")
         return result
 
-    justfile_path = project_dir / "justfile"
+    justfile_path = project_dir / JUSTFILE_NAME
     if not justfile_path.exists():
         result.warn(
             "justfile is missing — cannot verify just-recipe integrity.",
@@ -584,7 +591,7 @@ def _check_dependencies(
 
     result = HealthResult("Dependencies")
 
-    pyproject_path = project_dir / "pyproject.toml"
+    pyproject_path = project_dir / PYPROJECT_FILE
     if not pyproject_path.exists():
         result.error(
             "pyproject.toml is missing.",
@@ -608,8 +615,8 @@ def _check_dependencies(
         "project", {}
     ).get("optional-dependencies", {}).get("dev", [])
 
-    installed_deps = {_pkg_name(d) for d in raw_deps}
-    installed_dev_deps = {_pkg_name(d) for d in dev_group}
+    installed_deps = {_dep_package_name(d) for d in raw_deps}
+    installed_dev_deps = {_dep_package_name(d) for d in dev_group}
 
     if template_config is None or contributions is None:
         zenit_root = get_zenit_root()
@@ -630,9 +637,11 @@ def _check_dependencies(
     expected_deps = contributions.deps
     expected_dev_deps = contributions.template_dev_deps + contributions.dev_deps
 
-    missing_deps = [d for d in expected_deps if _pkg_name(d) not in installed_deps]
+    missing_deps = [
+        d for d in expected_deps if _dep_package_name(d) not in installed_deps
+    ]
     missing_dev_deps = [
-        d for d in expected_dev_deps if _pkg_name(d) not in installed_dev_deps
+        d for d in expected_dev_deps if _dep_package_name(d) not in installed_dev_deps
     ]
 
     if missing_deps:
@@ -713,8 +722,7 @@ def _check_files(
                 f"Restore it or re-run 'zenit add {source}' if it was an addon.",
             )
 
-    common_files = [".gitignore", ".gitattributes", ".pre-commit-config.yaml"]
-    for fname in common_files:
+    for fname in COMMON_FILES:
         if not (project_dir / fname).exists():
             result.warn(
                 f"'{fname}' is missing.",
@@ -778,7 +786,7 @@ def _check_compose(
 
     result = HealthResult("Compose")
 
-    compose_path = project_dir / "compose.yml"
+    compose_path = project_dir / COMPOSE_FILE
     if not compose_path.exists():
         result.ok("No compose.yml — skipping compose check.")
         return result
@@ -885,7 +893,7 @@ def _check_env(
         result.ok("No env vars expected.")
         return result
 
-    for file_name in (".env", ".env.example"):
+    for file_name in ENV_FILES:
         env_path = project_dir / file_name
         if not env_path.exists():
             result.warn(

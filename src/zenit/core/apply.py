@@ -9,6 +9,7 @@ import jinja2
 import yaml
 
 from zenit.cli.ui import warn as _warn
+from zenit.core._filenames import COMPOSE_FILE, ENV_FILES
 from zenit.core.filesystem import FileSystem
 from zenit.core.handlers.base import HandlerDispatcher
 from zenit.core.manifest import (
@@ -189,12 +190,12 @@ def apply_contributions(
             )
             add_python_block(manifest, block)
 
-    if contributions.compose_services and (project_dir / "compose.yml").exists():
+    if contributions.compose_services and (project_dir / COMPOSE_FILE).exists():
         merge_compose(
             ctx, fs, contributions.compose_services, contributions.compose_volumes
         )
 
-    for file_name in (".env", ".env.example"):
+    for file_name in ENV_FILES:
         if (project_dir / file_name).exists() and contributions.env_vars:
             _merge_env_vars(ctx, fs, file_name, contributions.env_vars)
 
@@ -217,7 +218,7 @@ def merge_compose(
     volumes: list[str],
 ) -> None:
     """Add *services* and *volumes* to ``compose.yml``, skipping duplicates."""
-    compose_path = ctx.project_dir / "compose.yml"
+    compose_path = ctx.project_dir / COMPOSE_FILE
     data: dict[str, Any] = (
         yaml.safe_load(compose_path.read_text(encoding="utf-8")) or {}
     )
@@ -257,7 +258,7 @@ def merge_compose(
             vols_section[vol_name] = None
 
     fs.write_file(
-        "compose.yml",
+        COMPOSE_FILE,
         yaml.dump(data, default_flow_style=False, sort_keys=False),
     )
 

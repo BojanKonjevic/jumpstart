@@ -36,6 +36,7 @@ import tomlkit
 import tomlkit.items
 from jinja2 import Environment
 
+from zenit.core._filenames import LOCKFILE_NAME
 from zenit.core.constants import _RECIPE_NAME_RE
 from zenit.core.filesystem import atomic_write_text
 from zenit.schema.models import (
@@ -49,7 +50,6 @@ from zenit.schema.models import (
     OwnedEntry,
 )
 
-LOCKFILE_NAME = ".zenit.toml"
 MANIFEST_SCHEMA_VERSION = 2
 
 
@@ -169,7 +169,7 @@ def add_just_recipe(
         manifest.just_recipes.append(OwnedEntry(name=name, source=source, addon=addon))
 
 
-def _pkg_name(dep: str) -> str:
+def _dep_package_name(dep: str) -> str:
     match = re.match(r"^([a-zA-Z0-9_.-]+)", dep)
     return match.group(1).lower().replace("-", "_") if match else dep.lower()
 
@@ -192,7 +192,7 @@ def record_addon_manifest_entries(
     for dep in addon_cfg.deps:
         add_dependency(
             manifest,
-            _pkg_name(dep),
+            _dep_package_name(dep),
             dep,
             source=EntrySource.ADDON,
             addon=addon_id,
@@ -201,7 +201,7 @@ def record_addon_manifest_entries(
     for dep in addon_cfg.dev_deps:
         add_dependency(
             manifest,
-            _pkg_name(dep),
+            _dep_package_name(dep),
             dep,
             source=EntrySource.ADDON,
             addon=addon_id,

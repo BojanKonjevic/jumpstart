@@ -37,20 +37,11 @@ select = ["E", "F", "I", "UP", "B", "ANN", "SIM"]
 
 [tool.mypy]
 strict = true
-[% if "sqlalchemy" in addons %]
-[[tool.mypy.overrides]]
-module = ["sqlalchemy.*", "alembic.*"]
-ignore_missing_imports = true
-[% endif %]
-[% if "auth-manual" in addons %]
-[[tool.mypy.overrides]]
-module = ["jose.*"]
-ignore_missing_imports = true
-ignore_errors = true
-[% endif %]
-[% if "celery" in addons %]
-[[tool.mypy.overrides]]
-module = ["celery.*"]
-ignore_missing_imports = true
-ignore_errors = true
-[% endif %]
+[% for section, overrides in tool_overrides.items() %]
+[% for override in overrides %]
+[[tool.(( section )).overrides]]
+[% for key, val in override.items() %]
+(( key )) = (( val | tojson ))
+[% endfor %]
+[% endfor %]
+[% endfor %]

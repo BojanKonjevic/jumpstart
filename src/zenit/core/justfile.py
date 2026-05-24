@@ -9,6 +9,9 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
+from zenit.core._filenames import JUSTFILE_NAME
+from zenit.core.constants import _recipe_name
+
 
 def inject_just_recipes(project_dir: Path, recipes: list[str]) -> list[str]:
     """Append missing recipes to the justfile in *project_dir*.
@@ -16,7 +19,7 @@ def inject_just_recipes(project_dir: Path, recipes: list[str]) -> list[str]:
     Returns the list of recipe names that were actually added.
     Recipes whose name already appears in the justfile are skipped.
     """
-    justfile_path = project_dir / "justfile"
+    justfile_path = project_dir / JUSTFILE_NAME
     if not justfile_path.exists():
         return []
 
@@ -33,17 +36,6 @@ def inject_just_recipes(project_dir: Path, recipes: list[str]) -> list[str]:
 
     justfile_path.write_text(appended, encoding="utf-8")
     return [name for r in to_add if (name := _recipe_name(r)) is not None]
-
-
-def _recipe_name(recipe: str) -> str | None:
-    """Return the bare recipe name from a recipe block string.
-
-    Returns ``None`` when no recipe line is found (comment-only or empty input).
-    """
-    for line in recipe.strip().splitlines():
-        if not line.startswith("#"):
-            return line.split(":")[0].strip().split()[0]
-    return None
 
 
 def _extract_recipe_names(text: str) -> set[str]:

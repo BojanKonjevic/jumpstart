@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from zenit.core._filenames import ENV_FILES
+
 
 def require_src_layout(project_dir: Path, addon_name: str) -> str | None:
     if not (project_dir / "src").is_dir():
@@ -26,7 +28,7 @@ def reject_existing_file(path: Path, project_dir: Path) -> str | None:
 
 
 def reject_existing_in_env(
-    project_dir: Path, key: str, env_files: tuple[str, ...] = (".env", ".env.example")
+    project_dir: Path, key: str, env_files: tuple[str, ...] = ENV_FILES
 ) -> str | None:
     for env_file in env_files:
         path = project_dir / env_file

@@ -77,6 +77,15 @@ config = AddonConfig(
         "    docker compose logs -f celery-worker\n"
         "[% endif %]",
     ],
+    tool_overrides={
+        "mypy": [
+            {
+                "module": ["celery.*"],
+                "ignore_missing_imports": True,
+                "ignore_errors": True,
+            },
+        ],
+    },
 )
 
 

@@ -62,10 +62,6 @@ def _get_templates() -> list[tuple[str, str]]:
         return []
 
 
-TEMPLATES: list[tuple[str, str]] = _get_templates()
-TEMPLATE_REQUIRES: dict[str, list[str]] = {}
-
-
 # ── Search ─────────────────────────────────────────────────────────────────────
 
 

@@ -10,7 +10,6 @@ from zenit.templates._load_config import list_templates
 from ._keys import tty_available
 from ._render import (
     _DONE,
-    TEMPLATES,
     clear_lines,
     filter_indices,
     render_single,
@@ -24,7 +23,7 @@ def prompt_template(default: str | None = None) -> str:
     if not tty_available():
         return _fallback_template(default)
 
-    templates = TEMPLATES or _load_templates_list()
+    templates = _load_templates_list()
 
     cursor = 0
     search_query = ""
@@ -101,7 +100,7 @@ def _load_templates_list() -> list[tuple[str, str]]:
     try:
         return [(t.id, t.description) for t in list_templates()]
     except Exception:
-        return TEMPLATES
+        return []
 
 
 def prompt_single_addon(
@@ -204,7 +203,7 @@ def prompt_single_addon(
 
 
 def _fallback_template(default: str | None = None) -> str:
-    templates = TEMPLATES or _load_templates_list()
+    templates = _load_templates_list()
     print("\n  Select a base template:\n")
     idx = run_fallback(templates, default_name=default, prompt_text="Template")
     if idx is None:

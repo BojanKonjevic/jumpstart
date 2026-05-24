@@ -7,6 +7,7 @@ from zenit.addons._preflight import (
     reject_existing_in_env,
     require_src_layout,
 )
+from zenit.core._filenames import ENV_FILES
 from zenit.core.lockfile import ZenitLockfile
 from zenit.core.pkg_name import normalise_pkg_name
 from zenit.doctor.doctor import HealthIssue, Severity
@@ -115,7 +116,7 @@ def health_check(project_dir: Path, lockfile: object) -> list[HealthIssue]:
     if not redis_file.exists():
         return issues
 
-    for env_file in (".env", ".env.example"):
+    for env_file in ENV_FILES:
         path = project_dir / env_file
         if path.exists():
             if "REDIS_URL=" in path.read_text(encoding="utf-8"):

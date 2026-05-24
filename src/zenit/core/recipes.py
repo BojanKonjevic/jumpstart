@@ -4,24 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-
-def _recipe_name(recipe: str) -> str | None:
-    """Return the bare recipe name (text before the first colon).
-
-    Skips leading comment lines so that a recipe like::
-
-        # start the server
-        run:
-            uvicorn ...
-
-    correctly returns ``"run"``.
-
-    Returns ``None`` when no recipe line is found (comment-only or empty input).
-    """
-    for line in recipe.strip().splitlines():
-        if not line.startswith("#"):
-            return line.split(":")[0].strip().split()[0]
-    return None
+from zenit.core.constants import _recipe_name
 
 
 @dataclass

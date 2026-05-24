@@ -5,13 +5,19 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from zenit.cli.ui import step, success
+from zenit.core._filenames import JUSTFILE_NAME, PYPROJECT_FILE
+from zenit.core.constants import _recipe_name
 from zenit.core.filesystem import FileSystem
-from zenit.core.recipes import _recipe_name
 from zenit.core.render import build_recipe_render_vars, make_env
 
 if TYPE_CHECKING:
     from zenit.core.context import Context
     from zenit.schema.models import Contributions
+
+_GENERATE_FILES: list[tuple[str, str]] = [
+    ("pyproject.toml.j2", PYPROJECT_FILE),
+    ("justfile.j2", JUSTFILE_NAME),
+]
 
 
 def generate_all(
@@ -67,12 +73,10 @@ def generate_all(
         "dev_deps": contributions.template_dev_deps + contributions.dev_deps,
         "template_just_recipes": rendered_template_recipes,
         "extra_just_recipes": unique_addon_recipes,
+        "tool_overrides": contributions.tool_overrides,
     }
 
-    for template_name, dest_rel in [
-        ("pyproject.toml.j2", "pyproject.toml"),
-        ("justfile.j2", "justfile"),
-    ]:
+    for template_name, dest_rel in _GENERATE_FILES:
         content = env.get_template(template_name).render(**template_vars)
         fs.write_file(dest_rel, content)
         if not ctx.dry_run:

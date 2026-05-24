@@ -10,7 +10,6 @@ import typer
 
 from zenit.addons._registry import get_addon, list_addons
 from zenit.cli.prompt import prompt_addons, prompt_template
-from zenit.cli.prompt._render import TEMPLATES
 from zenit.cli.ui import confirm, error, info, print_commands_from_just, success
 from zenit.config.config import load_config
 from zenit.core._apply_loader import load_apply
@@ -25,7 +24,7 @@ from zenit.core.generate import generate_all
 from zenit.core.git import init
 from zenit.core.lockfile import write_lockfile
 from zenit.core.manifest import (
-    _pkg_name,
+    _dep_package_name,
     add_compose_service,
     add_compose_volume,
     add_dependency,
@@ -44,15 +43,16 @@ from zenit.core.validate import (
     validate_name,
 )
 from zenit.schema.models import EntrySource, TemplateConfig
-from zenit.templates._load_config import load_template_config
+from zenit.templates._load_config import list_templates, load_template_config
 
 
 def validate_template_exists(template: str) -> None:
     """Exit with code 1 if template is not in the available templates list."""
-    valid = {name for name, _ in TEMPLATES}
+    templates = [(t.id, t.description) for t in list_templates()]
+    valid = {name for name, _ in templates}
     if template not in valid:
         error(f"Unknown template '{template}'.")
-        available = "\n    ".join(f"• {name}" for name, _ in TEMPLATES)
+        available = "\n    ".join(f"• {name}" for name, _ in templates)
         print(f"\n  Available templates:\n    {available}\n")
         raise typer.Exit(1)
 
@@ -221,13 +221,13 @@ def _stamp_template_manifest(
         add_compose_volume(manifest, vol, source=EntrySource.TEMPLATE, addon="")
 
     for dep in template_config.deps:
-        pkg = _pkg_name(dep)
+        pkg = _dep_package_name(dep)
         add_dependency(
             manifest, pkg, dep, source=EntrySource.TEMPLATE, addon="", dev=False
         )
 
     for dep in template_config.dev_deps:
-        pkg = _pkg_name(dep)
+        pkg = _dep_package_name(dep)
         add_dependency(
             manifest, pkg, dep, source=EntrySource.TEMPLATE, addon="", dev=True
         )

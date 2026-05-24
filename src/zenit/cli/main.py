@@ -106,8 +106,8 @@ def cmd_list(
         raise typer.Exit(1)
 
     from zenit.addons._registry import list_addons
-    from zenit.cli.prompt._render import TEMPLATES
     from zenit.core.lockfile import read_lockfile
+    from zenit.templates._load_config import list_templates
 
     project_dir = Path.cwd()
     lockfile = read_lockfile(project_dir)
@@ -124,8 +124,9 @@ def cmd_list(
         _print_installed(lockfile, project_dir)
         return
 
+    templates_list = [(t.id, t.description) for t in list_templates()]
     if available or lockfile is None:
-        _print_available(TEMPLATES, list_addons())
+        _print_available(templates_list, list_addons())
         return
 
     _print_default(lockfile, list_addons(), project_dir)
@@ -284,15 +285,16 @@ def cmd_add(
 
     Run without arguments to select addons interactively.
     """
+    project_dir = Path.cwd()
     if addon is None:
         from zenit.addons.add import add_addon_interactive
 
-        add_addon_interactive(dry_run=dry_run, yes=yes)
+        add_addon_interactive(dry_run=dry_run, yes=yes, project_dir=project_dir)
     else:
         from zenit.addons.add import add_addon
 
         for a in addon:
-            add_addon(a, dry_run=dry_run, yes=yes)
+            add_addon(a, dry_run=dry_run, yes=yes, project_dir=project_dir)
 
 
 @app.command("remove")
@@ -315,17 +317,18 @@ def cmd_remove(
 
     Run without arguments to select addons interactively.
     """
+    project_dir = Path.cwd()
     if addon is None:
         from zenit.addons.remove import remove_addon_interactive
 
-        remove_addon_interactive(dry_run=dry_run, yes=yes)
+        remove_addon_interactive(dry_run=dry_run, yes=yes, project_dir=project_dir)
     else:
         from zenit.addons.remove import remove_addon
         from zenit.schema.exceptions import ZenitError
 
         for a in addon:
             try:
-                remove_addon(a, dry_run=dry_run, yes=yes)
+                remove_addon(a, dry_run=dry_run, yes=yes, project_dir=project_dir)
             except ZenitError as exc:
                 from zenit.cli.ui import error
 

@@ -25,9 +25,9 @@ from pathlib import Path
 
 import tomlkit
 
+from zenit.core._filenames import LOCKFILE_NAME
 from zenit.core.filesystem import atomic_write_text
 
-LOCKFILE_NAME = ".zenit.toml"
 SCHEMA_VERSION = 2
 
 

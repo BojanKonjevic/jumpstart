@@ -10,15 +10,9 @@ import libcst as cst
 
 from zenit.core.handlers.base import FileHandler
 from zenit.core.handlers.locators import (
-    LOCATOR_AFTER_LAST_CLASS_ATTR,
-    LOCATOR_AFTER_LAST_IMPORT,
-    LOCATOR_AFTER_STATEMENT_MATCHING,
-    LOCATOR_AT_FILE_END,
-    LOCATOR_AT_MODULE_END,
-    LOCATOR_BEFORE_RETURN,
-    LOCATOR_BEFORE_YIELD,
-    LOCATOR_IN_FUNCTION_BODY,
+    _REGISTRY,
     LocatorError,
+    LocatorScope,
     locate,
 )
 from zenit.core.manifest import _normalise as _manifest_normalise
@@ -67,15 +61,18 @@ def _locate_line(
             return positions[body[-1]].end.line
         return 0
 
-    if locator_name in (
-        LOCATOR_AFTER_LAST_IMPORT,
-        LOCATOR_AFTER_STATEMENT_MATCHING,
-        LOCATOR_AT_MODULE_END,
-        LOCATOR_AT_FILE_END,
-    ):
+    locator_fn = _REGISTRY.get(locator_name)
+    if locator_fn is None:
+        raise InjectionError(
+            f"Locator '{locator_name}' is not registered. "
+            f"Add it to _REGISTRY in locators.py."
+        )
+
+    scope: LocatorScope = locator_fn.__locator_scope__  # type: ignore[attr-defined]
+    if scope == LocatorScope.MODULE_BODY:
         return _split_for(module.body, insert_index)
 
-    if locator_name == LOCATOR_AFTER_LAST_CLASS_ATTR:
+    if scope == LocatorScope.CLASS_BODY:
         class_name = str(locator_args.get("class_name", ""))
         for node in module.body:
             if isinstance(node, cst.ClassDef) and node.name.value == class_name:
@@ -85,11 +82,7 @@ def _locate_line(
             "Cannot convert CST index to line number."
         )
 
-    if locator_name in (
-        LOCATOR_BEFORE_YIELD,
-        LOCATOR_BEFORE_RETURN,
-        LOCATOR_IN_FUNCTION_BODY,
-    ):
+    if scope == LocatorScope.FUNCTION_BODY:
         fn_name = str(locator_args.get("function", ""))
         for node in module.body:
             if isinstance(node, cst.FunctionDef) and node.name.value == fn_name:
@@ -100,10 +93,9 @@ def _locate_line(
             f"Has the function been removed or renamed?"
         )
 
-    # Unknown locator — fail loudly so developers add it to the dispatch table.
     raise InjectionError(
-        f"Locator '{locator_name}' is not supported by _locate_line. "
-        f"Add it to the dispatch table in python_handler.py."
+        f"Locator '{locator_name}' has unknown scope '{scope}'. "
+        f"Check the @locator decorator in locators.py."
     )
 
 

@@ -19,7 +19,6 @@ from ._render import (
     EMPTY,
     LABEL_WIDTH,
     LOCKED,
-    TEMPLATE_REQUIRES,
     clear_lines,
     filter_indices,
     reserve_lines,
@@ -175,9 +174,6 @@ def prompt_addons(
 
     # Addons that the selected template auto-selects and locks.
     always_locked: set[int] = set()
-    for req in TEMPLATE_REQUIRES.get(template, []):
-        if req in name_to_idx:
-            always_locked.add(name_to_idx[req])
 
     # Addons that declare a templates allowlist which doesn't include the
     # currently selected template — they cannot be used at all this run.
@@ -398,7 +394,7 @@ def _fallback_multi(
     default_addon_names: list[str],
     available: list[AddonMeta] | None = None,
 ) -> list[str]:
-    always_locked_names = set(TEMPLATE_REQUIRES.get(template, []))
+    always_locked_names: set[str] = set()
 
     # Build incompatible set by addon id for the fallback path.
     incompatible_names: set[str] = set()

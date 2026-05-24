@@ -13,7 +13,8 @@ from typing import cast
 import tomlkit
 from tomlkit.container import Container
 
-from zenit.core.manifest import _pkg_name
+from zenit.core._filenames import PYPROJECT_FILE
+from zenit.core.manifest import _dep_package_name
 
 
 def _add_deps_if_missing(
@@ -23,9 +24,9 @@ def _add_deps_if_missing(
 ) -> list[str]:
     added: list[str] = []
     for dep in deps_to_add:
-        if _pkg_name(dep) not in existing_names:
+        if _dep_package_name(dep) not in existing_names:
             target_list.append(dep)
-            existing_names.add(_pkg_name(dep))
+            existing_names.add(_dep_package_name(dep))
             added.append(dep)
     return added
 
@@ -41,7 +42,7 @@ def inject_deps(
     Deps that are already present (by package name, ignoring version specifiers)
     are skipped silently.
     """
-    pyproject_path = project_dir / "pyproject.toml"
+    pyproject_path = project_dir / PYPROJECT_FILE
     if not pyproject_path.exists():
         raise FileNotFoundError(
             "pyproject.toml not found — cannot inject dependencies."
@@ -54,7 +55,7 @@ def inject_deps(
     existing_deps = cast(
         list[str], project_table.get("dependencies") or tomlkit.array()
     )
-    existing_names = {_pkg_name(str(d)) for d in existing_deps}
+    existing_names = {_dep_package_name(str(d)) for d in existing_deps}
 
     added_deps = _add_deps_if_missing(existing_deps, existing_names, deps)
 
@@ -64,7 +65,7 @@ def inject_deps(
     if "dependency-groups" in doc:
         group = cast(Container, doc["dependency-groups"])
         existing_dev = cast(list[str], group.get("dev") or tomlkit.array())
-        existing_dev_names = {_pkg_name(str(d)) for d in existing_dev}
+        existing_dev_names = {_dep_package_name(str(d)) for d in existing_dev}
         added_dev_deps = _add_deps_if_missing(
             existing_dev, existing_dev_names, dev_deps
         )
@@ -74,7 +75,7 @@ def inject_deps(
     ):
         opt = cast(Container, cast(Container, doc["project"])["optional-dependencies"])
         existing_dev = cast(list[str], opt.get("dev") or tomlkit.array())
-        existing_dev_names = {_pkg_name(str(d)) for d in existing_dev}
+        existing_dev_names = {_dep_package_name(str(d)) for d in existing_dev}
         added_dev_deps = _add_deps_if_missing(
             existing_dev, existing_dev_names, dev_deps
         )

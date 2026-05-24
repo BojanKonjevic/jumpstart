@@ -46,7 +46,8 @@ def collect_all(
     c.env_vars.extend(template_config.env_vars)
     c.deps.extend(template_config.deps)
     c.template_dev_deps.extend(template_config.dev_deps)
-    c.template_dev_deps.extend(DEFAULT_DEV_DEPS)
+    if not template_config.dev_deps:
+        c.template_dev_deps.extend(DEFAULT_DEV_DEPS)
     c.recipes.template.extend(template_config.just_recipes)
 
     for inj in template_config.injections:
@@ -62,6 +63,8 @@ def collect_all(
         c.deps.extend(addon.deps)
         c.dev_deps.extend(addon.dev_deps)
         c.recipes.addon.extend(addon.just_recipes)
+        for section, overrides in addon.tool_overrides.items():
+            c.tool_overrides.setdefault(section, []).extend(overrides)
         for inj in addon.injections:
             inj.addon_id = addon.id
             c.injections.append(inj)
@@ -124,6 +127,8 @@ def collect_addon_only(addon_configs: list[AddonConfig]) -> Contributions:
         c.deps.extend(addon.deps)
         c.dev_deps.extend(addon.dev_deps)
         c.recipes.addon.extend(addon.just_recipes)
+        for section, overrides in addon.tool_overrides.items():
+            c.tool_overrides.setdefault(section, []).extend(overrides)
         for inj in addon.injections:
             inj.addon_id = addon.id
             c.injections.append(inj)

@@ -29,13 +29,14 @@ from zenit.cli.ui import (
     success,
     warn,
 )
+from zenit.core._filenames import COMPOSE_FILE, ENV_FILES, JUSTFILE_NAME, PYPROJECT_FILE
 from zenit.core._paths import get_zenit_root
 from zenit.core.constants import _RECIPE_NAME_RE
 from zenit.core.dependency import DependencyGraph
 from zenit.core.handlers import HandlerDispatcher
 from zenit.core.lockfile import ZenitLockfile, read_lockfile, write_lockfile
 from zenit.core.manifest import (
-    _pkg_name,
+    _dep_package_name,
     read_manifest,
     remove_blocks_for_addon,
     write_manifest,
@@ -323,7 +324,7 @@ def _remove_compose_services(
 ) -> list[str]:
     """Remove compose services that belong to this addon. Returns removed service names."""
 
-    compose_path = project_dir / "compose.yml"
+    compose_path = project_dir / COMPOSE_FILE
     if not compose_path.exists():
         return []
 
@@ -354,7 +355,7 @@ def _remove_compose_volumes(
 ) -> None:
     """Remove named volumes that belong to this addon from compose.yml."""
 
-    compose_path = project_dir / "compose.yml"
+    compose_path = project_dir / COMPOSE_FILE
     if not compose_path.exists():
         return
 
@@ -390,7 +391,7 @@ def _remove_env_vars(
         return []
     removed: list[str] = []
 
-    for file_name in (".env", ".env.example"):
+    for file_name in ENV_FILES:
         env_path = project_dir / file_name
         if not env_path.exists():
             continue
@@ -417,7 +418,7 @@ def _partition_deps(
     removed: list[str] = []
     kept: list[str] = []
     for d in items:
-        if _pkg_name(str(d)) in names_to_remove:
+        if _dep_package_name(str(d)) in names_to_remove:
             removed.append(str(d))
         else:
             kept.append(d)
@@ -432,7 +433,7 @@ def _remove_deps(
     Returns (removed_deps, removed_dev_deps).
     """
 
-    pyproject_path = project_dir / "pyproject.toml"
+    pyproject_path = project_dir / PYPROJECT_FILE
     if not pyproject_path.exists():
         return [], []
 
@@ -488,7 +489,7 @@ def _remove_just_recipes(
 ) -> list[str]:
     """Remove just recipes contributed by this addon from the justfile."""
 
-    justfile_path = project_dir / "justfile"
+    justfile_path = project_dir / JUSTFILE_NAME
     if not justfile_path.exists():
         return []
 
@@ -597,10 +598,13 @@ def _dry_remove(
     print()
 
 
-def remove_addon_interactive(dry_run: bool = False, yes: bool = False) -> None:
+def remove_addon_interactive(
+    dry_run: bool = False, yes: bool = False, project_dir: Path | None = None
+) -> None:
     """Interactive TUI for removing a single addon from an existing project."""
 
-    project_dir = Path.cwd()
+    if project_dir is None:
+        project_dir = Path.cwd()
     lockfile = read_lockfile(project_dir)
 
     if lockfile is None:

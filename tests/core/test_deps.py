@@ -1,6 +1,6 @@
 """Tests for zenit.deps — dependency injection into pyproject.toml.
 
-Covers inject_deps and the _pkg_name helper for all relevant cases:
+Covers inject_deps and the _dep_package_name helper for all relevant cases:
 adding new deps, skipping existing ones, handling both [dependency-groups]
 and [project.optional-dependencies] dev layouts, and edge cases.
 
@@ -20,46 +20,46 @@ from pathlib import Path
 import pytest
 
 from zenit.core.deps import inject_deps
-from zenit.core.manifest import _pkg_name
+from zenit.core.manifest import _dep_package_name
 
-# ── _pkg_name ─────────────────────────────────────────────────────────────────
-
-
-def test_pkg_name_simple():
-    assert _pkg_name("redis") == "redis"
+# ── _dep_package_name ─────────────────────────────────────────────────────────────────
 
 
-def test_pkg_name_with_version_specifier():
-    assert _pkg_name("redis>=5") == "redis"
+def test_dep_package_name_simple():
+    assert _dep_package_name("redis") == "redis"
 
 
-def test_pkg_name_with_extras():
-    assert _pkg_name("celery[redis]>=5") == "celery"
+def test_dep_package_name_with_version_specifier():
+    assert _dep_package_name("redis>=5") == "redis"
 
 
-def test_pkg_name_with_extras_no_version():
-    assert _pkg_name("sentry-sdk[fastapi]") == "sentry_sdk"
+def test_dep_package_name_with_extras():
+    assert _dep_package_name("celery[redis]>=5") == "celery"
 
 
-def test_pkg_name_lowercased():
-    assert _pkg_name("FastAPI") == "fastapi"
+def test_dep_package_name_with_extras_no_version():
+    assert _dep_package_name("sentry-sdk[fastapi]") == "sentry_sdk"
 
 
-def test_pkg_name_with_hyphen():
-    assert _pkg_name("python-dotenv>=1.0") == "python_dotenv"
+def test_dep_package_name_lowercased():
+    assert _dep_package_name("FastAPI") == "fastapi"
 
 
-def test_pkg_name_complex_extras():
-    assert _pkg_name("fakeredis[aioredis]") == "fakeredis"
+def test_dep_package_name_with_hyphen():
+    assert _dep_package_name("python-dotenv>=1.0") == "python_dotenv"
 
 
-def test_pkg_name_with_tilde_specifier():
-    assert _pkg_name("mypy~=1.0") == "mypy"
+def test_dep_package_name_complex_extras():
+    assert _dep_package_name("fakeredis[aioredis]") == "fakeredis"
 
 
-def test_pkg_name_empty_string():
+def test_dep_package_name_with_tilde_specifier():
+    assert _dep_package_name("mypy~=1.0") == "mypy"
+
+
+def test_dep_package_name_empty_string():
     # degenerate input — should not raise
-    result = _pkg_name("")
+    result = _dep_package_name("")
     assert isinstance(result, str)
 
 

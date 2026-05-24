@@ -3,17 +3,25 @@ import shutil
 import sys
 
 from zenit.cli.ui import step, success, warn
+from zenit.core._filenames import COMMON_FILES
 from zenit.core.context import Context
 from zenit.core.filesystem import FileSystem
+
+_COMMON_SOURCE_MAP: dict[str, str] = {
+    ".gitignore": "gitignore",
+    ".gitattributes": "gitattributes",
+    ".pre-commit-config.yaml": "pre-commit-config.yaml",
+}
 
 
 def apply(ctx: Context, fs: FileSystem) -> None:
     step("Copying common files")
     common = ctx.zenit_root / "templates" / "_common"
 
-    fs.copy_file(common / "gitignore", ".gitignore")
-    fs.copy_file(common / "gitattributes", ".gitattributes")
-    fs.copy_file(common / "pre-commit-config.yaml", ".pre-commit-config.yaml")
+    for dest_name in COMMON_FILES:
+        src_name = _COMMON_SOURCE_MAP.get(dest_name)
+        if src_name:
+            fs.copy_file(common / src_name, dest_name)
 
     if sys.platform != "win32":
         is_nixos = os.path.isfile("/etc/NIXOS")

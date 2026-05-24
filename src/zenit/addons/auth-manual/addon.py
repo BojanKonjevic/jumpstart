@@ -1,6 +1,7 @@
 from pathlib import Path
 
 from zenit.cli.ui import info
+from zenit.core._filenames import ENV_FILES
 from zenit.core.context import Context
 from zenit.core.filesystem import FileSystem
 from zenit.core.lockfile import ZenitLockfile
@@ -72,6 +73,15 @@ config = AddonConfig(
     just_recipes=[
         '# generate a secret key for JWT signing\ngen-secret:\n    python -c "import secrets; print(secrets.token_hex(32))"',
     ],
+    tool_overrides={
+        "mypy": [
+            {
+                "module": ["jose.*"],
+                "ignore_missing_imports": True,
+                "ignore_errors": True,
+            },
+        ],
+    },
     injections=[
         Injection(
             point="settings_fields",
@@ -162,7 +172,7 @@ def can_apply(project_dir: Path, lockfile: ZenitLockfile) -> str | None:
             f"      rm {auth_route.relative_to(project_dir)}"
         )
 
-    for env_file in (".env", ".env.example"):
+    for env_file in ENV_FILES:
         path = project_dir / env_file
         if path.exists() and "SECRET_KEY" in path.read_text(encoding="utf-8"):
             return (
