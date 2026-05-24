@@ -11,7 +11,7 @@ from unittest.mock import patch
 import pytest
 import typer
 import yaml
-from conftest import ZENIT_ROOT, write_test_manifest
+from helpers import ZENIT_ROOT, write_test_manifest
 
 from zenit.addons._registry import get_available_addons
 from zenit.addons.remove import _remove_files, remove_addon

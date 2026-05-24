@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from conftest import ZENIT_ROOT
+from helpers import ZENIT_ROOT
 
 from zenit.core.context import Context
 from zenit.core.dryrun import run_dry

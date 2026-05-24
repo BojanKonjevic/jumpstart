@@ -10,7 +10,7 @@ import subprocess
 from pathlib import Path
 
 import pytest
-from conftest import ZENIT_ROOT
+from helpers import ZENIT_ROOT
 
 from zenit.core.context import Context
 from zenit.core.filesystem import RealFileSystem, RecordingFileSystem

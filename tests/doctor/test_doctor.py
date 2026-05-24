@@ -8,7 +8,7 @@ from pathlib import Path
 
 import tomlkit
 import yaml
-from conftest import ZENIT_ROOT, write_test_manifest
+from helpers import ZENIT_ROOT, write_test_manifest
 
 from zenit.addons._registry import get_available_addons
 from zenit.core._apply_loader import load_apply

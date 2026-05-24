@@ -8,7 +8,7 @@ import shutil
 from unittest.mock import patch
 
 import pytest
-from conftest import ExitAssertion
+from helpers import ExitAssertion
 
 from zenit.core.validate import check_preflight, validate_addon_deps, validate_name
 from zenit.schema.models import AddonConfig

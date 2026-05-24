@@ -18,7 +18,7 @@ from unittest.mock import patch
 import pytest
 import yaml
 from click.exceptions import Exit as ClickExit
-from conftest import ZENIT_ROOT, write_test_manifest
+from helpers import ZENIT_ROOT, write_test_manifest
 
 from zenit.addons._registry import get_available_addons
 from zenit.addons.add import add_addon, add_addon_interactive
