@@ -74,11 +74,16 @@ def build_render_vars(
     so that all rendering code stays in sync without callers having to pass
     redundant flags.
 
+    ``addon_ids`` provides a set of all addon IDs for quick membership checks;
+    new code should prefer ``addon_id in addon_ids`` over ``has_postgres`` /
+    ``has_redis`` (kept for backward compatibility).
+
     ``deps`` and ``dev_deps`` let template files use ``(( deps ))`` and
     ``(( dev_deps ))`` in their content — e.g. to list dependencies in a
     README or generate an ``__init__.py`` that re-exports them.
     """
     addon_list = addons or []
+    addon_ids = set(addon_list)
     return {
         "name": name,
         "pkg_name": pkg_name,
@@ -87,6 +92,7 @@ def build_render_vars(
         "has_postgres": "postgres" in addon_list,
         "has_redis": "redis" in addon_list,
         "addons": addon_list,
+        "addon_ids": addon_ids,
         "deps": deps or [],
         "dev_deps": dev_deps or [],
     }

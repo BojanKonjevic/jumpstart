@@ -547,7 +547,7 @@ class TestCheckAddonHealth:
 
         hooks = AddonHooks(health_check=broken_health_check)
         cfg = AddonConfig(id="docker", description="")
-        cfg._module = hooks
+        object.__setattr__(cfg, "_module", hooks)
 
         meta = AddonMeta(id="docker", description="Docker addon")
         with (

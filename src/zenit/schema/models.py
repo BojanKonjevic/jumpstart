@@ -180,7 +180,7 @@ class AddonHooks:
     can_remove: Callable[[Path, ZenitLockfile], str | None] | None = None
 
 
-@dataclass
+@dataclass(frozen=True)
 class AddonConfig:
     """All contributions made by a single addon."""
 

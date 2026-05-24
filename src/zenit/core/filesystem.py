@@ -5,6 +5,7 @@ from __future__ import annotations
 import os
 import shutil
 import subprocess
+import sys
 import tempfile
 from pathlib import Path
 from typing import Protocol
@@ -44,7 +45,7 @@ class RealFileSystem:
     def write_file(self, path: str, content: str) -> None:
         dest = self._project_dir / path
         dest.parent.mkdir(parents=True, exist_ok=True)
-        dest.write_text(content)
+        atomic_write_text(dest, content)
 
     def create_dir(self, path: str) -> None:
         (self._project_dir / path).mkdir(parents=True, exist_ok=True)
@@ -63,7 +64,15 @@ class RealFileSystem:
         pass
 
     def execute_command(self, cmd: list[str], check: bool = True) -> None:
-        subprocess.run(cmd, check=check, capture_output=True)
+        try:
+            subprocess.run(cmd, check=check, capture_output=True)
+        except subprocess.CalledProcessError as exc:
+            print(f"Command failed: {' '.join(cmd)}", file=sys.stderr)
+            if exc.stdout:
+                print(exc.stdout.decode(), file=sys.stderr)
+            if exc.stderr:
+                print(exc.stderr.decode(), file=sys.stderr)
+            raise
 
 
 class RecordingFileSystem:

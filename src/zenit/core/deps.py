@@ -16,6 +16,20 @@ from tomlkit.container import Container
 from zenit.core.manifest import _pkg_name
 
 
+def _add_deps_if_missing(
+    target_list: list[str],
+    existing_names: set[str],
+    deps_to_add: list[str],
+) -> list[str]:
+    added: list[str] = []
+    for dep in deps_to_add:
+        if _pkg_name(dep) not in existing_names:
+            target_list.append(dep)
+            existing_names.add(_pkg_name(dep))
+            added.append(dep)
+    return added
+
+
 def inject_deps(
     project_dir: Path,
     deps: list[str],
@@ -35,9 +49,6 @@ def inject_deps(
 
     doc = tomlkit.parse(pyproject_path.read_text(encoding="utf-8"))
 
-    added_deps: list[str] = []
-    added_dev_deps: list[str] = []
-
     # ── runtime deps ──────────────────────────────────────────────────────────
     project_table = cast(Container, doc.get("project", {}))
     existing_deps = cast(
@@ -45,11 +56,7 @@ def inject_deps(
     )
     existing_names = {_pkg_name(str(d)) for d in existing_deps}
 
-    for dep in deps:
-        if _pkg_name(dep) not in existing_names:
-            existing_deps.append(dep)
-            existing_names.add(_pkg_name(dep))
-            added_deps.append(dep)
+    added_deps = _add_deps_if_missing(existing_deps, existing_names, deps)
 
     # ── dev deps ──────────────────────────────────────────────────────────────
     # Support both [dependency-groups] dev (PEP 735 / uv style) and
@@ -58,11 +65,9 @@ def inject_deps(
         group = cast(Container, doc["dependency-groups"])
         existing_dev = cast(list[str], group.get("dev") or tomlkit.array())
         existing_dev_names = {_pkg_name(str(d)) for d in existing_dev}
-        for dep in dev_deps:
-            if _pkg_name(dep) not in existing_dev_names:
-                existing_dev.append(dep)
-                existing_dev_names.add(_pkg_name(dep))
-                added_dev_deps.append(dep)
+        added_dev_deps = _add_deps_if_missing(
+            existing_dev, existing_dev_names, dev_deps
+        )
 
     elif "project" in doc and "optional-dependencies" in cast(
         Container, doc["project"]
@@ -70,11 +75,12 @@ def inject_deps(
         opt = cast(Container, cast(Container, doc["project"])["optional-dependencies"])
         existing_dev = cast(list[str], opt.get("dev") or tomlkit.array())
         existing_dev_names = {_pkg_name(str(d)) for d in existing_dev}
-        for dep in dev_deps:
-            if _pkg_name(dep) not in existing_dev_names:
-                existing_dev.append(dep)
-                existing_dev_names.add(_pkg_name(dep))
-                added_dev_deps.append(dep)
+        added_dev_deps = _add_deps_if_missing(
+            existing_dev, existing_dev_names, dev_deps
+        )
+
+    else:
+        added_dev_deps = []
 
     pyproject_path.write_text(tomlkit.dumps(doc), encoding="utf-8")
     return added_deps, added_dev_deps

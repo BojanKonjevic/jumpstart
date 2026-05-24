@@ -410,6 +410,20 @@ def _remove_env_vars(
     return removed
 
 
+def _partition_deps(
+    items: list[str],
+    names_to_remove: set[str],
+) -> tuple[list[str], list[str]]:
+    removed: list[str] = []
+    kept: list[str] = []
+    for d in items:
+        if _pkg_name(str(d)) in names_to_remove:
+            removed.append(str(d))
+        else:
+            kept.append(d)
+    return removed, kept
+
+
 def _remove_deps(
     project_dir: Path, manifest: Manifest, addon_id: str
 ) -> tuple[list[str], list[str]]:
@@ -431,21 +445,17 @@ def _remove_deps(
         d.package for d in manifest.dependencies if d.addon == addon_id and d.dev
     }
 
-    removed: list[str] = []
-    removed_dev: list[str] = []
-
     project_deps = doc.get("project", {}).get("dependencies", [])
     if isinstance(project_deps, Array):
-        to_remove = []
-        for d in project_deps:
-            if _pkg_name(str(d)) in deps_to_remove:
-                removed.append(str(d))
-            else:
-                to_remove.append(d)
+        removed, to_remove = _partition_deps(
+            [str(d) for d in project_deps], deps_to_remove
+        )
         if removed:
             del project_deps[:]
             for d in to_remove:
                 project_deps.append(d)
+    else:
+        removed = []
 
     _dev_doc = doc.get("dependency-groups", {})
     _dev_group = _dev_doc.get("dev") if hasattr(_dev_doc, "get") else None
@@ -453,18 +463,17 @@ def _remove_deps(
         "optional-dependencies", {}
     ).get("dev")
     if isinstance(dev_group, (list, Array)):
-        new_dev = []
-        for d in dev_group:
-            if _pkg_name(str(d)) in dev_deps_to_remove:
-                removed_dev.append(str(d))
-            else:
-                new_dev.append(d)
+        removed_dev, new_dev = _partition_deps(
+            [str(d) for d in dev_group], dev_deps_to_remove
+        )
         if removed_dev:
             dep_groups = doc.get("dependency-groups")
             if isinstance(dep_groups, Mapping) and "dev" in dep_groups:
                 doc["dependency-groups"]["dev"] = new_dev
             else:
                 doc["project"]["optional-dependencies"]["dev"] = new_dev
+    else:
+        removed_dev = []
 
     if removed or removed_dev:
         pyproject_path.write_text(tomlkit.dumps(doc), encoding="utf-8")
@@ -492,6 +501,9 @@ def _remove_just_recipes(
     new_lines: list[str] = []
     skip = False
 
+    # NOTE: recipe-header detection uses a whitespace heuristic that works for
+    # zenit-generated justfiles but is fragile against recipe aliases, recipe
+    # attributes, and multiline recipes with inline comments.
     for line in lines:
         stripped = line.rstrip()
         is_recipe_header = (

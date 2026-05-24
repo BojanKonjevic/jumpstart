@@ -53,6 +53,11 @@ def health_check(project_dir: Path, lockfile: ZenitLockfile) -> list[HealthIssue
 
 
 def post_apply(ctx: Context, fs: FileSystem) -> None:  # noqa: ARG001
+    # Runs inside apply_contributions, before write_manifest.
+    # compose.yml has already been created by the file-contributions loop
+    # and merge_compose at this point, and the manifest entries for compose
+    # services are recorded AFTER this hook returns (by record_addon_manifest_entries
+    # in the caller), so the manifest stays consistent with compose.yml.
     template_config = load_template_config(ctx.zenit_root, ctx.template)
     active_configs = [get_addon(a) for a in ctx.addons]
     contributions = collect_all(template_config, active_configs)

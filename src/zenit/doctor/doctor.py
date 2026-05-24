@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+import sys
 import tomllib
 from collections.abc import Sequence
 from dataclasses import dataclass, field
@@ -88,8 +89,11 @@ def run_doctor(project_dir: Path, *, thorough: bool = False) -> list[HealthResul
             template_config = load_template_config(zenit_root, lockfile.template)
             addon_configs = [c for c in available_configs if c.id in lockfile.addons]
             contributions = collect_all(template_config, addon_configs)
-        except Exception:
-            pass
+        except Exception as exc:
+            print(
+                f"Warning: could not load template config or contributions: {exc}",
+                file=sys.stderr,
+            )
 
     results: list[HealthResult] = []
     results.append(_check_metadata(project_dir))

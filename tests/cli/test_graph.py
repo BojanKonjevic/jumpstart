@@ -173,7 +173,7 @@ class TestBuildTree:
         c = _addon("c", requires=["b"])
         d = _addon("d", requires=["c"])
         # Create cycle: b also requires d
-        b.requires = ["a", "d"]
+        object.__setattr__(b, "requires", ["a", "d"])
         forest = build_tree([a, b, c, d], installed_ids=set(), depth_limit=10)
         assert len(forest) == 1
         assert forest[0].addon.id == "a"

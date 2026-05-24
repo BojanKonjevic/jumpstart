@@ -206,7 +206,7 @@ def test_addon_config_module_excluded_from_repr():
 def test_addon_config_module_excluded_from_compare():
     cfg1 = AddonConfig(id="docker", description="")
     cfg2 = AddonConfig(id="docker", description="")
-    cfg1._module = AddonHooks(can_apply=lambda p, line: None)
+    object.__setattr__(cfg1, "_module", AddonHooks(can_apply=lambda p, line: None))
     # _module has compare=False so they should still be equal
     assert cfg1 == cfg2
 

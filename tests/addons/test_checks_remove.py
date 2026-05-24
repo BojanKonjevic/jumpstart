@@ -36,7 +36,7 @@ def _make_addon_config(
     id: str, requires: list[str] | None = None, hooks: AddonHooks | None = None
 ) -> AddonConfig:
     cfg = AddonConfig(id=id, description=f"{id} addon", requires=requires or [])
-    cfg._module = hooks
+    object.__setattr__(cfg, "_module", hooks)
     return cfg
 
 

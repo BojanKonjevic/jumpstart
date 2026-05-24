@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import dataclasses
 import functools
 import importlib.util
 import sys
@@ -62,8 +63,7 @@ def get_addon(addon_id: str) -> AddonConfig:
         can_apply=getattr(mod, "can_apply", None),
         can_remove=getattr(mod, "can_remove", None),
     )
-    cfg._module = hooks
-    return cfg
+    return dataclasses.replace(cfg, _module=hooks)
 
 
 # ── Backward-compatible full-ecosystem loader ─────────────────────────────
