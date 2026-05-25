@@ -57,11 +57,18 @@ def addon_or_rollback(project_dir: Path, addon_id: str) -> Generator[None]:
     """Roll back files written by an addon if it fails or is interrupted.
 
     Uses ``shutil.copytree`` to snapshot the project directory into a temp
-    directory for O(1) bulk backup/restore instead of per-file IO.
+    directory.  Generated/cache directories (``.venv``, ``.git``,
+    ``__pycache__``, etc.) are excluded from the snapshot via ignore
+    patterns since addons never modify them — this eliminates the dominant
+    performance bottleneck (copying a virtualenv can take seconds).
+
+    On rollback, files are merged back from the snapshot (overwriting
+    modifications) and any new files created by the addon are removed.
+    Pre-existing ignored directories are left intact.
     """
     with tempfile.TemporaryDirectory() as tmp:
         snapshot = Path(tmp) / "snapshot"
-        shutil.copytree(project_dir, snapshot)
+        shutil.copytree(project_dir, snapshot, ignore=_SNAPSHOT_IGNORE)
         try:
             yield
         except KeyboardInterrupt:
@@ -76,12 +83,85 @@ def addon_or_rollback(project_dir: Path, addon_id: str) -> Generator[None]:
             raise SystemExit(1) from exc
 
 
+# ── Snapshot ignore patterns ──────────────────────────────────────────────────
+# These directories are never modified by addons.  Excluding them from the
+# snapshot eliminates the dominant performance bottleneck (copying a large
+# virtualenv or .git directory can take seconds).
+
+_SNAPSHOT_IGNORE = shutil.ignore_patterns(
+    ".venv",
+    "venv",
+    "env",
+    ".git",
+    "__pycache__",
+    ".mypy_cache",
+    ".pytest_cache",
+    ".ruff_cache",
+    ".tox",
+    "node_modules",
+    ".eggs",
+    "*.egg-info",
+)
+
+# Exact-name subset of the above patterns, used by _remove_orphans to
+# distinguish "ignored but pre-existing" from "created by addon".
+# The *.egg-info glob is handled via _is_ignored_dir below.
+_IGNORED_DIR_NAMES = frozenset(
+    {
+        ".venv",
+        "venv",
+        "env",
+        ".git",
+        "__pycache__",
+        ".mypy_cache",
+        ".pytest_cache",
+        ".ruff_cache",
+        ".tox",
+        "node_modules",
+        ".eggs",
+    }
+)
+
+
+def _is_ignored_dir(name: str) -> bool:
+    return name in _IGNORED_DIR_NAMES or name.endswith(".egg-info")
+
+
 def _restore_snapshot(snapshot: Path, target: Path) -> None:
+    """Merge *snapshot* back into *target*.
+
+    * Overwrites files that were modified (present in both trees).
+    * Removes files/directories that were created by the addon.
+    * Leaves pre-existing ignored directories (``.venv``, ``.git``, etc.)
+      untouched.
+    """
     original_cwd = _move_cwd_out_of_tree(target)
-    shutil.rmtree(target, ignore_errors=True)
-    shutil.copytree(snapshot, target)
+    shutil.copytree(snapshot, target, dirs_exist_ok=True)
+    _remove_orphans(snapshot, target)
     if original_cwd is not None:
         os.chdir(original_cwd if original_cwd.exists() else target)
+
+
+def _remove_orphans(reference: Path, target: Path) -> None:
+    """Remove items in *target* that are not in *reference*.
+
+    Recurses into directories present in both trees.  Items whose name
+    matches ``_is_ignored_dir`` are never removed since they were excluded
+    from the snapshot at copy time.
+    """
+    ref_names = {p.name for p in reference.iterdir()} if reference.exists() else set()
+    for item in list(target.iterdir()):
+        if item.is_dir() and _is_ignored_dir(item.name):
+            continue
+        if item.name not in ref_names:
+            if item.is_dir():
+                shutil.rmtree(item, ignore_errors=True)
+            else:
+                item.unlink()
+        elif item.is_dir():
+            ref_item = reference / item.name
+            if ref_item.is_dir():
+                _remove_orphans(ref_item, item)
 
 
 def _move_cwd_out_of_tree(target: Path) -> Path | None:

@@ -31,7 +31,6 @@ import sys
 from pathlib import Path
 from typing import Any
 
-import libcst
 import tomlkit
 import tomlkit.items
 from jinja2 import Environment
@@ -295,6 +294,8 @@ def fingerprint(code: str) -> tuple[str, str]:
     but removal precision degrades for syntactically invalid blocks.
     """
     try:
+        import libcst
+
         module = libcst.parse_module(code)
         canonical = module.code
     except Exception:

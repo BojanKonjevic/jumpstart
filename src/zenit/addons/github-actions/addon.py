@@ -29,15 +29,4 @@ def can_apply(project_dir: Path, lockfile: ZenitLockfile) -> str | None:
             "      rm .github/workflows/ci.yml"
         )
 
-    # Warn if other workflow files exist — not a blocker, but worth knowing.
-    workflows_dir = project_dir / ".github" / "workflows"
-    if workflows_dir.is_dir() and any(workflows_dir.iterdir()):
-        existing = [f.name for f in workflows_dir.iterdir()]
-        existing_str = ", ".join(existing)
-        return (
-            f"Existing workflow files found in .github/workflows/: {existing_str}\n"
-            "    zenit generates ci.yml specifically. If those files conflict, remove them first.\n"
-            "    If they don't conflict, remove them and re-add them after running zenit add."
-        )
-
     return None

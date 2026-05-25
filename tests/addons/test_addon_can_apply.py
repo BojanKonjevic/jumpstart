@@ -319,15 +319,6 @@ class TestGithubActionsCanApply:
         assert result is not None
         assert "ci.yml" in result
 
-    def test_github_actions_fails_other_workflow_files_exist(self, tmp_path):
-        project_dir = _project_dir(tmp_path, "myapp")
-        workflows = project_dir / ".github" / "workflows"
-        workflows.mkdir(parents=True)
-        (workflows / "deploy.yml").write_text("name: Deploy\n")
-        result = _get_can_apply("github-actions")(project_dir, _lockfile())
-        assert result is not None
-        assert "deploy.yml" in result
-
     def test_github_actions_passes_workflows_dir_missing(self, tmp_path):
         project_dir = _project_dir(tmp_path, "myapp")
         result = _get_can_apply("github-actions")(project_dir, _lockfile())

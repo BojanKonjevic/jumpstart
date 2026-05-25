@@ -12,7 +12,7 @@ from zenit.cli.ui import warn as _warn
 from zenit.core._filenames import COMPOSE_FILE, ENV_FILES
 from zenit.core.filesystem import FileSystem
 from zenit.core.handlers.base import HandlerDispatcher
-from zenit.core.lockfile import read_lockfile
+from zenit.core.lockfile import ZenitLockfile, read_lockfile
 from zenit.core.manifest import (
     add_python_block,
     fingerprint,
@@ -25,7 +25,7 @@ from zenit.core.pkg_name import (
 )
 from zenit.core.render import make_env
 from zenit.schema.exceptions import ZenitError
-from zenit.schema.models import LocatorSpec, ManifestBlock
+from zenit.schema.models import LocatorSpec, Manifest, ManifestBlock
 
 if TYPE_CHECKING:
     from zenit.core.context import Context
@@ -43,6 +43,9 @@ def apply_contributions(
     contributions: Contributions,
     injection_points: dict[str, InjectionPoint],
     render_vars: dict[str, object],
+    *,
+    manifest: Manifest | None = None,
+    lockfile: ZenitLockfile | None = None,
 ) -> None:
     """Modify the generated project directory in-place according to *contributions*.
 
@@ -89,7 +92,8 @@ def apply_contributions(
     string_env = make_env()
     file_envs: dict[Path, jinja2.Environment] = {}
 
-    lockfile = read_lockfile(project_dir)
+    if lockfile is None:
+        lockfile = read_lockfile(project_dir)
 
     for fc in contributions.files:
         dest = resolve_dest_placeholder(fc.dest, pkg_name)
@@ -128,7 +132,9 @@ def apply_contributions(
             else:
                 fs.copy_file(src_path, dest)
 
-    manifest = read_manifest(project_dir)
+    manifest_external = manifest is not None
+    if manifest is None:
+        manifest = read_manifest(project_dir)
     dispatcher = HandlerDispatcher()
 
     # Sort injections by point + content so that multiple addons
@@ -214,7 +220,7 @@ def apply_contributions(
         if hooks is not None and hooks.post_apply is not None:
             hooks.post_apply(ctx, fs)
 
-    if not ctx.dry_run:
+    if not manifest_external and not ctx.dry_run:
         write_manifest(project_dir, manifest)
 
 

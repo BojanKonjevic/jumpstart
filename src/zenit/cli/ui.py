@@ -114,7 +114,8 @@ def bullet_list(
     title: str, items: list[str], *, bullet: str, bullet_color: str, suffix: str = ""
 ) -> None:
     print()
-    print(f"  {BOLD}{title}{RESET}")
+    if title:
+        print(f"  {BOLD}{title}{RESET}")
     for item in items:
         suffix_text = f"  {DIM}{suffix}{RESET}" if suffix else ""
         print(f"    {bullet_color}{bullet}{RESET} {item}{suffix_text}")

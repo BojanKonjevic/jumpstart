@@ -291,7 +291,7 @@ def cmd_add(
     addon: Annotated[
         list[str] | None,
         typer.Argument(
-            help="Addon(s) to add to the current project (omit for interactive selection)"
+            help="Addon(s) to add (space or comma-separated, omit for interactive selection)"
         ),
     ] = None,
     yes: Annotated[
@@ -312,10 +312,21 @@ def cmd_add(
 
         add_addon_interactive(dry_run=dry_run, yes=yes, project_dir=project_dir)
     else:
+        from zenit.addons._registry import list_addons
         from zenit.addons.add import add_addon
+        from zenit.core.dependency import DependencyGraph
 
-        for a in addon:
-            add_addon(a, dry_run=dry_run, yes=yes, project_dir=project_dir)
+        parsed = _parse_addon_list(addon) or []
+        available_meta = list_addons()
+        known_ids = {m.id for m in available_meta}
+        unknown = [a for a in parsed if a not in known_ids]
+        if unknown:
+            add_addon(unknown[0], dry_run=dry_run, yes=yes, project_dir=project_dir)
+            return
+
+        graph = DependencyGraph.build_from_meta(available_meta)
+        for addon_id in graph.tsort(set(parsed)):
+            add_addon(addon_id, dry_run=dry_run, yes=yes, project_dir=project_dir)
 
 
 @app.command("remove")
@@ -323,7 +334,7 @@ def cmd_remove(
     addon: Annotated[
         list[str] | None,
         typer.Argument(
-            help="Addon(s) to remove from the current project (omit for interactive selection)"
+            help="Addon(s) to remove (space or comma-separated, omit for interactive selection)"
         ),
     ] = None,
     yes: Annotated[
@@ -344,12 +355,33 @@ def cmd_remove(
 
         remove_addon_interactive(dry_run=dry_run, yes=yes, project_dir=project_dir)
     else:
+        from zenit.addons._registry import list_addons
         from zenit.addons.remove import remove_addon
+        from zenit.core.dependency import DependencyGraph
         from zenit.schema.exceptions import ZenitError
 
-        for a in addon:
+        parsed = _parse_addon_list(addon) or []
+        available_meta = list_addons()
+        known_ids = {m.id for m in available_meta}
+        unknown = [a for a in parsed if a not in known_ids]
+        if unknown:
             try:
-                remove_addon(a, dry_run=dry_run, yes=yes, project_dir=project_dir)
+                remove_addon(
+                    unknown[0], dry_run=dry_run, yes=yes, project_dir=project_dir
+                )
+            except ZenitError as exc:
+                from zenit.cli.ui import error
+
+                error(str(exc))
+                raise typer.Exit(1) from exc
+            return
+
+        graph = DependencyGraph.build_from_meta(available_meta)
+        for addon_id in graph.tsort_reverse(set(parsed)):
+            try:
+                remove_addon(
+                    addon_id, dry_run=dry_run, yes=yes, project_dir=project_dir
+                )
             except ZenitError as exc:
                 from zenit.cli.ui import error
 

@@ -36,7 +36,7 @@ from zenit.core.dependency import DependencyGraph
 from zenit.core.deps import inject_deps
 from zenit.core.filesystem import FileSystem, RealFileSystem, RecordingFileSystem
 from zenit.core.justfile import inject_just_recipes
-from zenit.core.lockfile import read_lockfile, write_lockfile
+from zenit.core.lockfile import ZenitLockfile, read_lockfile, write_lockfile
 from zenit.core.manifest import (
     read_manifest,
     record_addon_manifest_entries,
@@ -46,7 +46,7 @@ from zenit.core.pkg_name import normalise_pkg_name, resolve_dest_placeholder
 from zenit.core.render import build_recipe_render_vars, build_render_vars, make_env
 from zenit.core.rollback import addon_or_rollback
 from zenit.schema.exceptions import ZenitError
-from zenit.schema.models import AddonConfig, TemplateConfig
+from zenit.schema.models import AddonConfig, Manifest, TemplateConfig
 from zenit.templates._load_config import load_template_config
 
 
@@ -56,6 +56,7 @@ class _AddResult:
 
     added_deps: list[str] = field(default_factory=list)
     added_dev_deps: list[str] = field(default_factory=list)
+    added_env_vars: list[str] = field(default_factory=list)
     added_recipes: list[str] = field(default_factory=list)
     recorded_files: list[tuple[str, str, str]] = field(default_factory=list)
 
@@ -79,6 +80,8 @@ def _run_add_pipeline(
     fs: FileSystem,
     addon_cfg: AddonConfig,
     installed_addons: list[str] | None = None,
+    *,
+    lockfile_override: ZenitLockfile | None = None,
 ) -> _AddResult:
     """Shared pipeline body for both real and dry-run add operations.
 
@@ -123,12 +126,17 @@ def _run_add_pipeline(
         dev_deps=contributions.dev_deps,
     )
 
+    # Read .zenit.toml once and pass it down to avoid redundant parse.
+    manifest = Manifest() if ctx.dry_run else read_manifest(project_dir)
+
     apply_contributions(
         ctx,
         fs,
         contributions,
         template_config.injection_points,
         render_vars,
+        manifest=manifest if not ctx.dry_run else None,
+        lockfile=lockfile_override,
     )
 
     # ── Dependencies ──────────────────────────────────────────────────────────
@@ -168,7 +176,6 @@ def _run_add_pipeline(
 
     # ── Manifest recording ────────────────────────────────────────────────────
     if not ctx.dry_run:
-        manifest = read_manifest(project_dir)
         upgraded = record_addon_manifest_entries(
             manifest,
             addon_cfg,
@@ -182,12 +189,16 @@ def _run_add_pipeline(
                 f"to addon '{addon_cfg.id}'."
             )
 
+    # ── Env vars ──────────────────────────────────────────────────────────────
+    added_env_vars = [ev.key for ev in contributions.env_vars]
+
     # ── Recorded files (dry-run only) ─────────────────────────────────────────
     recorded_files = list(fs.recorded_files) if ctx.dry_run else []  # type: ignore[attr-defined]
 
     return _AddResult(
         added_deps=added_deps,
         added_dev_deps=added_dev_deps,
+        added_env_vars=added_env_vars,
         added_recipes=added_recipes,
         recorded_files=recorded_files,
     )
@@ -257,6 +268,11 @@ def add_addon(
             for name in result.added_recipes:
                 dry_dep(name)
 
+        if result.added_env_vars:
+            dry_header("Environment variables that would be added")
+            for ev in result.added_env_vars:
+                dry_dep(ev)
+
         print()
         return
 
@@ -300,7 +316,13 @@ def add_addon(
             project_dir=project_dir,
         )
         fs = RealFileSystem(project_dir)
-        result = _run_add_pipeline(ctx, fs, addon_cfg, installed_addons=lockfile.addons)
+        result = _run_add_pipeline(
+            ctx,
+            fs,
+            addon_cfg,
+            installed_addons=lockfile.addons,
+            lockfile_override=lockfile,
+        )
         write_lockfile(
             project_dir,
             template,
@@ -337,6 +359,11 @@ def add_addon(
     if result.added_recipes:
         bullet_list(
             "Just recipes added:", result.added_recipes, bullet="+", bullet_color=GREEN
+        )
+
+    if result.added_env_vars:
+        bullet_list(
+            "Env vars added:", result.added_env_vars, bullet="+", bullet_color=GREEN
         )
 
     print()

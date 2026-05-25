@@ -453,7 +453,7 @@ def _remove_env_vars(
             new_lines.append(line)
         env_path.write_text("".join(new_lines), encoding="utf-8")
 
-    return removed
+    return list(dict.fromkeys(removed))
 
 
 def _partition_deps(
