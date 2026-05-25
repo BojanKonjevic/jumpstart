@@ -91,7 +91,11 @@ def write_lockfile(
         mig = tomlkit.table()
         mig.add("source", migrated.source)
         mig.add("has_tasks", migrated.has_tasks)
-        mig.add("file_paths", list(migrated.file_paths))
+        file_paths = tomlkit.array()
+        file_paths.multiline(True)
+        for p in migrated.file_paths:
+            file_paths.append(p)
+        mig.add("file_paths", file_paths)
         doc["migrated"] = mig
 
     atomic_write_text(path, tomlkit.dumps(doc))
