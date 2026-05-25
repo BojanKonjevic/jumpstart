@@ -96,7 +96,7 @@ def _scaffold(tmp_path: Path, name: str, template: str, addons: list[str]) -> Pa
 
 
 def test_add_overwrite_warning_fires(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     """Addon file destinations overlapping with migrated.file_paths must warn."""
     project_dir = _scaffold(tmp_path, "myapp", "blank", [])
@@ -110,10 +110,9 @@ def test_add_overwrite_warning_fires(
             file_paths=["Dockerfile"],
         ),
     )
-    monkeypatch.chdir(project_dir)
 
     with suppress_stdin():
-        add_addon("docker")
+        add_addon("docker", project_dir=project_dir)
 
     stderr = capsys.readouterr().err
     assert "Dockerfile" in stderr
