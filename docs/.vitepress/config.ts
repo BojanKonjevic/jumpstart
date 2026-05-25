@@ -38,6 +38,7 @@ export default defineConfig({
         items: [
           { text: 'Overview', link: '/commands/' },
           { text: 'zenit create', link: '/commands/create' },
+          { text: 'zenit migrate', link: '/commands/migrate' },
           { text: 'zenit add', link: '/commands/add' },
           { text: 'zenit remove', link: '/commands/remove' },
           { text: 'zenit doctor', link: '/commands/doctor' },
