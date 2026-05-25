@@ -69,7 +69,7 @@ Passing `--name` or any `--data` flag enables non-interactive mode. Every
 question takes its default value, overridden by any `--data` flags. Questions
 without a default that are not covered by `--data` cause an error.
 
-Templated defaults (e.g. `package_name: "{{ project_name | replace('-', '_') }}"`)
+Templated defaults (e.g. <code v-pre>package_name: "{{ project_name | replace('-', '_') }}"</code>)
 are resolved in question order at render time, matching Copier's behavior.
 
 ---
