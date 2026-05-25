@@ -34,7 +34,21 @@ Every package recorded in the manifest is checked against the current `[project.
 
 Only runs when the `docker` addon is installed. If any installed addon (or the template) declares compose services, `compose.yml` is checked for each service name. A missing service is an error. If docker is not installed or no addon has compose services, this check is skipped.
 
-**6. Env vars are defined**
+**6. Migration status**
+
+When the project was created via `zenit migrate`, a `[migrated]` section is
+present in `.zenit.toml`. A migration health check reports:
+
+- **Warnings** for each unmanaged env var, compose service, and dependency
+  (written by the Copier template and presence-tracked only).
+- **Warning** with the count of unmanaged files listed in
+  `[migrated].file_paths`.
+- **Error** if the Copier template had `_tasks` that were not automatically
+  applied. Check `.zenit-tasks.md` for the list of commands to run manually.
+- **Warning** identifying the migration source.
+- **OK** if the project has no migration metadata (native project).
+
+**7. Env vars are defined**
 
 Every env var recorded in the manifest is checked against `.env.example`. A missing key is a warning — you may have intentionally removed it from `.env.example` after deciding not to use it.
 

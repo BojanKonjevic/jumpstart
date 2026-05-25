@@ -7,6 +7,7 @@ All commands that modify files support `--dry-run`, which prints exactly what wo
 | Command | Description |
 |---|---|---|
 | [`zenit create`](./create.md) | Scaffold a new project from a template with optional addons |
+| [`zenit migrate`](./migrate.md) | Create a new project from a Copier template with zenit lifecycle metadata |
 | [`zenit add`](./add.md) | Add one or more addons to the current project |
 | [`zenit remove`](./remove.md) | Remove one or more addons from the current project |
 | [`zenit doctor`](./doctor.md) | Verify the project's state matches `.zenit.toml` |

@@ -159,8 +159,7 @@ def remove_blocks_for_addon(manifest: Manifest, addon_id: str) -> None:
     """Remove all manifest entries that belong to *addon_id*.
 
     Entries with ``source == EntrySource.MIGRATED`` are never removed —
-    they are outside the addon lifecycle and must be handled separately
-    via ``zenit adopt``.
+    they are outside the addon lifecycle and must be handled separately.
     """
     manifest.python_blocks = [
         b

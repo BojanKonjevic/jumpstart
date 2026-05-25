@@ -102,9 +102,17 @@ One entry per environment variable added by an addon.
 
 `key` — the variable name, e.g. `REDIS_URL`.
 
-`source` — one of the `EntrySource` enum values: `"addon"` for addon-added entries, `"template"` for template-owned entries. See [EntrySource](./addons-and-templates.md#entrysource-enum).
+`source` — one of the `EntrySource` enum values:
 
-`addon` — the addon that added this variable. Empty string for template-owned vars.
+- `"addon"` — added by an addon. Full lifecycle management.
+- `"template"` — written by the scaffold template.
+- `"migrated"` — presence-tracked from a Copier template migration. Not under
+  full lifecycle management. Upgraded to `"addon"` the first time you run
+  `zenit add <addon>` for the addon that owns that entry. See
+  [EntrySource](./addons-and-templates.md#entrysource-enum).
+
+`addon` — the addon that added this variable. Empty string for template-owned
+and migrated entries.
 
 ---
 

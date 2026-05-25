@@ -540,24 +540,20 @@ def _check_migration_health(
     for entry in migrated_env:
         result.warn(
             f"Env var '{entry.key}' is unmanaged (written by Copier template).",
-            hint="Run 'zenit adopt <addon>' to bring it under management.",
         )
     for svc in migrated_services:
         result.warn(
             f"Compose service '{svc.name}' is unmanaged (written by Copier template).",
-            hint="Run 'zenit adopt <addon>' to bring it under management.",
         )
     for dep in migrated_deps:
         result.warn(
             f"Dependency '{dep.package}' is unmanaged (written by Copier template).",
-            hint="Run 'zenit adopt <addon>' to bring it under management.",
         )
 
     file_count = len(lockfile.migrated.file_paths)
     result.warn(
         f"{file_count} files are unmanaged (written by Copier template, "
         f"not tracked by zenit).",
-        hint="Run 'zenit adopt <addon>' to bring components under management.",
     )
 
     if lockfile.migrated.has_tasks:
@@ -573,10 +569,7 @@ def _check_migration_health(
     result.warn(
         "This project was migrated from a Copier template. Some content "
         "is not under zenit's full lifecycle management.",
-        hint=(
-            f"Migrated from: {lockfile.migrated.source}. "
-            "Run 'zenit adopt <addon>' to bring components under management."
-        ),
+        hint=f"Migrated from: {lockfile.migrated.source}.",
     )
 
     return result

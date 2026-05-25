@@ -256,7 +256,7 @@ def _remove_files(
 
     removed: list[str] = []
 
-    # Phase 1 — delete all contributed files except empty __init__.py
+    # Delete all contributed files except empty __init__.py
     for fc in addon_cfg.files:
         dest = resolve_dest_placeholder(fc.dest, pkg_name)
         if dest.endswith("__init__.py") and fc.content == "":
@@ -267,7 +267,7 @@ def _remove_files(
             removed.append(dest)
             _prune_empty_parents(full.parent, project_dir)
 
-    # Phase 2 — delete empty __init__.py only in truly empty directories
+    # Delete empty __init__.py only in truly empty directories
     for fc in addon_cfg.files:
         dest = resolve_dest_placeholder(fc.dest, pkg_name)
         if not (dest.endswith("__init__.py") and fc.content == ""):
@@ -665,7 +665,7 @@ def _dry_remove(
     dry_run_banner("remove", addon_id)
 
     dry_header("Files that would be removed")
-    # Phase 1 — show all non-empty-init files
+    # Show all non-empty-init files
     for fc in addon_cfg.files:
         dest = resolve_dest_placeholder(fc.dest, pkg_name)
         if dest.endswith("__init__.py") and fc.content == "":
@@ -675,7 +675,7 @@ def _dry_remove(
             print(f"  {RED}-{RESET} {dest}")
         else:
             print(f"  {DIM}  {dest}  (already missing){RESET}")
-    # Phase 2 — show empty __init__.py only if parent would be truly empty
+    # Show empty __init__.py only if parent would be truly empty
     all_this_addon_dests = {
         resolve_dest_placeholder(fc.dest, pkg_name) for fc in addon_cfg.files
     }

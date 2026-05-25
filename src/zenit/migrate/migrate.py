@@ -194,8 +194,7 @@ def _prompt_questions(
     Uses zenit's existing prompt patterns (simple input prompts, no TUI).
 
     All question types — including boolean ADDON_CANDIDATE questions — are
-    stored as render-time variables. No inline addon stubs are generated in
-    Phase 1 (reserved for Phase 3 ``zenit adopt``).
+    stored as render-time variables. No inline addon stubs are generated.
     """
     answers = MigrationAnswers()
 
@@ -351,7 +350,7 @@ def _render_template(
     Returns all file contributions from the template (both static and
     translated Jinja2 files).  Every Copier question — whether ADDON_CANDIDATE,
     PARTIAL_ADDON, or RENDER_VAR — becomes a render-time variable.  No inline
-    addon stubs are created in Phase 1: all content is presence-tracked only
+    addon stubs are created: all content is presence-tracked only
     via the ``[migrated]`` lockfile section.
     """
     copier_yml = _find_copier_file(template_dir)
@@ -715,8 +714,7 @@ def _print_migration_report(result: MigrationResult) -> None:
     print(
         f"  {DIM}zenit doctor integrity checks) work fully only for components{RESET}"
     )
-    print(f"  {DIM}zenit owns outright. Run 'zenit adopt <addon>' to bring{RESET}")
-    print(f"  {DIM}components under full management. Run 'zenit doctor' to see{RESET}")
+    print(f"  {DIM}zenit owns outright. Run 'zenit doctor' to see{RESET}")
     print(f"  {DIM}the current health report.{RESET}")
     print()
 

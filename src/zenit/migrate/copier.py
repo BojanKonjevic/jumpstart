@@ -352,9 +352,9 @@ def translate_delimiters(content: str) -> str:
     Raises ``jinja2.TemplateSyntaxError`` if the content is not valid Jinja2
     (e.g. unclosed blocks).
 
-    NOTE: Currently unused in Phase 1. In Phase 3, this translates migrated
-    template content so it can be re-rendered by zenit's Jinja2 environment
-    (which uses ``(( ))`` / ``[% %]`` delimiters).
+    NOTE: Currently unused during migration. When activated, this translates
+    migrated template content so it can be re-rendered by zenit's Jinja2
+    environment (which uses ``(( ))`` / ``[% %]`` delimiters).
     """
     if not content.strip():
         return content
