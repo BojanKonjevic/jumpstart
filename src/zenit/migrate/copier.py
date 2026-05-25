@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import fnmatch
 import json
 from dataclasses import dataclass, field
@@ -81,7 +82,7 @@ def _to_nice_json(value: object, indent: int = 2) -> str:
 
 # ── Copier delimiters (standard Jinja2) ────────────────────────────────────────
 
-_COPIER_ENV = jinja2.Environment(
+COPIER_ENV = jinja2.Environment(
     variable_start_string="{{",
     variable_end_string="}}",
     block_start_string="{%",
@@ -90,8 +91,8 @@ _COPIER_ENV = jinja2.Environment(
     comment_end_string="#}",
     keep_trailing_newline=True,
 )
-_COPIER_ENV.filters["to_nice_yaml"] = _to_nice_yaml
-_COPIER_ENV.filters["to_nice_json"] = _to_nice_json
+COPIER_ENV.filters["to_nice_yaml"] = _to_nice_yaml
+COPIER_ENV.filters["to_nice_json"] = _to_nice_json
 
 
 # ── Parser ─────────────────────────────────────────────────────────────────────
@@ -181,7 +182,7 @@ def _get_undeclared_variables(content: str) -> set[str]:
     names that are referenced but not defined locally in the template.
     """
     try:
-        ast = _COPIER_ENV.parse(content)
+        ast = COPIER_ENV.parse(content)
     except Exception:
         return set()
     try:
@@ -264,18 +265,44 @@ def _has_jinja_expressions(content: str) -> bool:
     return "{{" in content or "{%" in content or "{#" in content
 
 
-def classify_file(file_path: Path, config: CopierConfig) -> FileJinjaClass:
+def _excluded_by_pattern(
+    file_path: Path, content_dir: Path | None, patterns: list[str]
+) -> bool:
+    """Check if *file_path* matches any exclude pattern.
+
+    Copier's ``_exclude`` patterns match against paths relative to the
+    content directory (or the template root when there is no subdirectory).
+    """
+    if not patterns:
+        return False
+    rel_str: str | None = None
+    if content_dir is not None:
+        with contextlib.suppress(ValueError):
+            rel_str = str(file_path.relative_to(content_dir))
+    candidates = [p for p in (rel_str, str(file_path), file_path.name) if p is not None]
+    for pattern in patterns:
+        for candidate in candidates:
+            if fnmatch.fnmatch(candidate, pattern):
+                return True
+    return False
+
+
+def classify_file(
+    file_path: Path, config: CopierConfig, content_dir: Path | None = None
+) -> FileJinjaClass:
     """Classify a single file as JINJA2, STATIC, or UNTRANSLATABLE.
 
-    1. If the file matches an exclude pattern, skip (STATIC).
+    1. If the file matches an exclude pattern, skip (STATIC). Patterns are
+       matched against the path relative to *content_dir* when available,
+       falling back to the full path and then the filename. This matches
+       Copier's behavior where ``_exclude`` patterns are relative-path based.
     2. If the file has a .jinja, .j2, or .jinja2 extension, it is a template.
     3. If ``jinja_extensions`` is non-empty, mark as UNTRANSLATABLE.
     4. Otherwise, attempt to parse with Jinja2. If parsing succeeds and the AST
        contains expressions, treat as JINJA2. Otherwise STATIC.
     """
-    for pattern in config.exclude:
-        if fnmatch.fnmatch(file_path.name, pattern):
-            return FileJinjaClass.STATIC
+    if _excluded_by_pattern(file_path, content_dir, config.exclude):
+        return FileJinjaClass.STATIC
 
     if file_path.suffix in (".jinja", ".j2", ".jinja2"):
         if config.jinja_extensions:
@@ -294,7 +321,7 @@ def classify_file(file_path: Path, config: CopierConfig) -> FileJinjaClass:
         return FileJinjaClass.STATIC
 
     try:
-        ast = _COPIER_ENV.parse(content)
+        ast = COPIER_ENV.parse(content)
     except Exception:
         return FileJinjaClass.STATIC
 
@@ -324,19 +351,23 @@ def translate_delimiters(content: str) -> str:
 
     Raises ``jinja2.TemplateSyntaxError`` if the content is not valid Jinja2
     (e.g. unclosed blocks).
+
+    NOTE: Currently unused in Phase 1. In Phase 3, this translates migrated
+    template content so it can be re-rendered by zenit's Jinja2 environment
+    (which uses ``(( ))`` / ``[% %]`` delimiters).
     """
     if not content.strip():
         return content
 
     # Parse with Copier's Jinja2 to validate template structure
     try:
-        _COPIER_ENV.parse(content)
+        COPIER_ENV.parse(content)
     except jinja2.TemplateSyntaxError:
         raise
     except Exception:
         pass
 
-    lexer = jinja2.lexer.get_lexer(_COPIER_ENV)
+    lexer = jinja2.lexer.get_lexer(COPIER_ENV)
     tokens = list(lexer.tokenize(content))
 
     return _process_token_stream(tokens)

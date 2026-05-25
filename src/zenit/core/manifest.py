@@ -162,7 +162,11 @@ def remove_blocks_for_addon(manifest: Manifest, addon_id: str) -> None:
     they are outside the addon lifecycle and must be handled separately
     via ``zenit adopt``.
     """
-    manifest.python_blocks = [b for b in manifest.python_blocks if b.addon != addon_id]
+    manifest.python_blocks = [
+        b
+        for b in manifest.python_blocks
+        if b.addon != addon_id and b.source != EntrySource.MIGRATED
+    ]
     manifest.env = [
         e
         for e in manifest.env
@@ -238,7 +242,7 @@ def add_just_recipe(
         manifest.just_recipes.append(OwnedEntry(name=name, source=source, addon=addon))
 
 
-def _dep_package_name(dep: str) -> str:
+def dep_package_name(dep: str) -> str:
     match = re.match(r"^([a-zA-Z0-9_.-]+)", dep)
     return match.group(1).lower().replace("-", "_") if match else dep.lower()
 
@@ -248,22 +252,36 @@ def record_addon_manifest_entries(
     addon_cfg: AddonConfig,
     string_env: Environment,
     render_vars: dict[str, object],
-) -> None:
+) -> list[str]:
+    """Record manifest entries for *addon_cfg*, upgrading MIGRATED entries.
+
+    Returns a list of human-readable upgrade descriptions (e.g.
+    ``"env:REDIS_URL"``) that callers can display to the user.
+    """
+    upgraded: list[str] = []
     addon_id = addon_cfg.id
     for ev in addon_cfg.env_vars:
-        if not upgrade_migrated_entry(manifest, ev.key, addon_id, "env"):
+        if upgrade_migrated_entry(manifest, ev.key, addon_id, "env"):
+            upgraded.append(f"env:{ev.key}")
+        else:
             add_env_entry(manifest, ev.key, source=EntrySource.ADDON, addon=addon_id)
     for svc in addon_cfg.compose_services:
-        if not upgrade_migrated_entry(manifest, svc.name, addon_id, "compose_service"):
+        if upgrade_migrated_entry(manifest, svc.name, addon_id, "compose_service"):
+            upgraded.append(f"compose_service:{svc.name}")
+        else:
             add_compose_service(
                 manifest, svc.name, source=EntrySource.ADDON, addon=addon_id
             )
     for vol in addon_cfg.compose_volumes:
-        if not upgrade_migrated_entry(manifest, vol, addon_id, "compose_volume"):
+        if upgrade_migrated_entry(manifest, vol, addon_id, "compose_volume"):
+            upgraded.append(f"compose_volume:{vol}")
+        else:
             add_compose_volume(manifest, vol, source=EntrySource.ADDON, addon=addon_id)
     for dep in addon_cfg.deps:
-        pkg = _dep_package_name(dep)
-        if not upgrade_migrated_entry(manifest, pkg, addon_id, "dependency"):
+        pkg = dep_package_name(dep)
+        if upgrade_migrated_entry(manifest, pkg, addon_id, "dependency"):
+            upgraded.append(f"dependency:{pkg}")
+        else:
             add_dependency(
                 manifest,
                 pkg,
@@ -273,8 +291,10 @@ def record_addon_manifest_entries(
                 dev=False,
             )
     for dep in addon_cfg.dev_deps:
-        pkg = _dep_package_name(dep)
-        if not upgrade_migrated_entry(manifest, pkg, addon_id, "dependency"):
+        pkg = dep_package_name(dep)
+        if upgrade_migrated_entry(manifest, pkg, addon_id, "dependency"):
+            upgraded.append(f"dev_dependency:{pkg}")
+        else:
             add_dependency(
                 manifest,
                 pkg,
@@ -286,12 +306,14 @@ def record_addon_manifest_entries(
     for recipe_raw in addon_cfg.just_recipes:
         rendered = string_env.from_string(recipe_raw).render(**render_vars)
         m = _RECIPE_NAME_RE.search(rendered)
-        if m and not upgrade_migrated_entry(
-            manifest, m.group(1), addon_id, "just_recipe"
-        ):
-            add_just_recipe(
-                manifest, m.group(1), source=EntrySource.ADDON, addon=addon_id
-            )
+        if m:
+            if upgrade_migrated_entry(manifest, m.group(1), addon_id, "just_recipe"):
+                upgraded.append(f"just_recipe:{m.group(1)}")
+            else:
+                add_just_recipe(
+                    manifest, m.group(1), source=EntrySource.ADDON, addon=addon_id
+                )
+    return upgraded
 
 
 # ── Fingerprinting ────────────────────────────────────────────────────────────
@@ -378,6 +400,7 @@ def _encode_manifest(m: Manifest) -> tomlkit.items.Table:
             item.add("lines", b.lines)
             item.add("fingerprint", b.fingerprint)
             item.add("fingerprint_normalised", b.fingerprint_normalised)
+            item.add("source", b.source.value)
             loc = tomlkit.table()
             loc.add("name", b.locator.name)
             loc.add("args", b.locator.args)
@@ -470,6 +493,7 @@ def _decode_manifest(raw: dict[str, Any]) -> Manifest:
                     name=loc.get("name", ""),
                     args=dict(loc.get("args", {})),
                 ),
+                source=_parse_source(b.get("source", EntrySource.ADDON.value)),
             )
         )
 

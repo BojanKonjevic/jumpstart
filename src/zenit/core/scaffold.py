@@ -24,12 +24,12 @@ from zenit.core.generate import generate_all
 from zenit.core.git import init
 from zenit.core.lockfile import write_lockfile
 from zenit.core.manifest import (
-    _dep_package_name,
     add_compose_service,
     add_compose_volume,
     add_dependency,
     add_env_entry,
     add_just_recipe,
+    dep_package_name,
     read_manifest,
     record_addon_manifest_entries,
     write_manifest,
@@ -236,13 +236,13 @@ def _stamp_template_manifest(
         add_compose_volume(manifest, vol, source=EntrySource.TEMPLATE, addon="")
 
     for dep in template_config.deps:
-        pkg = _dep_package_name(dep)
+        pkg = dep_package_name(dep)
         add_dependency(
             manifest, pkg, dep, source=EntrySource.TEMPLATE, addon="", dev=False
         )
 
     for dep in template_config.dev_deps:
-        pkg = _dep_package_name(dep)
+        pkg = dep_package_name(dep)
         add_dependency(
             manifest, pkg, dep, source=EntrySource.TEMPLATE, addon="", dev=True
         )

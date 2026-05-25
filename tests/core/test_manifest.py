@@ -431,3 +431,78 @@ def test_record_idempotent() -> None:
 
     redis_dep_entries = [d for d in m.dependencies if d.package == "redis"]
     assert len(redis_dep_entries) == 1
+
+
+# ── upgrade_migrated_entry ─────────────────────────────────────────────────────
+
+
+class TestUpgradeMigratedEntry:
+    """C02: Ensure upgrade_migrated_entry correctly upgrades ownership."""
+
+    def test_upgrades_env_entry(self) -> None:
+        m = Manifest()
+        m.env.append(EnvEntry(key="REDIS_URL", source=EntrySource.MIGRATED, addon=""))
+        from zenit.core.manifest import upgrade_migrated_entry
+
+        assert upgrade_migrated_entry(m, "REDIS_URL", "redis", "env")
+        assert m.env[0].source == EntrySource.ADDON
+        assert m.env[0].addon == "redis"
+
+    def test_returns_false_when_not_migrated(self) -> None:
+        m = Manifest()
+        m.env.append(EnvEntry(key="REDIS_URL", source=EntrySource.ADDON, addon="redis"))
+        from zenit.core.manifest import upgrade_migrated_entry
+
+        assert not upgrade_migrated_entry(m, "REDIS_URL", "redis", "env")
+
+    def test_returns_false_when_missing(self) -> None:
+        from zenit.core.manifest import upgrade_migrated_entry
+
+        assert not upgrade_migrated_entry(Manifest(), "NONEXISTENT", "redis", "env")
+
+    def test_unknown_entry_type_returns_false(self) -> None:
+        from zenit.core.manifest import upgrade_migrated_entry
+
+        assert not upgrade_migrated_entry(Manifest(), "x", "redis", "unknown_type")
+
+    def test_upgrades_compose_service(self) -> None:
+        m = Manifest()
+        m.compose_services.append(
+            OwnedEntry(name="redis", source=EntrySource.MIGRATED, addon="")
+        )
+        from zenit.core.manifest import upgrade_migrated_entry
+
+        assert upgrade_migrated_entry(m, "redis", "redis", "compose_service")
+
+    def test_upgrades_compose_volume(self) -> None:
+        m = Manifest()
+        m.compose_volumes.append(
+            OwnedEntry(name="redis-data", source=EntrySource.MIGRATED, addon="")
+        )
+        from zenit.core.manifest import upgrade_migrated_entry
+
+        assert upgrade_migrated_entry(m, "redis-data", "redis", "compose_volume")
+
+    def test_upgrades_dependency(self) -> None:
+        m = Manifest()
+        m.dependencies.append(
+            DependencyEntry(
+                package="redis",
+                spec="redis>=5",
+                source=EntrySource.MIGRATED,
+                addon="",
+                dev=False,
+            )
+        )
+        from zenit.core.manifest import upgrade_migrated_entry
+
+        assert upgrade_migrated_entry(m, "redis", "redis", "dependency")
+
+    def test_upgrades_just_recipe(self) -> None:
+        m = Manifest()
+        m.just_recipes.append(
+            OwnedEntry(name="redis-up", source=EntrySource.MIGRATED, addon="")
+        )
+        from zenit.core.manifest import upgrade_migrated_entry
+
+        assert upgrade_migrated_entry(m, "redis-up", "redis", "just_recipe")

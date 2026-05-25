@@ -34,10 +34,11 @@ from zenit.cli.ui import (
 from zenit.core._filenames import COMPOSE_FILE, ENV_FILES, PYPROJECT_FILE
 from zenit.core.lockfile import MigratedMeta, write_lockfile
 from zenit.core.manifest import (
-    _dep_package_name,
     add_compose_service,
+    add_compose_volume,
     add_dependency,
     add_env_entry,
+    dep_package_name,
     read_manifest,
     write_manifest,
 )
@@ -49,7 +50,7 @@ from zenit.schema.models import (
 )
 
 from .copier import (
-    _COPIER_ENV,
+    COPIER_ENV,
     CopierConfig,
     CopierQuestion,
     CopierTask,
@@ -67,7 +68,6 @@ class MigrationAnswers:
     """User-provided answers to the template questions."""
 
     render_vars: dict[str, Any] = field(default_factory=dict)
-    addons: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -81,6 +81,7 @@ class MigrationResult:
     has_tasks: bool = False
     env_count: int = 0
     compose_service_count: int = 0
+    compose_volume_count: int = 0
     dep_count: int = 0
 
 
@@ -168,7 +169,7 @@ def _fetch_source(source: str) -> Path:
         except FileNotFoundError:
             shutil.rmtree(tmp, ignore_errors=True)
             raise ZenitError(
-                "git is required to clone remote templates. "
+                f"git is required to clone '{normalised}'. "
                 "Install git and try again, or use a local path."
             ) from None
 
@@ -191,6 +192,10 @@ def _prompt_questions(
     """Prompt the user for answers to all Copier template questions.
 
     Uses zenit's existing prompt patterns (simple input prompts, no TUI).
+
+    All question types — including boolean ADDON_CANDIDATE questions — are
+    stored as render-time variables. No inline addon stubs are generated in
+    Phase 1 (reserved for Phase 3 ``zenit adopt``).
     """
     answers = MigrationAnswers()
 
@@ -201,7 +206,7 @@ def _prompt_questions(
             _render_copier_default(q.default, answers.render_vars),
         )
 
-        if qclass in (QuestionClass.ADDON_CANDIDATE, QuestionClass.PARTIAL_ADDON):
+        if q.type == QuestionType.BOOL:
             msg = f"{q.help or q.name}"
             raw = input(f"  {msg} {DIM}[Y/n]{RESET}  ").strip().lower()
             answer = raw in ("", "y", "yes") if raw else bool(default_value)
@@ -214,26 +219,21 @@ def _prompt_questions(
                 answers.render_vars[q.name] = raw
             else:
                 answers.render_vars[q.name] = default_value
-        elif qclass == QuestionClass.RENDER_VAR:
-            if q.type == QuestionType.BOOL:
-                msg = f"{q.help or q.name}"
-                raw = input(f"  {msg} {DIM}[Y/n]{RESET}  ").strip().lower()
-                answer = raw in ("", "y", "yes") if raw else bool(default_value)
-                answers.render_vars[q.name] = answer
-            else:
-                default_str = str(default_value) if default_value != "" else ""
-                msg = f"{q.help or q.name}"
-                if q.type == QuestionType.INT:
-                    raw = input(f"  {msg} [{default_str}]: ").strip()
-                    answers.render_vars[q.name] = int(raw) if raw else default_value
-                elif q.type == QuestionType.FLOAT:
-                    raw = input(f"  {msg} [{default_str}]: ").strip()
-                    answers.render_vars[q.name] = float(raw) if raw else default_value
-                else:
-                    raw = input(f"  {msg} [{default_str}]: ").strip()
-                    answers.render_vars[q.name] = raw if raw else default_value
+        elif q.type == QuestionType.INT:
+            default_str = str(default_value) if default_value != "" else ""
+            msg = f"{q.help or q.name}"
+            raw = input(f"  {msg} [{default_str}]: ").strip()
+            answers.render_vars[q.name] = int(raw) if raw else default_value
+        elif q.type == QuestionType.FLOAT:
+            default_str = str(default_value) if default_value != "" else ""
+            msg = f"{q.help or q.name}"
+            raw = input(f"  {msg} [{default_str}]: ").strip()
+            answers.render_vars[q.name] = float(raw) if raw else default_value
         else:
-            answers.render_vars[q.name] = default_value
+            default_str = str(default_value) if default_value != "" else ""
+            msg = f"{q.help or q.name}"
+            raw = input(f"  {msg} [{default_str}]: ").strip()
+            answers.render_vars[q.name] = raw if raw else default_value
 
     return answers
 
@@ -304,7 +304,7 @@ def _render_copier_default(
         return value
     if "{{" not in value and "{%" not in value and "{#" not in value:
         return value
-    return _COPIER_ENV.from_string(value).render(**render_vars)
+    return COPIER_ENV.from_string(value).render(**render_vars)
 
 
 def _coerce_question_value(
@@ -371,7 +371,7 @@ def _render_template(
         rel = f.relative_to(content_dir)
         dest = _destination_template(rel)
 
-        jclass = classify_file(f, config)
+        jclass = classify_file(f, config, content_dir)
 
         fc = _build_file_contribution(f, dest, jclass, config)
         if fc is not None:
@@ -416,7 +416,7 @@ def _destination_template(rel_path: Path) -> str:
 
 def _render_destination_path(dest_template: str, render_vars: dict[str, Any]) -> Path:
     """Render a destination path template using Copier's Jinja environment."""
-    rendered = _COPIER_ENV.from_string(dest_template).render(**render_vars).strip()
+    rendered = COPIER_ENV.from_string(dest_template).render(**render_vars).strip()
     if not rendered:
         raise ZenitError("Migration produced an empty destination path.")
     dest_path = Path(rendered)
@@ -430,7 +430,7 @@ def _render_destination_path(dest_template: str, render_vars: dict[str, Any]) ->
 def _uses_copier_internal_path_vars(dest_template: str) -> bool:
     """Return True when a destination path depends on Copier-only variables."""
     try:
-        referenced = _COPIER_ENV.parse(dest_template)
+        referenced = COPIER_ENV.parse(dest_template)
     except Exception:
         return False
 
@@ -484,7 +484,7 @@ def _task_enabled(task: CopierTask, render_vars: dict[str, Any]) -> bool:
     when = task.get("when")
     if not isinstance(when, str) or not when.strip():
         return True
-    rendered = _COPIER_ENV.from_string(when).render(**render_vars).strip().lower()
+    rendered = COPIER_ENV.from_string(when).render(**render_vars).strip().lower()
     return rendered in ("1", "true", "yes", "y", "on")
 
 
@@ -630,7 +630,7 @@ def _inventory_deps(project_dir: Path) -> list[tuple[str, str, bool]]:
     if isinstance(deps, list):
         for dep in deps:
             if isinstance(dep, str):
-                pkg = _dep_package_name(dep)
+                pkg = dep_package_name(dep)
                 result.append((pkg, dep, False))
 
     dep_groups = data.get("dependency-groups", {})
@@ -639,7 +639,7 @@ def _inventory_deps(project_dir: Path) -> list[tuple[str, str, bool]]:
         if isinstance(dev, list):
             for dep in dev:
                 if isinstance(dep, str):
-                    pkg = _dep_package_name(dep)
+                    pkg = dep_package_name(dep)
                     result.append((pkg, dep, True))
 
     return result
@@ -689,6 +689,10 @@ def _print_migration_report(result: MigrationResult) -> None:
     if result.compose_service_count > 0:
         print(
             f"    ~ {result.compose_service_count} compose service(s) with source=migrated"
+        )
+    if result.compose_volume_count > 0:
+        print(
+            f"    ~ {result.compose_volume_count} compose volume(s) with source=migrated"
         )
     if result.dep_count > 0:
         print(f"    ~ {result.dep_count} dependencies with source=migrated")
@@ -760,6 +764,13 @@ def run_migration(
     step("Analyzing template questions")
     classes = classify_questions(config, template_dir)
 
+    if config.skip_if_exists:
+        for pattern in config.skip_if_exists:
+            warn(
+                f"'_skip_if_exists' pattern '{pattern}' is not supported in migration. "
+                f"Any matching files were written unconditionally."
+            )
+
     non_interactive = name is not None or (data is not None and len(data) > 0)
 
     if non_interactive:
@@ -817,6 +828,10 @@ def run_migration(
 
         for fc in file_contributions:
             if _uses_copier_internal_path_vars(fc.dest):
+                warn(
+                    f"Skipping '{fc.dest}' — destination depends on Copier-only "
+                    f"variables (prefixed with _copier_)."
+                )
                 continue
             dest_path = project_dir / _render_destination_path(
                 fc.dest, answers.render_vars
@@ -827,7 +842,7 @@ def run_migration(
             if fc.content is not None:
                 if fc.template:
                     try:
-                        rendered = _COPIER_ENV.from_string(fc.content).render(
+                        rendered = COPIER_ENV.from_string(fc.content).render(
                             **answers.render_vars
                         )
                         dest_path.write_text(rendered, encoding="utf-8")
@@ -851,6 +866,8 @@ def run_migration(
         add_env_entry(manifest, key, source=EntrySource.MIGRATED, addon="")
     for svc in compose_services:
         add_compose_service(manifest, svc, source=EntrySource.MIGRATED, addon="")
+    for vol in compose_volumes:
+        add_compose_volume(manifest, vol, source=EntrySource.MIGRATED, addon="")
     for pkg, spec, dev in deps:
         add_dependency(
             manifest, pkg, spec, source=EntrySource.MIGRATED, addon="", dev=dev
@@ -877,6 +894,7 @@ def run_migration(
         has_tasks=bool(pending_tasks),
         env_count=len(env_keys),
         compose_service_count=len(compose_services),
+        compose_volume_count=len(compose_volumes),
         dep_count=len(deps),
     )
 
@@ -887,7 +905,7 @@ def run_migration(
 
 
 def _cleanup_temp(template_dir: Path) -> None:
-    """Clean up a temporary directory if it's under /tmp."""
-    tmp_str = str(template_dir)
-    if "/tmp/" in tmp_str or tmp_str.startswith("/var/tmp/"):
+    """Clean up a temporary directory if it's in the system temp dir."""
+    tmp = Path(tempfile.gettempdir()).resolve()
+    if template_dir.resolve().is_relative_to(tmp):
         shutil.rmtree(template_dir, ignore_errors=True)

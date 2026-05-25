@@ -169,13 +169,18 @@ def _run_add_pipeline(
     # ── Manifest recording ────────────────────────────────────────────────────
     if not ctx.dry_run:
         manifest = read_manifest(project_dir)
-        record_addon_manifest_entries(
+        upgraded = record_addon_manifest_entries(
             manifest,
             addon_cfg,
             string_env,
             render_vars,
         )
         write_manifest(project_dir, manifest)
+        for u in upgraded:
+            info(
+                f"Transferred ownership of {u} from Copier template "
+                f"to addon '{addon_cfg.id}'."
+            )
 
     # ── Recorded files (dry-run only) ─────────────────────────────────────────
     recorded_files = list(fs.recorded_files) if ctx.dry_run else []  # type: ignore[attr-defined]

@@ -69,6 +69,7 @@ class ManifestBlock:
     fingerprint: str  # sha256 of canonical libcst output
     fingerprint_normalised: str  # sha256 of normalised output (formatter-resilient)
     locator: LocatorSpec
+    source: EntrySource = EntrySource.ADDON  # default preserves backward compat
 
 
 @dataclass

@@ -14,7 +14,7 @@ import tomlkit
 from tomlkit.container import Container
 
 from zenit.core._filenames import PYPROJECT_FILE
-from zenit.core.manifest import _dep_package_name
+from zenit.core.manifest import dep_package_name
 
 
 def _add_deps_if_missing(
@@ -24,9 +24,9 @@ def _add_deps_if_missing(
 ) -> list[str]:
     added: list[str] = []
     for dep in deps_to_add:
-        if _dep_package_name(dep) not in existing_names:
+        if dep_package_name(dep) not in existing_names:
             target_list.append(dep)
-            existing_names.add(_dep_package_name(dep))
+            existing_names.add(dep_package_name(dep))
             added.append(dep)
     return added
 
@@ -64,7 +64,7 @@ def inject_deps(
         project_table["dependencies"] = existing_deps
     existing_deps = cast(list[str], existing_deps)
 
-    existing_names = {_dep_package_name(str(d)) for d in existing_deps}
+    existing_names = {dep_package_name(str(d)) for d in existing_deps}
     added_deps = _add_deps_if_missing(existing_deps, existing_names, deps)
 
     # ── dev deps ──────────────────────────────────────────────────────────────
@@ -77,7 +77,7 @@ def inject_deps(
             existing_dev = tomlkit.array()
             group["dev"] = existing_dev
         existing_dev = cast(list[str], existing_dev)
-        existing_dev_names = {_dep_package_name(str(d)) for d in existing_dev}
+        existing_dev_names = {dep_package_name(str(d)) for d in existing_dev}
         added_dev_deps = _add_deps_if_missing(
             existing_dev, existing_dev_names, dev_deps
         )
@@ -91,7 +91,7 @@ def inject_deps(
             existing_dev = tomlkit.array()
             opt["dev"] = existing_dev
         existing_dev = cast(list[str], existing_dev)
-        existing_dev_names = {_dep_package_name(str(d)) for d in existing_dev}
+        existing_dev_names = {dep_package_name(str(d)) for d in existing_dev}
         added_dev_deps = _add_deps_if_missing(
             existing_dev, existing_dev_names, dev_deps
         )

@@ -18,7 +18,12 @@ from zenit.core.context import Context
 from zenit.core.filesystem import RealFileSystem
 from zenit.core.generate import generate_all
 from zenit.core.git import init
-from zenit.core.lockfile import ZenitLockfile, read_lockfile, write_lockfile
+from zenit.core.lockfile import (
+    MigratedMeta,
+    ZenitLockfile,
+    read_lockfile,
+    write_lockfile,
+)
 from zenit.core.render import build_render_vars
 from zenit.doctor.doctor import (
     HealthIssue,
@@ -30,12 +35,22 @@ from zenit.doctor.doctor import (
     _check_env,
     _check_files,
     _check_metadata,
+    _check_migration_health,
     _check_python_integrity,
     _check_python_line_presence,
     print_results,
     run_doctor,
 )
-from zenit.schema.models import AddonConfig, AddonHooks, AddonMeta
+from zenit.schema.models import (
+    AddonConfig,
+    AddonHooks,
+    AddonMeta,
+    DependencyEntry,
+    EntrySource,
+    EnvEntry,
+    Manifest,
+    OwnedEntry,
+)
 from zenit.templates._load_config import load_template_config
 
 # ── helpers ───────────────────────────────────────────────────────────────────
@@ -1108,3 +1123,86 @@ class TestRunDoctorThoroughFlag:
             result = _check_python_line_presence(project_dir)
 
         assert result is not None
+
+
+# ── _check_migration_health (H01) ──────────────────────────────────────────────
+
+
+class TestCheckMigrationHealth:
+    """H01: Ensure _check_migration_health produces correct warnings."""
+
+    def _make_lockfile(
+        self, migrated: MigratedMeta | None, template: str = "migrated:test"
+    ) -> ZenitLockfile:
+        return ZenitLockfile(
+            template=template,
+            addons=[],
+            zenit_version="1.0.0",
+            schema_version=3,
+            migrated=migrated,
+        )
+
+    def test_non_migrated_project_returns_ok(self) -> None:
+        lockfile = self._make_lockfile(migrated=None)
+        result = _check_migration_health(Path("/nonexistent"), lockfile)
+        assert len(result.issues) == 1
+        assert result.issues[0].severity == Severity.OK
+
+    def test_migrated_with_env_warns_per_entry(self) -> None:
+        m = Manifest()
+        m.env.append(EnvEntry(key="REDIS_URL", source=EntrySource.MIGRATED, addon=""))
+        m.env.append(EnvEntry(key="DB_URL", source=EntrySource.MIGRATED, addon=""))
+        lockfile = self._make_lockfile(
+            MigratedMeta(source="test", has_tasks=False, file_paths=["main.py"])
+        )
+        result = _check_migration_health(Path("/nonexistent"), lockfile, m)
+        env_warnings = [i for i in result.issues if "Env var" in i.message]
+        assert len(env_warnings) == 2
+
+    def test_migrated_with_compose_service_warns(self) -> None:
+        m = Manifest()
+        m.compose_services.append(
+            OwnedEntry(name="redis", source=EntrySource.MIGRATED, addon="")
+        )
+        lockfile = self._make_lockfile(
+            MigratedMeta(source="test", has_tasks=False, file_paths=[])
+        )
+        result = _check_migration_health(Path("/nonexistent"), lockfile, m)
+        svc_warnings = [i for i in result.issues if "Compose service" in i.message]
+        assert len(svc_warnings) == 1
+
+    def test_migrated_with_deps_warns(self) -> None:
+        m = Manifest()
+        m.dependencies.append(
+            DependencyEntry(
+                package="redis",
+                spec="redis>=5",
+                source=EntrySource.MIGRATED,
+                addon="",
+                dev=False,
+            )
+        )
+        lockfile = self._make_lockfile(
+            MigratedMeta(source="test", has_tasks=False, file_paths=[])
+        )
+        result = _check_migration_health(Path("/nonexistent"), lockfile, m)
+        dep_warnings = [i for i in result.issues if "Dependency" in i.message]
+        assert len(dep_warnings) == 1
+
+    def test_migrated_with_tasks_returns_error(self) -> None:
+        lockfile = self._make_lockfile(
+            MigratedMeta(source="test", has_tasks=True, file_paths=["main.py"])
+        )
+        result = _check_migration_health(Path("/nonexistent"), lockfile)
+        errors = [i for i in result.issues if i.severity == Severity.ERROR]
+        assert any("pending manual steps" in i.message for i in errors)
+
+    def test_migrated_produces_general_warning(self) -> None:
+        lockfile = self._make_lockfile(
+            MigratedMeta(source="test", has_tasks=False, file_paths=["main.py"])
+        )
+        result = _check_migration_health(Path("/nonexistent"), lockfile)
+        general_warnings = [
+            i for i in result.issues if "migrated from a Copier template" in i.message
+        ]
+        assert len(general_warnings) == 1

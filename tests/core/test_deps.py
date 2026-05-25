@@ -13,46 +13,46 @@ from pathlib import Path
 import pytest
 
 from zenit.core.deps import inject_deps
-from zenit.core.manifest import _dep_package_name
+from zenit.core.manifest import dep_package_name
 
-# ── _dep_package_name ─────────────────────────────────────────────────────────────────
+# ── dep_package_name ───────────────────────────────────────────────────────────
 
 
 def test_dep_package_name_simple():
-    assert _dep_package_name("redis") == "redis"
+    assert dep_package_name("redis") == "redis"
 
 
 def test_dep_package_name_with_version_specifier():
-    assert _dep_package_name("redis>=5") == "redis"
+    assert dep_package_name("redis>=5") == "redis"
 
 
 def test_dep_package_name_with_extras():
-    assert _dep_package_name("celery[redis]>=5") == "celery"
+    assert dep_package_name("celery[redis]>=5") == "celery"
 
 
 def test_dep_package_name_with_extras_no_version():
-    assert _dep_package_name("sentry-sdk[fastapi]") == "sentry_sdk"
+    assert dep_package_name("sentry-sdk[fastapi]") == "sentry_sdk"
 
 
 def test_dep_package_name_lowercased():
-    assert _dep_package_name("FastAPI") == "fastapi"
+    assert dep_package_name("FastAPI") == "fastapi"
 
 
 def test_dep_package_name_with_hyphen():
-    assert _dep_package_name("python-dotenv>=1.0") == "python_dotenv"
+    assert dep_package_name("python-dotenv>=1.0") == "python_dotenv"
 
 
 def test_dep_package_name_complex_extras():
-    assert _dep_package_name("fakeredis[aioredis]") == "fakeredis"
+    assert dep_package_name("fakeredis[aioredis]") == "fakeredis"
 
 
 def test_dep_package_name_with_tilde_specifier():
-    assert _dep_package_name("mypy~=1.0") == "mypy"
+    assert dep_package_name("mypy~=1.0") == "mypy"
 
 
 def test_dep_package_name_empty_string():
     # degenerate input — should not raise
-    result = _dep_package_name("")
+    result = dep_package_name("")
     assert isinstance(result, str)
 
 

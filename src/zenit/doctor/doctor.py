@@ -26,7 +26,7 @@ from zenit.core._paths import get_zenit_root
 from zenit.core.collect import collect_all
 from zenit.core.constants import _RECIPE_NAME_RE
 from zenit.core.lockfile import SCHEMA_VERSION, ZenitLockfile, read_lockfile
-from zenit.core.manifest import _dep_package_name, read_manifest
+from zenit.core.manifest import dep_package_name, read_manifest
 from zenit.core.pkg_name import normalise_pkg_name, resolve_dest_placeholder
 from zenit.schema.models import (
     AddonConfig,
@@ -163,7 +163,9 @@ def _check_manifest_schema(
         return {
             getattr(e, attr)
             for e in entries
-            if getattr(e, attr) and getattr(e, attr) not in addon_ids
+            if getattr(e, attr)
+            and getattr(e, attr) not in addon_ids
+            and getattr(e, "source", EntrySource.ADDON) != EntrySource.MIGRATED
         }
 
     orphan_addons = (
@@ -319,12 +321,12 @@ def _check_manifest_deps(
         "project", {}
     ).get("optional-dependencies", {}).get("dev", [])
 
-    installed = {_dep_package_name(d) for d in raw_deps}
-    installed_dev = {_dep_package_name(d) for d in dev_group}
+    installed = {dep_package_name(d) for d in raw_deps}
+    installed_dev = {dep_package_name(d) for d in dev_group}
 
     for dep in manifest.dependencies:
         bucket = installed_dev if dep.dev else installed
-        if _dep_package_name(dep.package) not in bucket:
+        if dep_package_name(dep.package) not in bucket:
             kind = "dev " if dep.dev else ""
             result.error(
                 f"Manifest {kind}dependency '{dep.package}' "
@@ -690,8 +692,8 @@ def _check_dependencies(
         "project", {}
     ).get("optional-dependencies", {}).get("dev", [])
 
-    installed_deps = {_dep_package_name(d) for d in raw_deps}
-    installed_dev_deps = {_dep_package_name(d) for d in dev_group}
+    installed_deps = {dep_package_name(d) for d in raw_deps}
+    installed_dev_deps = {dep_package_name(d) for d in dev_group}
 
     if template_config is None or contributions is None:
         zenit_root = get_zenit_root()
@@ -713,10 +715,10 @@ def _check_dependencies(
     expected_dev_deps = contributions.template_dev_deps + contributions.dev_deps
 
     missing_deps = [
-        d for d in expected_deps if _dep_package_name(d) not in installed_deps
+        d for d in expected_deps if dep_package_name(d) not in installed_deps
     ]
     missing_dev_deps = [
-        d for d in expected_dev_deps if _dep_package_name(d) not in installed_dev_deps
+        d for d in expected_dev_deps if dep_package_name(d) not in installed_dev_deps
     ]
 
     if missing_deps:

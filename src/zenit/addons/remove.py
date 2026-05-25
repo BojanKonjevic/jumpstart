@@ -37,7 +37,7 @@ from zenit.core.dependency import DependencyGraph
 from zenit.core.handlers import HandlerDispatcher
 from zenit.core.lockfile import ZenitLockfile, read_lockfile, write_lockfile
 from zenit.core.manifest import (
-    _dep_package_name,
+    dep_package_name,
     read_manifest,
     remove_blocks_for_addon,
     write_manifest,
@@ -47,7 +47,7 @@ from zenit.core.manifest import (
 )
 from zenit.core.pkg_name import normalise_pkg_name, resolve_dest_placeholder
 from zenit.schema.exceptions import ZenitError
-from zenit.schema.models import AddonConfig, ComposeService, Manifest
+from zenit.schema.models import AddonConfig, ComposeService, EntrySource, Manifest
 from zenit.templates._load_config import load_template_config
 
 
@@ -351,9 +351,9 @@ def _remove_compose_services(
 
     removed: list[str] = []
 
-    # Remove services recorded in the manifest.
+    # Remove services recorded in the manifest (never MIGRATED).
     for entry in manifest.compose_services:
-        if entry.addon != addon_id:
+        if entry.addon != addon_id or entry.source == EntrySource.MIGRATED:
             continue
         if entry.name in services:
             del services[entry.name]
@@ -398,7 +398,7 @@ def _remove_compose_volumes(
 
     removed_names: list[str] = []
     for entry in manifest.compose_volumes:
-        if entry.addon != addon_id:
+        if entry.addon != addon_id or entry.source == EntrySource.MIGRATED:
             continue
         if entry.name in vols:
             del vols[entry.name]
@@ -424,7 +424,11 @@ def _remove_env_vars(
 ) -> list[str]:
     """Remove env var lines owned by this addon. Returns removed keys."""
 
-    keys_to_remove = {e.key for e in manifest.env if e.addon == addon_id}
+    keys_to_remove = {
+        e.key
+        for e in manifest.env
+        if e.addon == addon_id and e.source != EntrySource.MIGRATED
+    }
     if not keys_to_remove:
         return []
     removed: list[str] = []
@@ -456,7 +460,7 @@ def _partition_deps(
     removed: list[str] = []
     kept: list[str] = []
     for d in items:
-        if _dep_package_name(str(d)) in names_to_remove:
+        if dep_package_name(str(d)) in names_to_remove:
             removed.append(str(d))
         else:
             kept.append(d)
@@ -478,10 +482,14 @@ def _remove_deps(
     doc = tomlkit.parse(pyproject_path.read_text(encoding="utf-8"))
 
     deps_to_remove = {
-        d.package for d in manifest.dependencies if d.addon == addon_id and not d.dev
+        d.package
+        for d in manifest.dependencies
+        if d.addon == addon_id and not d.dev and d.source != EntrySource.MIGRATED
     }
     dev_deps_to_remove = {
-        d.package for d in manifest.dependencies if d.addon == addon_id and d.dev
+        d.package
+        for d in manifest.dependencies
+        if d.addon == addon_id and d.dev and d.source != EntrySource.MIGRATED
     }
 
     project_deps = doc.get("project", {}).get("dependencies", [])
@@ -610,7 +618,11 @@ def _remove_just_recipes(
     if not justfile_path.exists():
         return []
 
-    recipe_names = {r.name for r in manifest.just_recipes if r.addon == addon_id}
+    recipe_names = {
+        r.name
+        for r in manifest.just_recipes
+        if r.addon == addon_id and r.source != EntrySource.MIGRATED
+    }
     if not recipe_names:
         return []
 
