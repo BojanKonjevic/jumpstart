@@ -33,6 +33,7 @@ from zenit.core.generate import generate_all
 from zenit.core.git import init
 from zenit.core.lockfile import MigratedMeta, read_lockfile, write_lockfile
 from zenit.core.render import build_render_vars
+from zenit.schema.models import OwnedEntry
 from zenit.templates._load_config import load_template_config
 
 # ── helpers ───────────────────────────────────────────────────────────────────
@@ -89,6 +90,104 @@ def _scaffold(tmp_path: Path, name: str, template: str, addons: list[str]) -> Pa
     init(project_dir)
     write_lockfile(project_dir, template, addons)
     return project_dir
+
+
+# ── add_addon — migrated-project tests ─────────────────────────────────────────
+
+
+def test_add_overwrite_warning_fires(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Addon file destinations overlapping with migrated.file_paths must warn."""
+    project_dir = _scaffold(tmp_path, "myapp", "blank", [])
+    write_lockfile(
+        project_dir,
+        "migrated:https://example.com/template",
+        [],
+        migrated=MigratedMeta(
+            source="https://example.com/template",
+            has_tasks=False,
+            file_paths=["Dockerfile"],
+        ),
+    )
+    monkeypatch.chdir(project_dir)
+
+    with suppress_stdin():
+        add_addon("docker")
+
+    stderr = capsys.readouterr().err
+    assert "Dockerfile" in stderr
+    assert "override" in stderr
+
+
+def test_full_add_on_migrated_lifecycle(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Add an addon on a migrated project upgrades MIGRATED entries, then remove
+    correctly cleans up the upgraded (ADDON) entries without touching other
+    MIGRATED content."""
+    from zenit.core.manifest import read_manifest as _rd
+    from zenit.core.manifest import write_manifest as _wr
+    from zenit.schema.models import EntrySource
+
+    project_dir = _scaffold(tmp_path, "myapp", "blank", [])
+
+    # Write a MIGRATED compose_service entry into the manifest
+    manifest = _rd(project_dir)
+    manifest.compose_services.append(
+        OwnedEntry(name="redis", source=EntrySource.MIGRATED, addon="")
+    )
+    _wr(project_dir, manifest)
+
+    # Ensure docker is "installed" so compose contributions are allowed
+    with suppress_stdin():
+        add_addon("docker", project_dir=project_dir)
+
+    # Also add a migrated compose service (simulating a Copier template that wrote compose entries)
+    manifest = _rd(project_dir)
+    manifest.compose_services.append(
+        OwnedEntry(name="redis", source=EntrySource.MIGRATED, addon="")
+    )
+    _wr(project_dir, manifest)
+
+    # Write lockfile with migrated metadata and docker installed
+    write_lockfile(
+        project_dir,
+        "migrated:https://example.com/template",
+        ["docker"],
+        migrated=MigratedMeta(
+            source="https://example.com/template",
+            has_tasks=False,
+            file_paths=[],
+        ),
+    )
+
+    monkeypatch.chdir(project_dir)
+
+    # ── Step 1: Add redis ──────────────────────────────────────────────────
+    with suppress_stdin():
+        add_addon("redis")
+
+    manifest = _rd(project_dir)
+    redis_entry = next(
+        (e for e in manifest.compose_services if e.name == "redis"), None
+    )
+    assert redis_entry is not None
+    assert redis_entry.source == EntrySource.ADDON
+    assert redis_entry.addon == "redis"
+
+    # ── Step 2: Remove redis ───────────────────────────────────────────────
+    with suppress_stdin():
+        from zenit.addons.remove import remove_addon
+
+        remove_addon("redis", project_dir=project_dir)
+
+    manifest = _rd(project_dir)
+    redis_entry = next(
+        (e for e in manifest.compose_services if e.name == "redis"), None
+    )
+    # After upgrade to ADDON followed by remove, the entry is gone entirely
+    assert redis_entry is None
 
 
 # ── add_addon — lockfile ──────────────────────────────────────────────────────

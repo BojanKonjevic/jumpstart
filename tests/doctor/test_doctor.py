@@ -1206,3 +1206,22 @@ class TestCheckMigrationHealth:
             i for i in result.issues if "migrated from a Copier template" in i.message
         ]
         assert len(general_warnings) == 1
+
+    def test_migrated_with_zero_files_still_warns(self) -> None:
+        """A migrated project with no env, compose, or deps still reports
+        file_paths warning but no spurious errors."""
+        m = Manifest()
+        lockfile = self._make_lockfile(
+            MigratedMeta(source="test", has_tasks=False, file_paths=["main.py"])
+        )
+        result = _check_migration_health(Path("/nonexistent"), lockfile, m)
+        file_warnings = [i for i in result.issues if "files are unmanaged" in i.message]
+        assert len(file_warnings) == 1
+        assert "0 files" not in file_warnings[0].message
+        assert (
+            "1 files" in file_warnings[0].message
+            or "1 file" in file_warnings[0].message
+        )
+        # No errors - no tasks
+        errors = [i for i in result.issues if i.severity == Severity.ERROR]
+        assert len(errors) == 0

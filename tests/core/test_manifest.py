@@ -433,6 +433,69 @@ def test_record_idempotent() -> None:
     assert len(redis_dep_entries) == 1
 
 
+# ── record_addon_manifest_entries returns upgrade list ─────────────────────────
+
+
+class TestRecordAddonManifestEntriesUpgradeList:
+    """record_addon_manifest_entries must return descriptions of upgrades."""
+
+    def test_returns_upgrade_list_for_env(self) -> None:
+        m = Manifest()
+        m.env.append(EnvEntry(key="REDIS_URL", source=EntrySource.MIGRATED, addon=""))
+        from zenit.core.manifest import record_addon_manifest_entries
+
+        addon = AddonConfig(
+            id="redis",
+            description="",
+            env_vars=[EnvVar(key="REDIS_URL", default="redis://localhost")],
+        )
+        upgraded = record_addon_manifest_entries(m, addon, Environment(), {})
+        assert "env:REDIS_URL" in upgraded
+        assert len(upgraded) == 1
+
+    def test_returns_upgrade_list_for_multiple_types(self) -> None:
+        m = Manifest()
+        m.env.append(EnvEntry(key="REDIS_URL", source=EntrySource.MIGRATED, addon=""))
+        m.compose_services.append(
+            OwnedEntry(name="redis", source=EntrySource.MIGRATED, addon="")
+        )
+        m.dependencies.append(
+            DependencyEntry(
+                package="redis",
+                spec="redis>=5",
+                source=EntrySource.MIGRATED,
+                addon="",
+                dev=False,
+            )
+        )
+        from zenit.core.manifest import record_addon_manifest_entries
+
+        addon = AddonConfig(
+            id="redis",
+            description="",
+            env_vars=[EnvVar(key="REDIS_URL", default="redis://localhost")],
+            compose_services=[ComposeService(name="redis", image="redis:7")],
+            deps=["redis>=5"],
+        )
+        upgraded = record_addon_manifest_entries(m, addon, Environment(), {})
+        assert "env:REDIS_URL" in upgraded
+        assert "compose_service:redis" in upgraded
+        assert "dependency:redis" in upgraded
+        assert len(upgraded) == 3
+
+    def test_no_upgrade_when_no_migrated_entries(self) -> None:
+        m = Manifest()
+        from zenit.core.manifest import record_addon_manifest_entries
+
+        addon = AddonConfig(
+            id="redis",
+            description="",
+            env_vars=[EnvVar(key="REDIS_URL", default="redis://localhost")],
+        )
+        upgraded = record_addon_manifest_entries(m, addon, Environment(), {})
+        assert upgraded == []
+
+
 # ── upgrade_migrated_entry ─────────────────────────────────────────────────────
 
 

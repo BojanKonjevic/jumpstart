@@ -195,7 +195,12 @@ def remove_addon(
 
     # ── lockfile ──────────────────────────────────────────────────────────
     new_addons = [a for a in lockfile.addons if a != addon_id]
-    write_lockfile(project_dir, template, new_addons)
+    write_lockfile(
+        project_dir,
+        template,
+        new_addons,
+        migrated=lockfile.migrated,
+    )
 
     # ── output ────────────────────────────────────────────────────────────
     print()

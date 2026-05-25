@@ -22,7 +22,7 @@ from zenit.core.context import Context
 from zenit.core.filesystem import RealFileSystem
 from zenit.core.generate import generate_all
 from zenit.core.git import init
-from zenit.core.lockfile import read_lockfile, write_lockfile
+from zenit.core.lockfile import MigratedMeta, read_lockfile, write_lockfile
 from zenit.core.manifest import read_manifest, write_manifest
 from zenit.core.render import build_render_vars
 from zenit.schema.exceptions import ZenitError
@@ -605,6 +605,52 @@ class TestRemoveAddonIntegration:
 
         assert not (project_dir / "compose.yml").exists()
         assert not (project_dir / "Dockerfile").exists()
+
+
+# ── Migrated-project tests ──────────────────────────────────────────────────────
+
+
+def test_remove_on_migrated_project_preserves_migrated_section(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Regression test: remove_addon must preserve the [migrated] section."""
+    from zenit.addons.add import add_addon
+
+    # Scaffold a blank project (no addons installed)
+    project_dir = _scaffold(tmp_path, "myapp", "blank", [])
+
+    # Write the lockfile with migrated metadata but NO addons
+    write_lockfile(
+        project_dir,
+        "migrated:https://example.com/template",
+        [],
+        migrated=MigratedMeta(
+            source="https://example.com/template",
+            has_tasks=False,
+            file_paths=[],
+        ),
+    )
+
+    monkeypatch.chdir(project_dir)
+
+    # Add docker
+    with suppress_stdin():
+        add_addon("docker", project_dir=project_dir)
+
+    lockfile = read_lockfile(project_dir)
+    assert lockfile is not None
+    assert lockfile.migrated is not None
+    assert "docker" in lockfile.addons
+
+    # Remove docker
+    with suppress_stdin():
+        remove_addon("docker", project_dir=project_dir)
+
+    lockfile = read_lockfile(project_dir)
+    assert lockfile is not None
+    assert lockfile.migrated is not None
+    assert lockfile.migrated.source == "https://example.com/template"
+    assert lockfile.addons == []
 
 
 # ── Crash-safety / retry tests ─────────────────────────────────────────────────
