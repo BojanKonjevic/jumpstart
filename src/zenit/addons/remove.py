@@ -47,7 +47,7 @@ from zenit.core.manifest import (
 )
 from zenit.core.pkg_name import normalise_pkg_name, resolve_dest_placeholder
 from zenit.schema.exceptions import ZenitError
-from zenit.schema.models import AddonConfig, Manifest
+from zenit.schema.models import AddonConfig, ComposeService, Manifest
 from zenit.templates._load_config import load_template_config
 
 
@@ -167,8 +167,18 @@ def remove_addon(
     _undo_injections_physical(project_dir, manifest, addon_id)
 
     # ── compose services ────────────────────────────────────────────────────
-    removed_services = _remove_compose_services(project_dir, manifest, addon_id)
-    _remove_compose_volumes(project_dir, manifest, addon_id)
+    removed_services = _remove_compose_services(
+        project_dir,
+        manifest,
+        addon_id,
+        addon_services=addon_cfg.compose_services,
+    )
+    _remove_compose_volumes(
+        project_dir,
+        manifest,
+        addon_id,
+        addon_volumes=addon_cfg.compose_volumes,
+    )
 
     # ── env vars ─────────────────────────────────────────────────────────────
     removed_env_vars = _remove_env_vars(project_dir, manifest, addon_id)
@@ -322,9 +332,14 @@ def _remove_compose_services(
     project_dir: Path,
     manifest: Manifest,
     addon_id: str,
+    addon_services: list[ComposeService] | None = None,
 ) -> list[str]:
-    """Remove compose services that belong to this addon. Returns removed service names."""
+    """Remove compose services that belong to this addon from compose.yml.
 
+    Removes services recorded in the manifest (normal path) AND services
+    the addon defines but were never recorded in the manifest (e.g. because
+    compose contributions were gated at add time).
+    """
     compose_path = project_dir / COMPOSE_FILE
     if not compose_path.exists():
         return []
@@ -335,12 +350,22 @@ def _remove_compose_services(
     services: dict[str, Any] = data.get("services", {})
 
     removed: list[str] = []
+
+    # Remove services recorded in the manifest.
     for entry in manifest.compose_services:
         if entry.addon != addon_id:
             continue
         if entry.name in services:
             del services[entry.name]
             removed.append(entry.name)
+
+    # Remove services the addon defines but the manifest may not track
+    # (out-of-sync state from earlier gate behaviour).
+    if addon_services is not None:
+        for svc in addon_services:
+            if svc.name not in removed and svc.name in services:
+                del services[svc.name]
+                removed.append(svc.name)
 
     if removed:
         compose_path.write_text(
@@ -352,10 +377,16 @@ def _remove_compose_services(
 
 
 def _remove_compose_volumes(
-    project_dir: Path, manifest: Manifest, addon_id: str
+    project_dir: Path,
+    manifest: Manifest,
+    addon_id: str,
+    addon_volumes: list[str] | None = None,
 ) -> None:
-    """Remove named volumes that belong to this addon from compose.yml."""
+    """Remove named volumes that belong to this addon from compose.yml.
 
+    Removes volumes recorded in the manifest (normal path) AND volumes
+    the addon defines but were never recorded in the manifest.
+    """
     compose_path = project_dir / COMPOSE_FILE
     if not compose_path.exists():
         return
@@ -365,15 +396,21 @@ def _remove_compose_volumes(
     )
     vols: dict[str, Any] = data.get("volumes", {})
 
-    changed = False
+    removed_names: list[str] = []
     for entry in manifest.compose_volumes:
         if entry.addon != addon_id:
             continue
         if entry.name in vols:
             del vols[entry.name]
-            changed = True
+            removed_names.append(entry.name)
 
-    if changed:
+    if addon_volumes is not None:
+        for vol_name in addon_volumes:
+            if vol_name not in removed_names and vol_name in vols:
+                del vols[vol_name]
+                removed_names.append(vol_name)
+
+    if removed_names:
         compose_path.write_text(
             yaml.dump(data, default_flow_style=False, sort_keys=False),
             encoding="utf-8",
@@ -700,11 +737,12 @@ def remove_addon_interactive(
 
     zenit_root = get_zenit_root()
     template_required: set[str] = set()
-    try:
-        template_config = load_template_config(zenit_root, lockfile.template)
-        template_required = set(template_config.requires_addons)
-    except FileNotFoundError:
-        pass
+    if not lockfile.template.startswith("migrated:"):
+        try:
+            template_config = load_template_config(zenit_root, lockfile.template)
+            template_required = set(template_config.requires_addons)
+        except FileNotFoundError:
+            pass
 
     items = []
 

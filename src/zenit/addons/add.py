@@ -9,7 +9,7 @@ from pathlib import Path
 import typer
 
 from zenit.addons._registry import get_addon, list_addons
-from zenit.addons.checks import check_can_add
+from zenit.addons.checks import check_can_add, resolve_runtime_template
 from zenit.cli.prompt import prompt_multi_addon
 from zenit.cli.ui import (
     DIM,
@@ -42,11 +42,11 @@ from zenit.core.manifest import (
     record_addon_manifest_entries,
     write_manifest,
 )
-from zenit.core.pkg_name import normalise_pkg_name
+from zenit.core.pkg_name import normalise_pkg_name, resolve_dest_placeholder
 from zenit.core.render import build_recipe_render_vars, build_render_vars, make_env
 from zenit.core.rollback import addon_or_rollback
 from zenit.schema.exceptions import ZenitError
-from zenit.schema.models import AddonConfig
+from zenit.schema.models import AddonConfig, TemplateConfig
 from zenit.templates._load_config import load_template_config
 
 
@@ -60,20 +60,59 @@ class _AddResult:
     recorded_files: list[tuple[str, str, str]] = field(default_factory=list)
 
 
+def _migrated_overrides(
+    addon_cfg: AddonConfig,
+    migrated_paths: list[str],
+    pkg_name: str,
+) -> list[str]:
+    """Return addon file destinations that would override presence-tracked files."""
+    migrated_set = set(migrated_paths)
+    return [
+        resolve_dest_placeholder(fc.dest, pkg_name)
+        for fc in addon_cfg.files
+        if resolve_dest_placeholder(fc.dest, pkg_name) in migrated_set
+    ]
+
+
 def _run_add_pipeline(
     ctx: Context,
     fs: FileSystem,
     addon_cfg: AddonConfig,
+    installed_addons: list[str] | None = None,
 ) -> _AddResult:
-    """Shared pipeline body for both real and dry-run add operations."""
+    """Shared pipeline body for both real and dry-run add operations.
+
+    Parameters
+    ----------
+    installed_addons:
+        Addons already present in the lockfile.  Used to decide whether
+        docker-managed compose contributions are allowed.  Pass the
+        lockfile's ``addons`` list; omitted during dry runs.
+    """
 
     zenit_root = ctx.zenit_root
     template = ctx.template
     pkg_name = ctx.pkg_name
     project_dir = ctx.project_dir
 
-    template_config = load_template_config(zenit_root, template)
+    try:
+        template_config = load_template_config(zenit_root, template)
+    except (FileNotFoundError, ZenitError):
+        template_config = TemplateConfig(id="migrated", description="migrated project")
     contributions = collect_addon_only([addon_cfg])
+
+    # Non-docker addons only contribute compose entries when the zenit docker
+    # addon already manages compose.  This keeps merge_compose, manifest
+    # recording, and removal (which looks up the manifest to find what to
+    # delete from compose.yml) in sync.  Copier-template Docker files
+    # (presence-tracked but not managed) do not count.
+    if (
+        addon_cfg.id != "docker"
+        and installed_addons is not None
+        and "docker" not in installed_addons
+    ):
+        contributions.compose_services = []
+        contributions.compose_volumes = []
 
     render_vars = build_render_vars(
         name=ctx.name,
@@ -166,7 +205,9 @@ def add_addon(
         error(str(exc))
         raise typer.Exit(1) from exc
 
-    template = lockfile.template
+    stored_template = lockfile.template
+    runtime_template = resolve_runtime_template(project_dir, lockfile)
+    template = runtime_template or stored_template
     pkg_name = normalise_pkg_name(project_dir.name)
     zenit_root = get_zenit_root()
 
@@ -184,7 +225,16 @@ def add_addon(
             dry_run=True,
         )
         addon_cfg = get_addon(addon_id)
-        result = _run_add_pipeline(ctx, fs, addon_cfg)
+        if lockfile.migrated and lockfile.migrated.file_paths:
+            overrides = _migrated_overrides(
+                addon_cfg, lockfile.migrated.file_paths, pkg_name
+            )
+            if overrides:
+                warn(
+                    "Addon overrides presence-tracked Copier template files: "
+                    + ", ".join(overrides)
+                )
+        result = _run_add_pipeline(ctx, fs, addon_cfg, installed_addons=lockfile.addons)
 
         dry_run_banner("add", addon_id)
 
@@ -207,6 +257,18 @@ def add_addon(
         print()
         return
 
+    addon_cfg = get_addon(addon_id)
+
+    # ── Warn about overrides of presence-tracked Copier template files ─────
+    migrated = lockfile.migrated
+    if migrated and migrated.file_paths:
+        overrides = _migrated_overrides(addon_cfg, migrated.file_paths, pkg_name)
+        if overrides:
+            warn(
+                "This addon will override files from the Copier template: "
+                + ", ".join(overrides)
+            )
+
     # ── Real mode: prompt ─────────────────────────────────────────────────────
     addon_summary("add", addon_id, project_dir, template)
 
@@ -224,7 +286,6 @@ def add_addon(
         else:
             warn("Non‑interactive mode — proceeding automatically.")
 
-    addon_cfg = get_addon(addon_id)
     with addon_or_rollback(project_dir, addon_id):
         ctx = Context(
             name=project_dir.name,
@@ -235,8 +296,13 @@ def add_addon(
             project_dir=project_dir,
         )
         fs = RealFileSystem(project_dir)
-        result = _run_add_pipeline(ctx, fs, addon_cfg)
-        write_lockfile(project_dir, template, ctx.addons)
+        result = _run_add_pipeline(ctx, fs, addon_cfg, installed_addons=lockfile.addons)
+        write_lockfile(
+            project_dir,
+            stored_template,
+            ctx.addons,
+            migrated=lockfile.migrated,
+        )
 
     # ── Output ────────────────────────────────────────────────────────────────
     print()

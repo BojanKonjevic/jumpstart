@@ -6,6 +6,8 @@ addon_or_rollback (removes only files added during the failed addon apply).
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 
 from zenit.core.rollback import addon_or_rollback, scaffold_or_rollback
@@ -323,3 +325,15 @@ def test_addon_content_restored_when_file_deleted(tmp_path):
         raise RuntimeError("boom")
     assert existing.exists()
     assert existing.read_text() == "# content to restore"
+
+
+def test_addon_failure_restores_valid_cwd(tmp_path, monkeypatch):
+    project_dir = tmp_path / "myapp"
+    project_dir.mkdir()
+    monkeypatch.chdir(project_dir)
+
+    with pytest.raises(SystemExit), addon_or_rollback(project_dir, "redis"):
+        (project_dir / "redis.py").write_text("# redis")
+        raise RuntimeError("boom")
+
+    assert Path.cwd() == project_dir

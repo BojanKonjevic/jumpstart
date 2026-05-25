@@ -51,12 +51,20 @@ def inject_deps(
     doc = tomlkit.parse(pyproject_path.read_text(encoding="utf-8"))
 
     # ── runtime deps ──────────────────────────────────────────────────────────
-    project_table = cast(Container, doc.get("project", {}))
-    existing_deps = cast(
-        list[str], project_table.get("dependencies") or tomlkit.array()
-    )
-    existing_names = {_dep_package_name(str(d)) for d in existing_deps}
+    # Ensure [project] table exists so our array stays linked to the document.
+    project_table = doc.get("project")
+    if project_table is None:
+        project_table = tomlkit.table()
+        doc["project"] = project_table
+    project_table = cast(Container, project_table)
 
+    existing_deps = project_table.get("dependencies")
+    if existing_deps is None:
+        existing_deps = tomlkit.array()
+        project_table["dependencies"] = existing_deps
+    existing_deps = cast(list[str], existing_deps)
+
+    existing_names = {_dep_package_name(str(d)) for d in existing_deps}
     added_deps = _add_deps_if_missing(existing_deps, existing_names, deps)
 
     # ── dev deps ──────────────────────────────────────────────────────────────
@@ -64,7 +72,11 @@ def inject_deps(
     # [project.optional-dependencies] dev.
     if "dependency-groups" in doc:
         group = cast(Container, doc["dependency-groups"])
-        existing_dev = cast(list[str], group.get("dev") or tomlkit.array())
+        existing_dev = group.get("dev")
+        if existing_dev is None:
+            existing_dev = tomlkit.array()
+            group["dev"] = existing_dev
+        existing_dev = cast(list[str], existing_dev)
         existing_dev_names = {_dep_package_name(str(d)) for d in existing_dev}
         added_dev_deps = _add_deps_if_missing(
             existing_dev, existing_dev_names, dev_deps
@@ -74,7 +86,11 @@ def inject_deps(
         Container, doc["project"]
     ):
         opt = cast(Container, cast(Container, doc["project"])["optional-dependencies"])
-        existing_dev = cast(list[str], opt.get("dev") or tomlkit.array())
+        existing_dev = opt.get("dev")
+        if existing_dev is None:
+            existing_dev = tomlkit.array()
+            opt["dev"] = existing_dev
+        existing_dev = cast(list[str], existing_dev)
         existing_dev_names = {_dep_package_name(str(d)) for d in existing_dev}
         added_dev_deps = _add_deps_if_missing(
             existing_dev, existing_dev_names, dev_deps

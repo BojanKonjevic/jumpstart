@@ -3,13 +3,6 @@
 Covers inject_deps and the _dep_package_name helper for all relevant cases:
 adding new deps, skipping existing ones, handling both [dependency-groups]
 and [project.optional-dependencies] dev layouts, and edge cases.
-
-Note on tomlkit behaviour: inject_deps relies on tomlkit returning a live
-reference to the array when it already contains items.  An empty array
-accessed via doc.get('project', {}).get('dependencies') returns a detached
-copy that is never written back.  This matches real usage — every generated
-project always has at least one runtime dep and one dev dep — so tests use
-pyproject fixtures that mirror that reality.
 """
 
 from __future__ import annotations
@@ -165,7 +158,70 @@ def test_inject_deps_returns_empty_lists_when_nothing_to_add(tmp_path):
     assert added_dev == []
 
 
+def test_inject_deps_creates_dependencies_key_when_missing(
+    tmp_path: Path,
+) -> None:
+    """pyproject.toml has [project] but no dependencies key at all."""
+    _write_pyproject(
+        tmp_path,
+        '[project]\nname = "myapp"\n',
+    )
+    added, _ = inject_deps(tmp_path, ["sentry-sdk[fastapi]", "python-dotenv"], [])
+    assert "sentry-sdk[fastapi]" in added
+    assert "python-dotenv" in added
+    text = (tmp_path / "pyproject.toml").read_text()
+    assert "sentry-sdk[fastapi]" in text
+    assert "python-dotenv" in text
+
+
+def test_inject_deps_creates_project_table_when_missing(tmp_path: Path) -> None:
+    """pyproject.toml has no [project] table at all (e.g. bare config)."""
+    _write_pyproject(tmp_path, "[tool.uv]\npackage = true\n")
+    added, _ = inject_deps(tmp_path, ["sentry-sdk", "python-dotenv"], [])
+    assert "sentry-sdk" in added
+    text = (tmp_path / "pyproject.toml").read_text()
+    assert "sentry-sdk" in text
+    assert "[project]" in text
+
+
+def test_inject_deps_writes_to_table_without_dotenv_seed(tmp_path: Path) -> None:
+    """pyproject.toml has [project] dependencies but no python-dotenv seed.
+
+    This simulates a Copier-generated project that ships with some deps
+    already present but not the ones the addon needs.
+    """
+    _write_pyproject(
+        tmp_path,
+        '[project]\nname = "myapp"\ndependencies = ["fastapi>=0.100"]\n'
+        '\n[dependency-groups]\ndev = ["pytest>=8"]\n',
+    )
+    added, added_dev = inject_deps(
+        tmp_path, ["sentry-sdk[fastapi]", "python-dotenv"], ["fakeredis"]
+    )
+    assert "sentry-sdk[fastapi]" in added
+    assert "python-dotenv" in added
+    assert "fakeredis" in added_dev
+    text = (tmp_path / "pyproject.toml").read_text()
+    assert "sentry-sdk[fastapi]" in text
+    assert "python-dotenv" in text
+    assert "fakeredis" in text
+
+
 # ── inject_deps — dev deps via [dependency-groups] ───────────────────────────
+
+
+def test_inject_dev_deps_creates_dev_key_when_missing(tmp_path: Path) -> None:
+    """[dependency-groups] exists but dev key does not."""
+    _write_pyproject(
+        tmp_path,
+        '[project]\nname = "myapp"\ndependencies = ["python-dotenv"]\n'
+        "\n[dependency-groups]\n",
+    )
+    _, added_dev = inject_deps(tmp_path, [], ["fakeredis"])
+    assert "fakeredis" in added_dev
+    text = (tmp_path / "pyproject.toml").read_text()
+    assert "[dependency-groups]" in text
+    assert "fakeredis" in text
 
 
 def test_inject_dev_deps_adds_to_dependency_groups(tmp_path):

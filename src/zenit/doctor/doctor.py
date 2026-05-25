@@ -563,7 +563,7 @@ def _check_migration_health(
             "This project has pending manual steps from Copier _tasks that "
             "were not executed automatically.",
             hint=(
-                "Check the post_apply stub in templates/_common/apply.py "
+                "Check .zenit-tasks.md in the project root "
                 "for the list of commands to run manually."
             ),
         )

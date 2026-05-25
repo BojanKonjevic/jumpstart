@@ -220,3 +220,77 @@ def test_apply_skips_python_block_for_missing_file(tmp_path: Path) -> None:
 
     manifest = read_manifest(ctx.project_dir)
     assert manifest.python_blocks == []
+
+
+# ── Env var merging ────────────────────────────────────────────────────────────
+
+
+def test_apply_env_vars_creates_dotenv(tmp_path: Path) -> None:
+    ctx, fs = _ctx(tmp_path)
+    addon = _addon(
+        "postgres",
+        env_vars=[EnvVar(key="DATABASE_URL", default="postgresql://localhost")],
+    )
+    contributions = Contributions(env_vars=addon.env_vars, _addon_configs=[addon])
+
+    apply_contributions(ctx, fs, contributions, {}, _render_vars(ctx))
+
+    dotenv = ctx.project_dir / ".env"
+    assert dotenv.exists()
+    assert "DATABASE_URL=postgresql://localhost" in dotenv.read_text(encoding="utf-8")
+
+
+def test_apply_env_vars_skips_duplicate_keys(tmp_path: Path) -> None:
+    ctx, fs = _ctx(tmp_path)
+    dotenv = ctx.project_dir / ".env"
+    dotenv.write_text("DATABASE_URL=existing\n", encoding="utf-8")
+
+    addon = _addon(
+        "postgres",
+        env_vars=[EnvVar(key="DATABASE_URL", default="postgresql://override")],
+    )
+    contributions = Contributions(env_vars=addon.env_vars, _addon_configs=[addon])
+
+    apply_contributions(ctx, fs, contributions, {}, _render_vars(ctx))
+
+    text = dotenv.read_text(encoding="utf-8")
+    assert "postgresql://override" not in text
+    assert "DATABASE_URL=existing" in text
+
+
+def test_apply_env_vars_appends_missing_keys(tmp_path: Path) -> None:
+    ctx, fs = _ctx(tmp_path)
+    dotenv = ctx.project_dir / ".env"
+    dotenv.write_text("EXISTING_KEY=stay\n", encoding="utf-8")
+
+    addon = _addon(
+        "postgres",
+        env_vars=[EnvVar(key="DATABASE_URL", default="postgresql://localhost")],
+    )
+    contributions = Contributions(env_vars=addon.env_vars, _addon_configs=[addon])
+
+    apply_contributions(ctx, fs, contributions, {}, _render_vars(ctx))
+
+    text = dotenv.read_text(encoding="utf-8")
+    assert "EXISTING_KEY=stay" in text
+    assert "DATABASE_URL=postgresql://localhost" in text
+
+
+def test_apply_env_vars_includes_comment(tmp_path: Path) -> None:
+    ctx, fs = _ctx(tmp_path)
+    addon = _addon(
+        "redis",
+        env_vars=[
+            EnvVar(
+                key="REDIS_URL",
+                default="redis://localhost:6379",
+                comment="Redis connection string",
+            )
+        ],
+    )
+    contributions = Contributions(env_vars=addon.env_vars, _addon_configs=[addon])
+
+    apply_contributions(ctx, fs, contributions, {}, _render_vars(ctx))
+
+    text = (ctx.project_dir / ".env").read_text(encoding="utf-8")
+    assert "REDIS_URL=redis://localhost:6379  # Redis connection string" in text

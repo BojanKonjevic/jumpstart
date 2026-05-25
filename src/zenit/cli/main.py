@@ -34,6 +34,22 @@ def _parse_addon_list(raw: list[str] | None) -> list[str] | None:
     return result if result else None
 
 
+def _parse_data_flags(raw: list[str]) -> dict[str, str]:
+    """Parse ``-D key=value`` flags into a dict.
+
+    Each flag must contain exactly one ``=`` sign.
+    """
+    result: dict[str, str] = {}
+    for item in raw:
+        if "=" not in item:
+            raise typer.BadParameter(
+                f"Invalid --data value {item!r}: expected key=value format"
+            )
+        key, value = item.split("=", 1)
+        result[key.strip()] = value.strip()
+    return result
+
+
 app = typer.Typer(
     name="zenit",
     add_completion=False,
@@ -388,6 +404,63 @@ def cmd_doctor(
 
         success("Project looks healthy.")
     print()
+
+
+@app.command("migrate")
+def cmd_migrate(
+    source: Annotated[
+        str,
+        typer.Argument(
+            help="Copier template source (GitHub URL, gh:user/repo, or local path)"
+        ),
+    ],
+    name: Annotated[
+        str | None,
+        typer.Option(
+            "--name",
+            "-n",
+            help="Project name (non-interactive mode; uses defaults for other questions)",
+        ),
+    ] = None,
+    data: Annotated[
+        list[str] | None,
+        typer.Option(
+            "--data",
+            "-D",
+            help="Override a template question: -D use_redis=yes (can be repeated)",
+        ),
+    ] = None,
+) -> None:
+    """Create a new project from a Copier template.
+
+    Migrates a Copier template into a zenit-managed project with
+    inventory-bootstrapped manifest entries.  The project directory is
+    created in the current working directory and named after the user's
+    project_name answer to the Copier questions.
+
+    In non-interactive mode (\fB--name\fR or \fB--data\fR) every question
+    takes its default value; use \fB--data\fR to override specific ones.
+    """
+    from zenit.migrate.migrate import run_migration
+
+    overrides = _parse_data_flags(data) if data else None
+
+    try:
+        result = run_migration(source, name=name, data=overrides)
+        _print_migration_result(result)
+    except Exception as exc:
+        from zenit.cli.ui import error
+
+        error(str(exc))
+        raise typer.Exit(1) from exc
+
+
+def _print_migration_result(result: object) -> None:
+    """Print migration result — imported lazily to avoid circular imports."""
+    from zenit.migrate.migrate import MigrationResult, _print_migration_report
+
+    if isinstance(result, MigrationResult):
+        _print_migration_report(result)
 
 
 @app.command("graph")

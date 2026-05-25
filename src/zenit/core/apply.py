@@ -210,7 +210,7 @@ def apply_contributions(
         )
 
     for file_name in ENV_FILES:
-        if (project_dir / file_name).exists() and contributions.env_vars:
+        if contributions.env_vars:
             _merge_env_vars(ctx, fs, file_name, contributions.env_vars)
 
     for addon_cfg in contributions._addon_configs:
@@ -280,9 +280,9 @@ def merge_compose(
 def _merge_env_vars(
     ctx: Context, fs: FileSystem, file_name: str, env_vars: list[EnvVar]
 ) -> None:
-    """Append missing env vars to the end of *file_name* via *fs*."""
+    """Append missing env vars to *file_name* (creating it if needed)."""
     env_path = ctx.project_dir / file_name
-    text = env_path.read_text(encoding="utf-8")
+    text = env_path.read_text(encoding="utf-8") if env_path.exists() else ""
 
     existing_keys = {
         line.split("=", 1)[0].strip()

@@ -1,0 +1,616 @@
+"""Tests for the migration pipeline."""
+
+from pathlib import Path
+
+import pytest
+import yaml
+
+from zenit.core.lockfile import read_lockfile
+from zenit.core.manifest import read_manifest
+from zenit.migrate.copier import (
+    CopierConfig,
+    CopierQuestion,
+    QuestionClass,
+    QuestionType,
+)
+from zenit.migrate.migrate import (
+    _addon_id_from_question,
+    _inventory_compose,
+    _inventory_deps,
+    _inventory_env,
+    _normalise_source,
+    _prompt_questions,
+    _resolve_answers_noninteractive,
+    run_migration,
+)
+from zenit.schema.exceptions import ZenitError
+
+# ── _normalise_source ──────────────────────────────────────────────────────────
+
+
+def test_normalise_github_url() -> None:
+    assert (
+        _normalise_source("https://github.com/user/repo")
+        == "https://github.com/user/repo"
+    )
+
+
+def test_normalise_gh_shorthand() -> None:
+    assert _normalise_source("gh:user/repo") == "https://github.com/user/repo"
+
+
+def test_normalise_gh_shorthand_no_slash() -> None:
+    """If no slash, assume repo name matches user name."""
+    assert _normalise_source("gh:user") == "https://github.com/user/user"
+
+
+def test_normalise_local_path() -> None:
+    assert _normalise_source("./local-template") == str(
+        Path("./local-template").resolve()
+    )
+
+
+# ── _addon_id_from_question ────────────────────────────────────────────────────
+
+
+def test_addon_id_strips_use_prefix() -> None:
+    assert _addon_id_from_question("use_postgres") == "postgres-migrated"
+
+
+def test_addon_id_strips_with_prefix() -> None:
+    assert _addon_id_from_question("with_redis") == "redis-migrated"
+
+
+def test_addon_id_strips_has_prefix() -> None:
+    assert _addon_id_from_question("has_docker") == "docker-migrated"
+
+
+def test_addon_id_no_prefix() -> None:
+    assert _addon_id_from_question("celery") == "celery-migrated"
+
+
+# ── _prompt_questions (non-interactive) ────────────────────────────────────────
+
+
+def test_prompt_render_var_str(monkeypatch: pytest.MonkeyPatch) -> None:
+    config = CopierConfig(
+        questions=[
+            CopierQuestion(
+                name="name", type=QuestionType.STR, default="myapp", help="Name"
+            )
+        ]
+    )
+    classes = {"name": QuestionClass.RENDER_VAR}
+    monkeypatch.setattr("builtins.input", lambda prompt="": "testproj")
+    answers = _prompt_questions(config, classes)
+    assert answers.render_vars["name"] == "testproj"
+
+
+def test_prompt_questions_uses_default_when_empty(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    config = CopierConfig(
+        questions=[
+            CopierQuestion(
+                name="name", type=QuestionType.STR, default="myapp", help="Name"
+            )
+        ]
+    )
+    classes = {"name": QuestionClass.RENDER_VAR}
+    monkeypatch.setattr("builtins.input", lambda prompt="": "")
+    answers = _prompt_questions(config, classes)
+    assert answers.render_vars["name"] == "myapp"
+
+
+# ── Non-interactive answer resolution ─────────────────────────────────────────
+
+
+def test_resolve_noninteractive_uses_defaults() -> None:
+    config = CopierConfig(
+        questions=[
+            CopierQuestion(name="name", type=QuestionType.STR, default="myapp"),
+            CopierQuestion(name="port", type=QuestionType.INT, default=8080),
+            CopierQuestion(name="debug", type=QuestionType.BOOL, default=False),
+        ]
+    )
+    answers = _resolve_answers_noninteractive(config, {})
+    assert answers.render_vars["name"] == "myapp"
+    assert answers.render_vars["port"] == 8080
+    assert answers.render_vars["debug"] is False
+
+
+def test_resolve_noninteractive_renders_jinja_defaults_in_order() -> None:
+    config = CopierConfig(
+        questions=[
+            CopierQuestion(
+                name="project_name",
+                type=QuestionType.STR,
+                default="my-proj",
+            ),
+            CopierQuestion(
+                name="package_name",
+                type=QuestionType.STR,
+                default="{{ project_name | replace('-', '_') }}",
+            ),
+        ]
+    )
+    answers = _resolve_answers_noninteractive(config, {})
+    assert answers.render_vars["project_name"] == "my-proj"
+    assert answers.render_vars["package_name"] == "my_proj"
+
+
+def test_resolve_noninteractive_applies_overrides() -> None:
+    config = CopierConfig(
+        questions=[
+            CopierQuestion(name="name", type=QuestionType.STR, default="myapp"),
+            CopierQuestion(name="port", type=QuestionType.INT, default=8080),
+            CopierQuestion(name="debug", type=QuestionType.BOOL, default=False),
+        ]
+    )
+    answers = _resolve_answers_noninteractive(
+        config, {"name": "custom", "port": "3000", "debug": "yes"}
+    )
+    assert answers.render_vars["name"] == "custom"
+    assert answers.render_vars["port"] == 3000
+    assert answers.render_vars["debug"] is True
+
+
+def test_resolve_noninteractive_missing_default() -> None:
+    config = CopierConfig(
+        questions=[
+            CopierQuestion(
+                name="db_url",
+                type=QuestionType.STR,
+                default=None,  # no default
+            ),
+        ]
+    )
+    with pytest.raises(ZenitError, match="has no default"):
+        _resolve_answers_noninteractive(config, {})
+
+
+def test_resolve_noninteractive_override_handles_missing_default() -> None:
+    """An override should satisfy a question that has no default."""
+    config = CopierConfig(
+        questions=[
+            CopierQuestion(name="db_url", type=QuestionType.STR, default=None),
+        ]
+    )
+    answers = _resolve_answers_noninteractive(
+        config, {"db_url": "postgres://localhost"}
+    )
+    assert answers.render_vars["db_url"] == "postgres://localhost"
+
+
+def test_resolve_noninteractive_renders_templated_default_values() -> None:
+    config = CopierConfig(
+        questions=[
+            CopierQuestion(
+                name="project_name", type=QuestionType.STR, default="my-proj"
+            ),
+            CopierQuestion(
+                name="package_name",
+                type=QuestionType.STR,
+                default="{{ project_name | replace('-', '_') }}",
+            ),
+        ]
+    )
+    answers = _resolve_answers_noninteractive(config, {})
+    assert answers.render_vars["project_name"] == "my-proj"
+    assert answers.render_vars["package_name"] == "my_proj"
+
+
+def test_run_migration_noninteractive_with_name(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    template_dir = _create_copier_template(tmp_path)
+    monkeypatch.chdir(tmp_path)
+
+    result = run_migration(str(template_dir), name="myproj")
+
+    assert result.project_dir == (tmp_path / "myproj").resolve()
+    assert result.project_dir.exists()
+    main_py = (result.project_dir / "main.py").read_text(encoding="utf-8")
+    assert "import redis" not in main_py  # use_redis default is False
+    assert '"""myproj main module."""' in main_py
+
+
+def test_run_migration_noninteractive_with_name_and_data(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    template_dir = _create_copier_template(tmp_path)
+    monkeypatch.chdir(tmp_path)
+
+    result = run_migration(str(template_dir), name="myproj", data={"use_redis": "yes"})
+
+    assert result.project_dir == (tmp_path / "myproj").resolve()
+    assert result.project_dir.exists()
+    main_py = (result.project_dir / "main.py").read_text(encoding="utf-8")
+    assert "import redis" in main_py  # overridden to yes
+    assert '"""myproj main module."""' in main_py
+
+
+def test_run_migration_noninteractive_with_data_only(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    template_dir = _create_copier_template(tmp_path)
+    monkeypatch.chdir(tmp_path)
+
+    # project_name has no explicit default; -D provides it
+    result = run_migration(
+        str(template_dir), data={"project_name": "myproj", "use_redis": "no"}
+    )
+
+    assert result.project_dir == (tmp_path / "myproj").resolve()
+    assert result.project_dir.exists()
+    main_py = (result.project_dir / "main.py").read_text(encoding="utf-8")
+    assert "import redis" not in main_py
+
+
+# ── Inventory ──────────────────────────────────────────────────────────────────
+
+
+def test_inventory_env(tmp_path: Path) -> None:
+    (tmp_path / ".env").write_text(
+        "# comment\nKEY1=val1\nKEY2=val2\n", encoding="utf-8"
+    )
+    keys = _inventory_env(tmp_path)
+    assert "KEY1" in keys
+    assert "KEY2" in keys
+
+
+def test_inventory_env_example(tmp_path: Path) -> None:
+    (tmp_path / ".env.example").write_text(
+        "DB_URL=postgres://localhost\n", encoding="utf-8"
+    )
+    keys = _inventory_env(tmp_path)
+    assert "DB_URL" in keys
+
+
+def test_inventory_compose(tmp_path: Path) -> None:
+    compose = {
+        "services": {"web": {"image": "nginx"}, "db": {"image": "postgres"}},
+        "volumes": {"data": None},
+    }
+    (tmp_path / "compose.yml").write_text(yaml.dump(compose), encoding="utf-8")
+    services, volumes = _inventory_compose(tmp_path)
+    assert sorted(services) == ["db", "web"]
+    assert volumes == ["data"]
+
+
+def test_inventory_compose_missing(tmp_path: Path) -> None:
+    services, volumes = _inventory_compose(tmp_path)
+    assert services == []
+    assert volumes == []
+
+
+def test_inventory_deps(tmp_path: Path) -> None:
+    (tmp_path / "pyproject.toml").write_text(
+        '[project]\ndependencies = ["fastapi>=0.100", "redis>=5"]\n'
+        '[dependency-groups]\ndev = ["pytest>=8"]\n',
+        encoding="utf-8",
+    )
+    deps = _inventory_deps(tmp_path)
+    dep_names = [d[0] for d in deps]
+    assert "fastapi" in dep_names
+    assert "redis" in dep_names
+    assert "pytest" in dep_names
+
+
+# ── run_migration (end-to-end with local template) ────────────────────────────
+
+
+def _create_copier_template(tmp_path: Path, name: str = "test-template") -> Path:
+    """Create a minimal Copier template directory for testing."""
+    template_dir = tmp_path / name
+    template_dir.mkdir()
+
+    copier_yml = {
+        "project_name": {"type": "str", "help": "Project name"},
+        "use_redis": {"type": "bool", "default": False, "help": "Add Redis?"},
+    }
+    (template_dir / "copier.yml").write_text(yaml.dump(copier_yml), encoding="utf-8")
+
+    (template_dir / "README.md.jinja").write_text(
+        "# {{ project_name }}\n\nWelcome to {{ project_name }}.\n",
+        encoding="utf-8",
+    )
+    (template_dir / "main.py.jinja").write_text(
+        '"""{{ project_name }} main module."""\n\n'
+        "{% if use_redis %}\nimport redis\n{% endif %}\n\n"
+        'def main() -> None:\n    print("hello")\n',
+        encoding="utf-8",
+    )
+    (template_dir / "static.txt").write_text("static content\n", encoding="utf-8")
+
+    return template_dir
+
+
+def test_run_migration_local_template(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    template_dir = _create_copier_template(tmp_path)
+
+    # Mock user input: project_name="myproject", use_redis=yes
+    inputs = iter(["myproject", "y"])
+    monkeypatch.setattr("builtins.input", lambda prompt="": next(inputs))
+    monkeypatch.chdir(tmp_path)
+
+    result = run_migration(str(template_dir))
+
+    assert result.project_dir.exists()
+    assert (result.project_dir / "README.md").exists()
+    assert (result.project_dir / "main.py").exists()
+    assert (result.project_dir / "static.txt").exists()
+    assert "README.md" in result.file_paths or "README.md.jinja" in result.file_paths
+
+    # Check lockfile
+    lockfile = read_lockfile(result.project_dir)
+    assert lockfile is not None
+    assert lockfile.migrated is not None
+    assert "migrated" in lockfile.template
+
+    # Check manifest has MIGRATED entries
+    manifest = read_manifest(result.project_dir)
+    assert manifest is not None
+
+    # Verify template was rendered with user answers
+    main_py = (result.project_dir / "main.py").read_text(encoding="utf-8")
+    assert "import redis" in main_py  # use_redis was yes
+    assert '"""myproject main module."""' in main_py  # project_name rendered
+
+
+def test_run_migration_without_addon(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    template_dir = _create_copier_template(tmp_path)
+
+    # Mock user input: project_name="myproject", use_redis=no
+    inputs = iter(["myproject", "n"])
+    monkeypatch.setattr("builtins.input", lambda prompt="": next(inputs))
+    monkeypatch.chdir(tmp_path)
+
+    result = run_migration(str(template_dir))
+
+    assert result.project_dir.exists()
+    main_py = (result.project_dir / "main.py").read_text(encoding="utf-8")
+    assert "import redis" not in main_py  # use_redis was no
+
+    lockfile = read_lockfile(result.project_dir)
+    assert lockfile is not None
+    assert lockfile.migrated is not None
+
+
+def test_run_migration_creates_lockfile_with_migrated_section(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    template_dir = _create_copier_template(tmp_path)
+
+    inputs = iter(["myproject", "n"])
+    monkeypatch.setattr("builtins.input", lambda prompt="": next(inputs))
+    monkeypatch.chdir(tmp_path)
+
+    result = run_migration(str(template_dir))
+
+    lockfile = read_lockfile(result.project_dir)
+    assert lockfile is not None
+    assert lockfile.migrated is not None
+    assert lockfile.migrated.source != ""
+    assert isinstance(lockfile.migrated.file_paths, list)
+    assert len(lockfile.migrated.file_paths) > 0
+
+
+def test_run_migration_fails_when_dir_exists(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    template_dir = _create_copier_template(tmp_path)
+
+    inputs = iter(["myproject", "n"])
+    monkeypatch.setattr("builtins.input", lambda prompt="": next(inputs))
+    monkeypatch.chdir(tmp_path)
+
+    # Create the project directory first so run_migration will fail
+    project_dir = tmp_path / "myproject"
+    project_dir.mkdir()
+
+    with pytest.raises(ZenitError):
+        run_migration(str(template_dir))
+
+
+def test_run_migration_renders_unsuffixed_pyproject_and_templated_paths(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    template_dir = tmp_path / "copier-template"
+    template_dir.mkdir()
+    (template_dir / "copier.yml").write_text(
+        yaml.dump(
+            {
+                "project_name": {"type": "str", "help": "Project name"},
+            }
+        ),
+        encoding="utf-8",
+    )
+    (template_dir / "pyproject.toml").write_text(
+        "[project]\n"
+        'name = "{{ project_name }}"\n'
+        'version = "0.1.0"\n'
+        "[project.scripts]\n"
+        '"{{ project_name }}" = '
+        "\"{{ project_name | replace('-', '_') }}.main:main\"\n"
+        "[tool.hatch.build.targets.wheel]\n"
+        "packages = [\"src/{{ project_name | replace('-', '_') }}\"]\n",
+        encoding="utf-8",
+    )
+    package_dir = template_dir / "src" / "{{ project_name | replace('-', '_') }}"
+    package_dir.mkdir(parents=True)
+    (package_dir / "main.py.jinja").write_text(
+        'def main() -> None:\n    print("hello from {{ project_name }}")\n',
+        encoding="utf-8",
+    )
+
+    monkeypatch.chdir(tmp_path)
+
+    result = run_migration(str(template_dir), name="my-proj")
+
+    pyproject_text = (result.project_dir / "pyproject.toml").read_text(encoding="utf-8")
+    assert "{{" not in pyproject_text
+    assert '"my-proj" = "my_proj.main:main"' in pyproject_text
+    assert 'packages = ["src/my_proj"]' in pyproject_text
+
+    package_main = result.project_dir / "src" / "my_proj" / "main.py"
+    assert package_main.exists()
+    assert 'print("hello from my-proj")' in package_main.read_text(encoding="utf-8")
+
+
+def test_run_migration_renders_jinja_backed_package_name_default(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    template_dir = tmp_path / "copier-template"
+    template_dir.mkdir()
+    (template_dir / "copier.yml").write_text(
+        "project_name:\n"
+        "  type: str\n"
+        "  help: Project name\n"
+        "package_name:\n"
+        "  type: str\n"
+        "  default: \"{{ project_name | replace('-', '_') }}\"\n",
+        encoding="utf-8",
+    )
+    (template_dir / "pyproject.toml.jinja").write_text(
+        "[project]\n"
+        'name = "{{ project_name }}"\n'
+        'version = "0.1.0"\n'
+        "[project.scripts]\n"
+        '"{{ project_name }}" = "{{ package_name }}.main:main"\n',
+        encoding="utf-8",
+    )
+    package_dir = template_dir / "src" / "{{ package_name }}"
+    package_dir.mkdir(parents=True)
+    (package_dir / "main.py.jinja").write_text(
+        'def main() -> None:\n    print("hello")\n',
+        encoding="utf-8",
+    )
+
+    monkeypatch.chdir(tmp_path)
+
+    result = run_migration(str(template_dir), name="my-proj")
+
+    pyproject_text = (result.project_dir / "pyproject.toml").read_text(encoding="utf-8")
+    assert "{{" not in pyproject_text
+    assert '"my-proj" = "my_proj.main:main"' in pyproject_text
+    assert (result.project_dir / "src" / "my_proj" / "main.py").exists()
+
+
+def test_run_migration_derives_package_name_when_project_name_empty(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """When project_name is empty (interactive mode, user pressed Enter),
+    _pick_project_name derives it from the source path.  package_name
+    (which defaults to ``{{ project_name | replace('-', '_') }}``) must
+    be re-derived from the new project_name so that template rendering
+    and mv-task rewrites use the correct value.
+    """
+    src_dir = tmp_path / "source"
+    src_dir.mkdir()
+    (src_dir / "copier.yml").write_text(
+        "project_name:\n"
+        "  type: str\n"
+        "  help: Project name\n"
+        "package_name:\n"
+        "  type: str\n"
+        "  default: \"{{ project_name | replace('-', '_') }}\"\n",
+        encoding="utf-8",
+    )
+    (src_dir / "main.py.jinja").write_text(
+        '"""{{ package_name }} main module."""\nVERSION = "0.1.0"\n',
+        encoding="utf-8",
+    )
+
+    # All prompts return empty — project_name is empty, so dependent
+    # defaults (package_name) are also empty at prompt-time.
+    monkeypatch.setattr("builtins.input", lambda prompt="": "")
+    out_dir = tmp_path / "out"
+    out_dir.mkdir()
+    monkeypatch.chdir(out_dir)
+
+    result = run_migration(str(src_dir))
+
+    # Project name derived from src_dir.name ("source").
+    # package_name must be re-derived as "source".
+    assert result.project_dir.name == "source"
+    main_py = (result.project_dir / "main.py").read_text(encoding="utf-8")
+    assert '"""source main module."""' in main_py
+
+
+def test_run_migration_applies_safe_mv_and_rm_tasks(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    template_dir = tmp_path / "copier-template"
+    template_dir.mkdir()
+    (template_dir / "copier.yml").write_text(
+        "project_name:\n"
+        "  type: str\n"
+        "package_name:\n"
+        "  type: str\n"
+        "  default: \"{{ project_name | replace('-', '_') }}\"\n"
+        "_tasks:\n"
+        '  - command: mv src/project_name "src/{{ package_name }}"\n'
+        "    when: \"{{ package_name != 'project_name' }}\"\n"
+        '  - command: rm -rf "src/{{ package_name }}/api/" docs/\n'
+        '    when: "{{ not use_api }}"\n'
+        "  - echo keep-manual\n"
+        "use_api:\n"
+        "  type: bool\n"
+        "  default: false\n",
+        encoding="utf-8",
+    )
+    src_dir = template_dir / "src" / "project_name"
+    (src_dir / "api").mkdir(parents=True)
+    (src_dir / "main.py.jinja").write_text("VALUE = 1\n", encoding="utf-8")
+    (src_dir / "api" / "routes.py.jinja").write_text("VALUE = 2\n", encoding="utf-8")
+    (template_dir / "docs" / "index.md").parent.mkdir(parents=True)
+    (template_dir / "docs" / "index.md").write_text("# docs\n", encoding="utf-8")
+
+    monkeypatch.chdir(tmp_path)
+
+    result = run_migration(str(template_dir), name="my-proj")
+
+    assert (result.project_dir / "src" / "my_proj" / "main.py").exists()
+    assert not (result.project_dir / "src" / "project_name").exists()
+    assert not (result.project_dir / "src" / "my_proj" / "api").exists()
+    assert not (result.project_dir / "docs").exists()
+
+    task_stub = (result.project_dir / ".zenit-tasks.md").read_text(encoding="utf-8")
+    assert "echo keep-manual" in task_stub
+    assert "mv src/project_name" not in task_stub
+    assert "rm -rf" not in task_stub
+
+
+def test_run_migration_skips_copier_internal_answers_file(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    template_dir = tmp_path / "copier-template"
+    template_dir.mkdir()
+    (template_dir / "copier.yml").write_text(
+        yaml.dump(
+            {
+                "project_name": {"type": "str", "help": "Project name"},
+            }
+        ),
+        encoding="utf-8",
+    )
+    (template_dir / "{{ _copier_conf.answers_file }}.jinja").write_text(
+        "{{ _copier_answers | to_nice_yaml }}\n",
+        encoding="utf-8",
+    )
+    (template_dir / "README.md.jinja").write_text(
+        "# {{ project_name }}\n",
+        encoding="utf-8",
+    )
+
+    monkeypatch.chdir(tmp_path)
+
+    result = run_migration(str(template_dir), name="myproj")
+
+    assert (result.project_dir / "README.md").exists()
+    assert not (result.project_dir / ".copier-answers.yml").exists()

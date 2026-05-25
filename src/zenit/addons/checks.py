@@ -27,6 +27,7 @@ Example in an addon.py
 
 from __future__ import annotations
 
+from dataclasses import replace
 from pathlib import Path
 
 from zenit.addons._registry import get_addon, list_addons
@@ -39,6 +40,38 @@ from zenit.templates._load_config import load_template_config
 
 def _known_addon_ids() -> set[str]:
     return {m.id for m in list_addons()}
+
+
+def resolve_runtime_template(
+    project_dir: Path,
+    lockfile: ZenitLockfile,
+) -> str | None:
+    """Resolve the native zenit template layout used for addon operations.
+
+    Migrated projects keep their original Copier source in ``lockfile.template``,
+    which is not a loadable zenit template id. For add-on compatibility checks
+    and injections we infer the closest native zenit layout from the generated
+    project structure.
+    """
+    if not lockfile.template.startswith("migrated:"):
+        return lockfile.template
+
+    src_dir = project_dir / "src"
+    if not src_dir.is_dir():
+        return None
+
+    package_dirs = [path for path in src_dir.iterdir() if path.is_dir()]
+    for package_dir in package_dirs:
+        if (package_dir / "lifecycle.py").exists() and (
+            package_dir / "api" / "router.py"
+        ).exists():
+            return "fastapi"
+
+    for package_dir in package_dirs:
+        if (package_dir / "main.py").exists():
+            return "blank"
+
+    return None
 
 
 def _read_lockfile_and_validate(
@@ -87,11 +120,18 @@ def check_can_add(
 
     # ── template compatibility ─────────────────────────────────────────────────
     cfg_meta = next(c for c in available_meta if c.id == addon_id)
-    if cfg_meta.templates and lockfile.template not in cfg_meta.templates:
+    runtime_template = resolve_runtime_template(project_dir, lockfile)
+    if cfg_meta.templates and runtime_template not in cfg_meta.templates:
         allowed = ", ".join(cfg_meta.templates)
+        if lockfile.template.startswith("migrated:") and runtime_template is None:
+            raise ZenitError(
+                f"'{addon_id}' requires the {allowed} template, "
+                "but zenit could not infer whether this migrated project matches "
+                "a supported native layout."
+            )
         raise ZenitError(
             f"'{addon_id}' is only compatible with the {allowed} template, "
-            f"but this project uses '{lockfile.template}'."
+            f"but this project uses '{runtime_template or lockfile.template}'."
         )
 
     # ── dependency addons are installed (transitive) ──────────────────────────
@@ -115,9 +155,24 @@ def check_can_add(
 
     # ── addon's own can_apply check ───────────────────────────────────────────
     cfg = get_addon(addon_id)
+    if (
+        lockfile.template.startswith("migrated:")
+        and runtime_template is None
+        and cfg.injections
+    ):
+        raise ZenitError(
+            f"Cannot add '{addon_id}' safely to this migrated project. "
+            "Zenit could not infer a compatible native layout, and this addon "
+            "requires structural code injections."
+        )
     hooks = cfg._module
     if hooks is not None and hooks.can_apply is not None:
-        reason = hooks.can_apply(project_dir, lockfile)
+        hook_lockfile = (
+            replace(lockfile, template=runtime_template)
+            if runtime_template is not None
+            else lockfile
+        )
+        reason = hooks.can_apply(project_dir, hook_lockfile)
         if reason:
             raise ZenitError(reason)
 
@@ -158,15 +213,16 @@ def check_can_remove(
     # ── template does not require this addon ──────────────────────────────────
 
     zenit_root = get_zenit_root()
-    try:
-        template_config = load_template_config(zenit_root, lockfile.template)
-        if addon_id in template_config.requires_addons:
-            raise ZenitError(
-                f"'{addon_id}' is required by the '{lockfile.template}' template "
-                f"and cannot be removed."
-            )
-    except FileNotFoundError:
-        pass  # Template not found locally — skip this check
+    if not lockfile.template.startswith("migrated:"):
+        try:
+            template_config = load_template_config(zenit_root, lockfile.template)
+            if addon_id in template_config.requires_addons:
+                raise ZenitError(
+                    f"'{addon_id}' is required by the '{lockfile.template}' template "
+                    f"and cannot be removed."
+                )
+        except FileNotFoundError:
+            pass  # Template not found locally — skip this check
 
     # ── addon's own can_remove check ──────────────────────────────────────────
     cfg = get_addon(addon_id)

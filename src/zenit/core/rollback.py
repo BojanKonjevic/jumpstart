@@ -77,5 +77,25 @@ def addon_or_rollback(project_dir: Path, addon_id: str) -> Generator[None]:
 
 
 def _restore_snapshot(snapshot: Path, target: Path) -> None:
+    original_cwd = _move_cwd_out_of_tree(target)
     shutil.rmtree(target, ignore_errors=True)
     shutil.copytree(snapshot, target)
+    if original_cwd is not None:
+        os.chdir(original_cwd if original_cwd.exists() else target)
+
+
+def _move_cwd_out_of_tree(target: Path) -> Path | None:
+    """Move cwd to a stable parent if it lives inside *target*.
+
+    ``addon_or_rollback`` removes and recreates the full project directory from
+    a snapshot. If the current process stays inside that directory, ``os.getcwd``
+    fails until the user manually leaves and re-enters it.
+    """
+    cwd = Path.cwd().resolve()
+    target_resolved = target.resolve()
+
+    if cwd == target_resolved or target_resolved in cwd.parents:
+        os.chdir(target.parent)
+        return cwd
+
+    return None

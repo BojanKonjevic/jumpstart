@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 
 from zenit.addons.checks import check_can_add
-from zenit.core.lockfile import write_lockfile
+from zenit.core.lockfile import MigratedMeta, write_lockfile
 from zenit.schema.exceptions import ZenitError
 from zenit.schema.models import AddonConfig, AddonHooks, AddonMeta
 
@@ -144,6 +144,35 @@ def test_passes_when_no_can_apply_hook(tmp_path, monkeypatch):
     _patch_registry(monkeypatch, [_make_addon_meta("docker")], {"docker": cfg})
     lockfile = check_can_add(tmp_path, "docker")
     assert lockfile is not None
+
+
+def test_passes_for_migrated_fastapi_layout(tmp_path, monkeypatch):
+    src_pkg = tmp_path / "src" / "myapp"
+    (src_pkg / "api").mkdir(parents=True)
+    (src_pkg / "lifecycle.py").write_text("async def lifespan():\n    yield\n")
+    (src_pkg / "api" / "router.py").write_text("from fastapi import APIRouter\n")
+    write_lockfile(
+        tmp_path,
+        "migrated:https://github.com/example/copier-template",
+        [],
+        migrated=MigratedMeta(
+            source="https://github.com/example/copier-template",
+            has_tasks=False,
+            file_paths=[],
+        ),
+    )
+    meta = AddonMeta(
+        id="auth-manual",
+        description="auth addon",
+        requires=[],
+        conflicts_with=[],
+        templates=["fastapi"],
+    )
+    cfg = _make_addon_config("auth-manual")
+    _patch_registry(monkeypatch, [meta], {"auth-manual": cfg})
+
+    lockfile = check_can_add(tmp_path, "auth-manual")
+    assert lockfile.template == "migrated:https://github.com/example/copier-template"
 
 
 def test_error_message_lists_known_addons_on_unknown(tmp_path, monkeypatch):

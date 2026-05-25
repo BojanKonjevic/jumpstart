@@ -31,7 +31,7 @@ from zenit.core.context import Context
 from zenit.core.filesystem import RealFileSystem
 from zenit.core.generate import generate_all
 from zenit.core.git import init
-from zenit.core.lockfile import read_lockfile, write_lockfile
+from zenit.core.lockfile import MigratedMeta, read_lockfile, write_lockfile
 from zenit.core.render import build_render_vars
 from zenit.templates._load_config import load_template_config
 
@@ -120,6 +120,26 @@ def test_add_lockfile_template_unchanged(tmp_path, monkeypatch):
         add_addon("docker")
     lockfile = read_lockfile(project_dir)
     assert lockfile.template == "blank"
+
+
+def test_add_on_migrated_project_preserves_migration_template(tmp_path, monkeypatch):
+    project_dir = _scaffold(tmp_path, "myapp", "blank", [])
+    write_lockfile(
+        project_dir,
+        "migrated:https://github.com/example/copier-template",
+        [],
+        migrated=MigratedMeta(
+            source="https://github.com/example/copier-template",
+            has_tasks=False,
+            file_paths=[],
+        ),
+    )
+    monkeypatch.chdir(project_dir)
+    with suppress_stdin():
+        add_addon("docker")
+    lockfile = read_lockfile(project_dir)
+    assert lockfile.template == "migrated:https://github.com/example/copier-template"
+    assert "docker" in lockfile.addons
 
 
 # ── add_addon — files ─────────────────────────────────────────────────────────
