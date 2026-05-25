@@ -59,7 +59,15 @@ def post_apply(ctx: Context, fs: FileSystem) -> None:  # noqa: ARG001
     # and merge_compose at this point, and the manifest entries for compose
     # services are recorded AFTER this hook returns (by record_addon_manifest_entries
     # in the caller), so the manifest stays consistent with compose.yml.
-    template_config = load_template_config(ctx.zenit_root, ctx.template)
+    try:
+        template_config = load_template_config(ctx.zenit_root, ctx.template)
+    except (FileNotFoundError, Exception):
+        # Copier templates (URIs) cannot be loaded as native configs.
+        # Fall back to an empty config — compose contributions are
+        # still applied via the addon's own contributions.
+        template_config = None
+    if template_config is None:
+        return
     active_configs = [get_addon(a) for a in ctx.addons]
     contributions = collect_all(template_config, active_configs)
     if not contributions.compose_services and not contributions.compose_volumes:

@@ -19,7 +19,6 @@ from zenit.core.filesystem import RealFileSystem
 from zenit.core.generate import generate_all
 from zenit.core.git import init
 from zenit.core.lockfile import (
-    MigratedMeta,
     ZenitLockfile,
     read_lockfile,
     write_lockfile,
@@ -35,9 +34,9 @@ from zenit.doctor.doctor import (
     _check_env,
     _check_files,
     _check_metadata,
-    _check_migration_health,
     _check_python_integrity,
     _check_python_line_presence,
+    _check_template_health,
     print_results,
     run_doctor,
 )
@@ -45,11 +44,6 @@ from zenit.schema.models import (
     AddonConfig,
     AddonHooks,
     AddonMeta,
-    DependencyEntry,
-    EntrySource,
-    EnvEntry,
-    Manifest,
-    OwnedEntry,
 )
 from zenit.templates._load_config import load_template_config
 
@@ -1125,103 +1119,64 @@ class TestRunDoctorThoroughFlag:
         assert result is not None
 
 
-# ── _check_migration_health (H01) ──────────────────────────────────────────────
+# ── _check_template_health (H01) ─────────────────────────────────────────────
 
 
-class TestCheckMigrationHealth:
-    """H01: Ensure _check_migration_health produces correct warnings."""
+class TestCheckTemplateHealth:
+    """H01: Ensure _check_template_health produces correct results."""
 
     def _make_lockfile(
-        self, migrated: MigratedMeta | None, template: str = "migrated:test"
+        self,
+        template_source: str = "native",
+        template_has_tasks: bool = False,
+        template_file_paths: list[str] | None = None,
+        template_uri: str = "",
     ) -> ZenitLockfile:
         return ZenitLockfile(
-            template=template,
+            template=template_uri or "test",
             addons=[],
             zenit_version="1.0.0",
-            schema_version=3,
-            migrated=migrated,
+            schema_version=4,
+            template_source=template_source,
+            template_uri=template_uri,
+            template_has_tasks=template_has_tasks,
+            template_file_paths=template_file_paths or [],
         )
 
-    def test_non_migrated_project_returns_ok(self) -> None:
-        lockfile = self._make_lockfile(migrated=None)
-        result = _check_migration_health(Path("/nonexistent"), lockfile)
+    def test_native_project_returns_ok(self) -> None:
+        lockfile = self._make_lockfile(template_source="native")
+        result = _check_template_health(Path("/nonexistent"), lockfile)
         assert len(result.issues) == 1
         assert result.issues[0].severity == Severity.OK
+        assert "native" in result.issues[0].message
 
-    def test_migrated_with_env_warns_per_entry(self) -> None:
-        m = Manifest()
-        m.env.append(EnvEntry(key="REDIS_URL", source=EntrySource.MIGRATED, addon=""))
-        m.env.append(EnvEntry(key="DB_URL", source=EntrySource.MIGRATED, addon=""))
+    def test_copier_with_tasks_returns_error(self) -> None:
         lockfile = self._make_lockfile(
-            MigratedMeta(source="test", has_tasks=False, file_paths=["main.py"])
+            template_source="copier",
+            template_has_tasks=True,
+            template_file_paths=["main.py"],
         )
-        result = _check_migration_health(Path("/nonexistent"), lockfile, m)
-        env_warnings = [i for i in result.issues if "Env var" in i.message]
-        assert len(env_warnings) == 2
-
-    def test_migrated_with_compose_service_warns(self) -> None:
-        m = Manifest()
-        m.compose_services.append(
-            OwnedEntry(name="redis", source=EntrySource.MIGRATED, addon="")
-        )
-        lockfile = self._make_lockfile(
-            MigratedMeta(source="test", has_tasks=False, file_paths=[])
-        )
-        result = _check_migration_health(Path("/nonexistent"), lockfile, m)
-        svc_warnings = [i for i in result.issues if "Compose service" in i.message]
-        assert len(svc_warnings) == 1
-
-    def test_migrated_with_deps_warns(self) -> None:
-        m = Manifest()
-        m.dependencies.append(
-            DependencyEntry(
-                package="redis",
-                spec="redis>=5",
-                source=EntrySource.MIGRATED,
-                addon="",
-                dev=False,
-            )
-        )
-        lockfile = self._make_lockfile(
-            MigratedMeta(source="test", has_tasks=False, file_paths=[])
-        )
-        result = _check_migration_health(Path("/nonexistent"), lockfile, m)
-        dep_warnings = [i for i in result.issues if "Dependency" in i.message]
-        assert len(dep_warnings) == 1
-
-    def test_migrated_with_tasks_returns_error(self) -> None:
-        lockfile = self._make_lockfile(
-            MigratedMeta(source="test", has_tasks=True, file_paths=["main.py"])
-        )
-        result = _check_migration_health(Path("/nonexistent"), lockfile)
+        result = _check_template_health(Path("/nonexistent"), lockfile)
         errors = [i for i in result.issues if i.severity == Severity.ERROR]
         assert any("pending manual steps" in i.message for i in errors)
 
-    def test_migrated_produces_general_warning(self) -> None:
+    def test_copier_with_files_warns(self) -> None:
         lockfile = self._make_lockfile(
-            MigratedMeta(source="test", has_tasks=False, file_paths=["main.py"])
+            template_source="copier",
+            template_has_tasks=False,
+            template_file_paths=["main.py"],
         )
-        result = _check_migration_health(Path("/nonexistent"), lockfile)
-        general_warnings = [
-            i for i in result.issues if "migrated from a Copier template" in i.message
-        ]
-        assert len(general_warnings) == 1
-
-    def test_migrated_with_zero_files_still_warns(self) -> None:
-        """A migrated project with no env, compose, or deps still reports
-        file_paths warning but no spurious errors."""
-        m = Manifest()
-        lockfile = self._make_lockfile(
-            MigratedMeta(source="test", has_tasks=False, file_paths=["main.py"])
-        )
-        result = _check_migration_health(Path("/nonexistent"), lockfile, m)
-        file_warnings = [i for i in result.issues if "files are unmanaged" in i.message]
+        result = _check_template_health(Path("/nonexistent"), lockfile)
+        file_warnings = [i for i in result.issues if "tracked as Copier" in i.message]
         assert len(file_warnings) == 1
-        assert "0 files" not in file_warnings[0].message
-        assert (
-            "1 files" in file_warnings[0].message
-            or "1 file" in file_warnings[0].message
-        )
-        # No errors - no tasks
+        assert "1 file" in file_warnings[0].message
         errors = [i for i in result.issues if i.severity == Severity.ERROR]
         assert len(errors) == 0
+
+    def test_copier_with_zero_files_ok(self) -> None:
+        lockfile = self._make_lockfile(
+            template_source="copier", template_has_tasks=False, template_file_paths=[]
+        )
+        result = _check_template_health(Path("/nonexistent"), lockfile)
+        ok_items = [i for i in result.issues if i.severity == Severity.OK]
+        assert any("No Copier template" in i.message for i in ok_items)

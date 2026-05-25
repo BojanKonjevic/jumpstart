@@ -9,7 +9,7 @@ from pathlib import Path
 import typer
 
 from zenit.addons._registry import get_addon, list_addons
-from zenit.addons.checks import check_can_add, resolve_runtime_template
+from zenit.addons.checks import check_can_add
 from zenit.cli.prompt import prompt_multi_addon
 from zenit.cli.ui import (
     DIM,
@@ -60,17 +60,17 @@ class _AddResult:
     recorded_files: list[tuple[str, str, str]] = field(default_factory=list)
 
 
-def _migrated_overrides(
+def _template_file_overrides(
     addon_cfg: AddonConfig,
-    migrated_paths: list[str],
+    template_paths: list[str],
     pkg_name: str,
 ) -> list[str]:
     """Return addon file destinations that would override presence-tracked files."""
-    migrated_set = set(migrated_paths)
+    tracked_set = set(template_paths)
     return [
         resolve_dest_placeholder(fc.dest, pkg_name)
         for fc in addon_cfg.files
-        if resolve_dest_placeholder(fc.dest, pkg_name) in migrated_set
+        if resolve_dest_placeholder(fc.dest, pkg_name) in tracked_set
     ]
 
 
@@ -210,9 +210,7 @@ def add_addon(
         error(str(exc))
         raise typer.Exit(1) from exc
 
-    stored_template = lockfile.template
-    runtime_template = resolve_runtime_template(project_dir, lockfile)
-    template = runtime_template or stored_template
+    template = lockfile.template
     pkg_name = normalise_pkg_name(project_dir.name)
     zenit_root = get_zenit_root()
 
@@ -230,9 +228,9 @@ def add_addon(
             dry_run=True,
         )
         addon_cfg = get_addon(addon_id)
-        if lockfile.migrated and lockfile.migrated.file_paths:
-            overrides = _migrated_overrides(
-                addon_cfg, lockfile.migrated.file_paths, pkg_name
+        if lockfile.template_file_paths:
+            overrides = _template_file_overrides(
+                addon_cfg, lockfile.template_file_paths, pkg_name
             )
             if overrides:
                 warn(
@@ -265,9 +263,10 @@ def add_addon(
     addon_cfg = get_addon(addon_id)
 
     # ── Warn about overrides of presence-tracked Copier template files ─────
-    migrated = lockfile.migrated
-    if migrated and migrated.file_paths:
-        overrides = _migrated_overrides(addon_cfg, migrated.file_paths, pkg_name)
+    if lockfile.template_file_paths:
+        overrides = _template_file_overrides(
+            addon_cfg, lockfile.template_file_paths, pkg_name
+        )
         if overrides:
             warn(
                 "This addon will override files from the Copier template: "
@@ -304,9 +303,12 @@ def add_addon(
         result = _run_add_pipeline(ctx, fs, addon_cfg, installed_addons=lockfile.addons)
         write_lockfile(
             project_dir,
-            stored_template,
+            template,
             ctx.addons,
-            migrated=lockfile.migrated,
+            template_source=lockfile.template_source,
+            template_uri=lockfile.template_uri,
+            template_has_tasks=lockfile.template_has_tasks,
+            template_file_paths=lockfile.template_file_paths,
         )
 
     # ── Output ────────────────────────────────────────────────────────────────

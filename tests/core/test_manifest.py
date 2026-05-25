@@ -439,9 +439,9 @@ def test_record_idempotent() -> None:
 class TestRecordAddonManifestEntriesUpgradeList:
     """record_addon_manifest_entries must return descriptions of upgrades."""
 
-    def test_returns_upgrade_list_for_env(self) -> None:
+    def test_adopts_template_env_entry(self) -> None:
         m = Manifest()
-        m.env.append(EnvEntry(key="REDIS_URL", source=EntrySource.MIGRATED, addon=""))
+        m.env.append(EnvEntry(key="REDIS_URL", source=EntrySource.TEMPLATE, addon=""))
         from zenit.core.manifest import record_addon_manifest_entries
 
         addon = AddonConfig(
@@ -449,21 +449,23 @@ class TestRecordAddonManifestEntriesUpgradeList:
             description="",
             env_vars=[EnvVar(key="REDIS_URL", default="redis://localhost")],
         )
-        upgraded = record_addon_manifest_entries(m, addon, Environment(), {})
-        assert "env:REDIS_URL" in upgraded
-        assert len(upgraded) == 1
+        adopted = record_addon_manifest_entries(m, addon, Environment(), {})
+        assert "env:REDIS_URL" in adopted
+        assert len(adopted) == 1
+        assert m.env[0].source == EntrySource.ADDON
+        assert m.env[0].addon == "redis"
 
-    def test_returns_upgrade_list_for_multiple_types(self) -> None:
+    def test_adopts_multiple_types(self) -> None:
         m = Manifest()
-        m.env.append(EnvEntry(key="REDIS_URL", source=EntrySource.MIGRATED, addon=""))
+        m.env.append(EnvEntry(key="REDIS_URL", source=EntrySource.TEMPLATE, addon=""))
         m.compose_services.append(
-            OwnedEntry(name="redis", source=EntrySource.MIGRATED, addon="")
+            OwnedEntry(name="redis", source=EntrySource.TEMPLATE, addon="")
         )
         m.dependencies.append(
             DependencyEntry(
                 package="redis",
                 spec="redis>=5",
-                source=EntrySource.MIGRATED,
+                source=EntrySource.TEMPLATE,
                 addon="",
                 dev=False,
             )
@@ -477,13 +479,13 @@ class TestRecordAddonManifestEntriesUpgradeList:
             compose_services=[ComposeService(name="redis", image="redis:7")],
             deps=["redis>=5"],
         )
-        upgraded = record_addon_manifest_entries(m, addon, Environment(), {})
-        assert "env:REDIS_URL" in upgraded
-        assert "compose_service:redis" in upgraded
-        assert "dependency:redis" in upgraded
-        assert len(upgraded) == 3
+        adopted = record_addon_manifest_entries(m, addon, Environment(), {})
+        assert "env:REDIS_URL" in adopted
+        assert "compose_service:redis" in adopted
+        assert "dependency:redis" in adopted
+        assert len(adopted) == 3
 
-    def test_no_upgrade_when_no_migrated_entries(self) -> None:
+    def test_no_adoption_when_no_template_entries(self) -> None:
         m = Manifest()
         from zenit.core.manifest import record_addon_manifest_entries
 
@@ -492,80 +494,79 @@ class TestRecordAddonManifestEntriesUpgradeList:
             description="",
             env_vars=[EnvVar(key="REDIS_URL", default="redis://localhost")],
         )
-        upgraded = record_addon_manifest_entries(m, addon, Environment(), {})
-        assert upgraded == []
+        adopted = record_addon_manifest_entries(m, addon, Environment(), {})
+        assert adopted == []
 
 
-# ── upgrade_migrated_entry ─────────────────────────────────────────────────────
+# ── add_*_entry adoption semantics ─────────────────────────────────────────────
 
 
-class TestUpgradeMigratedEntry:
-    """C02: Ensure upgrade_migrated_entry correctly upgrades ownership."""
+class TestAddEntryAdoption:
+    """C02: Ensure add_*_entry correctly adopts TEMPLATE entries."""
 
-    def test_upgrades_env_entry(self) -> None:
+    def test_add_env_entry_adopts_template(self) -> None:
         m = Manifest()
-        m.env.append(EnvEntry(key="REDIS_URL", source=EntrySource.MIGRATED, addon=""))
-        from zenit.core.manifest import upgrade_migrated_entry
+        m.env.append(EnvEntry(key="REDIS_URL", source=EntrySource.TEMPLATE, addon=""))
+        from zenit.core.manifest import add_env_entry
 
-        assert upgrade_migrated_entry(m, "REDIS_URL", "redis", "env")
+        assert add_env_entry(m, "REDIS_URL", EntrySource.ADDON, "redis")
         assert m.env[0].source == EntrySource.ADDON
         assert m.env[0].addon == "redis"
 
-    def test_returns_false_when_not_migrated(self) -> None:
+    def test_add_env_entry_skips_existing_addon(self) -> None:
         m = Manifest()
         m.env.append(EnvEntry(key="REDIS_URL", source=EntrySource.ADDON, addon="redis"))
-        from zenit.core.manifest import upgrade_migrated_entry
+        from zenit.core.manifest import add_env_entry
 
-        assert not upgrade_migrated_entry(m, "REDIS_URL", "redis", "env")
+        assert not add_env_entry(m, "REDIS_URL", EntrySource.ADDON, "redis2")
 
-    def test_returns_false_when_missing(self) -> None:
-        from zenit.core.manifest import upgrade_migrated_entry
+    def test_add_env_entry_creates_new(self) -> None:
+        m = Manifest()
+        from zenit.core.manifest import add_env_entry
 
-        assert not upgrade_migrated_entry(Manifest(), "NONEXISTENT", "redis", "env")
+        assert not add_env_entry(m, "REDIS_URL", EntrySource.TEMPLATE, "")
+        assert len(m.env) == 1
+        assert m.env[0].key == "REDIS_URL"
+        assert m.env[0].source == EntrySource.TEMPLATE
 
-    def test_unknown_entry_type_returns_false(self) -> None:
-        from zenit.core.manifest import upgrade_migrated_entry
-
-        assert not upgrade_migrated_entry(Manifest(), "x", "redis", "unknown_type")
-
-    def test_upgrades_compose_service(self) -> None:
+    def test_add_compose_service_adopts(self) -> None:
         m = Manifest()
         m.compose_services.append(
-            OwnedEntry(name="redis", source=EntrySource.MIGRATED, addon="")
+            OwnedEntry(name="redis", source=EntrySource.TEMPLATE, addon="")
         )
-        from zenit.core.manifest import upgrade_migrated_entry
+        from zenit.core.manifest import add_compose_service
 
-        assert upgrade_migrated_entry(m, "redis", "redis", "compose_service")
+        assert add_compose_service(m, "redis", EntrySource.ADDON, "redis")
 
-    def test_upgrades_compose_volume(self) -> None:
+    def test_add_compose_volume_adopts(self) -> None:
         m = Manifest()
         m.compose_volumes.append(
-            OwnedEntry(name="redis-data", source=EntrySource.MIGRATED, addon="")
+            OwnedEntry(name="redis-data", source=EntrySource.TEMPLATE, addon="")
         )
-        from zenit.core.manifest import upgrade_migrated_entry
+        from zenit.core.manifest import add_compose_volume
 
-        assert upgrade_migrated_entry(m, "redis-data", "redis", "compose_volume")
+        assert add_compose_volume(m, "redis-data", EntrySource.ADDON, "redis")
 
-    def test_upgrades_dependency(self) -> None:
+    def test_add_dependency_adopts(self) -> None:
         m = Manifest()
         m.dependencies.append(
             DependencyEntry(
                 package="redis",
                 spec="redis>=5",
-                source=EntrySource.MIGRATED,
+                source=EntrySource.TEMPLATE,
                 addon="",
                 dev=False,
             )
         )
-        from zenit.core.manifest import upgrade_migrated_entry
+        from zenit.core.manifest import add_dependency
 
-        assert upgrade_migrated_entry(m, "redis", "redis", "dependency")
+        assert add_dependency(m, "redis", "redis>=5", EntrySource.ADDON, "redis", False)
 
-    def test_upgrades_just_recipe(self) -> None:
+    def test_add_just_recipe_adopts(self) -> None:
         m = Manifest()
         m.just_recipes.append(
-            OwnedEntry(name="redis-up", source=EntrySource.MIGRATED, addon="")
+            OwnedEntry(name="redis-up", source=EntrySource.TEMPLATE, addon="")
         )
-        from zenit.core.manifest import upgrade_migrated_entry
+        from zenit.core.manifest import add_just_recipe
 
-        assert upgrade_migrated_entry(m, "redis-up", "redis", "just_recipe")
+        assert add_just_recipe(m, "redis-up", EntrySource.ADDON, "redis")

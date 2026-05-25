@@ -47,7 +47,7 @@ from zenit.core.manifest import (
 )
 from zenit.core.pkg_name import normalise_pkg_name, resolve_dest_placeholder
 from zenit.schema.exceptions import ZenitError
-from zenit.schema.models import AddonConfig, ComposeService, EntrySource, Manifest
+from zenit.schema.models import AddonConfig, ComposeService, Manifest
 from zenit.templates._load_config import load_template_config
 
 
@@ -199,7 +199,10 @@ def remove_addon(
         project_dir,
         template,
         new_addons,
-        migrated=lockfile.migrated,
+        template_source=lockfile.template_source,
+        template_uri=lockfile.template_uri,
+        template_has_tasks=lockfile.template_has_tasks,
+        template_file_paths=lockfile.template_file_paths,
     )
 
     # ── output ────────────────────────────────────────────────────────────
@@ -356,9 +359,8 @@ def _remove_compose_services(
 
     removed: list[str] = []
 
-    # Remove services recorded in the manifest (never MIGRATED).
     for entry in manifest.compose_services:
-        if entry.addon != addon_id or entry.source == EntrySource.MIGRATED:
+        if entry.addon != addon_id:
             continue
         if entry.name in services:
             del services[entry.name]
@@ -403,7 +405,7 @@ def _remove_compose_volumes(
 
     removed_names: list[str] = []
     for entry in manifest.compose_volumes:
-        if entry.addon != addon_id or entry.source == EntrySource.MIGRATED:
+        if entry.addon != addon_id:
             continue
         if entry.name in vols:
             del vols[entry.name]
@@ -429,11 +431,7 @@ def _remove_env_vars(
 ) -> list[str]:
     """Remove env var lines owned by this addon. Returns removed keys."""
 
-    keys_to_remove = {
-        e.key
-        for e in manifest.env
-        if e.addon == addon_id and e.source != EntrySource.MIGRATED
-    }
+    keys_to_remove = {e.key for e in manifest.env if e.addon == addon_id}
     if not keys_to_remove:
         return []
     removed: list[str] = []
@@ -487,14 +485,10 @@ def _remove_deps(
     doc = tomlkit.parse(pyproject_path.read_text(encoding="utf-8"))
 
     deps_to_remove = {
-        d.package
-        for d in manifest.dependencies
-        if d.addon == addon_id and not d.dev and d.source != EntrySource.MIGRATED
+        d.package for d in manifest.dependencies if d.addon == addon_id and not d.dev
     }
     dev_deps_to_remove = {
-        d.package
-        for d in manifest.dependencies
-        if d.addon == addon_id and d.dev and d.source != EntrySource.MIGRATED
+        d.package for d in manifest.dependencies if d.addon == addon_id and d.dev
     }
 
     project_deps = doc.get("project", {}).get("dependencies", [])
@@ -623,11 +617,7 @@ def _remove_just_recipes(
     if not justfile_path.exists():
         return []
 
-    recipe_names = {
-        r.name
-        for r in manifest.just_recipes
-        if r.addon == addon_id and r.source != EntrySource.MIGRATED
-    }
+    recipe_names = {r.name for r in manifest.just_recipes if r.addon == addon_id}
     if not recipe_names:
         return []
 
@@ -754,7 +744,7 @@ def remove_addon_interactive(
 
     zenit_root = get_zenit_root()
     template_required: set[str] = set()
-    if not lockfile.template.startswith("migrated:"):
+    if lockfile.template_source == "native":
         try:
             template_config = load_template_config(zenit_root, lockfile.template)
             template_required = set(template_config.requires_addons)

@@ -114,108 +114,65 @@ def add_python_block(manifest: Manifest, block: ManifestBlock) -> None:
     manifest.python_blocks.append(block)
 
 
-def upgrade_migrated_entry(
-    manifest: Manifest,
-    key: str,
-    addon_id: str,
-    entry_type: str,
-) -> bool:
-    """Upgrade a MIGRATED entry to ADDON ownership.
-
-    Returns True if an upgrade occurred (so the caller knows not to
-    call add_env_entry / add_compose_service / etc. for the same key).
-    Returns False if no MIGRATED entry was found.
-    """
-    collection: list[Any]
-    key_attr: str
-    match entry_type:
-        case "env":
-            collection = manifest.env
-            key_attr = "key"
-        case "compose_service":
-            collection = manifest.compose_services
-            key_attr = "name"
-        case "compose_volume":
-            collection = manifest.compose_volumes
-            key_attr = "name"
-        case "dependency":
-            collection = manifest.dependencies
-            key_attr = "package"
-        case "just_recipe":
-            collection = manifest.just_recipes
-            key_attr = "name"
-        case _:
-            return False
-
-    for entry in collection:
-        if getattr(entry, key_attr) == key and entry.source == EntrySource.MIGRATED:
-            entry.source = EntrySource.ADDON
-            entry.addon = addon_id
-            return True
-    return False
-
-
 def remove_blocks_for_addon(manifest: Manifest, addon_id: str) -> None:
-    """Remove all manifest entries that belong to *addon_id*.
-
-    Entries with ``source == EntrySource.MIGRATED`` are never removed —
-    they are outside the addon lifecycle and must be handled separately.
-    """
-    manifest.python_blocks = [
-        b
-        for b in manifest.python_blocks
-        if b.addon != addon_id and b.source != EntrySource.MIGRATED
-    ]
-    manifest.env = [
-        e
-        for e in manifest.env
-        if e.addon != addon_id and e.source != EntrySource.MIGRATED
-    ]
+    """Remove all manifest entries that belong to *addon_id*."""
+    manifest.python_blocks = [b for b in manifest.python_blocks if b.addon != addon_id]
+    manifest.env = [e for e in manifest.env if e.addon != addon_id]
     manifest.compose_services = [
-        s
-        for s in manifest.compose_services
-        if s.addon != addon_id and s.source != EntrySource.MIGRATED
+        s for s in manifest.compose_services if s.addon != addon_id
     ]
     manifest.compose_volumes = [
-        v
-        for v in manifest.compose_volumes
-        if v.addon != addon_id and v.source != EntrySource.MIGRATED
+        v for v in manifest.compose_volumes if v.addon != addon_id
     ]
-    manifest.dependencies = [
-        d
-        for d in manifest.dependencies
-        if d.addon != addon_id and d.source != EntrySource.MIGRATED
-    ]
-    manifest.just_recipes = [
-        r
-        for r in manifest.just_recipes
-        if r.addon != addon_id and r.source != EntrySource.MIGRATED
-    ]
+    manifest.dependencies = [d for d in manifest.dependencies if d.addon != addon_id]
+    manifest.just_recipes = [r for r in manifest.just_recipes if r.addon != addon_id]
 
 
 def add_env_entry(
     manifest: Manifest, key: str, source: EntrySource, addon: str
-) -> None:
-    if not any(e.key == key for e in manifest.env):
-        manifest.env.append(EnvEntry(key=key, source=source, addon=addon))
+) -> bool:
+    """Record *key* in the manifest.
+
+    If the entry already exists with ``source == TEMPLATE``, it is adopted
+    (source changed to ADDON, addon set).  Returns True if adoption occurred.
+    """
+    existing = next((e for e in manifest.env if e.key == key), None)
+    if existing is not None:
+        if existing.source == EntrySource.TEMPLATE:
+            existing.source = source
+            existing.addon = addon
+            return True
+        return False
+    manifest.env.append(EnvEntry(key=key, source=source, addon=addon))
+    return False
 
 
 def add_compose_service(
     manifest: Manifest, name: str, source: EntrySource, addon: str
-) -> None:
-    if not any(s.name == name for s in manifest.compose_services):
-        manifest.compose_services.append(
-            OwnedEntry(name=name, source=source, addon=addon)
-        )
+) -> bool:
+    existing = next((s for s in manifest.compose_services if s.name == name), None)
+    if existing is not None:
+        if existing.source == EntrySource.TEMPLATE:
+            existing.source = source
+            existing.addon = addon
+            return True
+        return False
+    manifest.compose_services.append(OwnedEntry(name=name, source=source, addon=addon))
+    return False
 
 
 def add_compose_volume(
     manifest: Manifest, name: str, source: EntrySource, addon: str
-) -> None:
-    if not any(v.name == name for v in manifest.compose_volumes):
-        manifest.compose_volumes.append(
-            OwnedEntry(name=name, source=source, addon=addon)
-        )
+) -> bool:
+    existing = next((v for v in manifest.compose_volumes if v.name == name), None)
+    if existing is not None:
+        if existing.source == EntrySource.TEMPLATE:
+            existing.source = source
+            existing.addon = addon
+            return True
+        return False
+    manifest.compose_volumes.append(OwnedEntry(name=name, source=source, addon=addon))
+    return False
 
 
 def add_dependency(
@@ -225,20 +182,32 @@ def add_dependency(
     source: EntrySource,
     addon: str,
     dev: bool,
-) -> None:
-    if not any(d.package == package for d in manifest.dependencies):
-        manifest.dependencies.append(
-            DependencyEntry(
-                package=package, spec=spec, source=source, addon=addon, dev=dev
-            )
-        )
+) -> bool:
+    existing = next((d for d in manifest.dependencies if d.package == package), None)
+    if existing is not None:
+        if existing.source == EntrySource.TEMPLATE:
+            existing.source = source
+            existing.addon = addon
+            return True
+        return False
+    manifest.dependencies.append(
+        DependencyEntry(package=package, spec=spec, source=source, addon=addon, dev=dev)
+    )
+    return False
 
 
 def add_just_recipe(
     manifest: Manifest, name: str, source: EntrySource, addon: str
-) -> None:
-    if not any(r.name == name for r in manifest.just_recipes):
-        manifest.just_recipes.append(OwnedEntry(name=name, source=source, addon=addon))
+) -> bool:
+    existing = next((r for r in manifest.just_recipes if r.name == name), None)
+    if existing is not None:
+        if existing.source == EntrySource.TEMPLATE:
+            existing.source = source
+            existing.addon = addon
+            return True
+        return False
+    manifest.just_recipes.append(OwnedEntry(name=name, source=source, addon=addon))
+    return False
 
 
 def dep_package_name(dep: str) -> str:
@@ -252,67 +221,57 @@ def record_addon_manifest_entries(
     string_env: Environment,
     render_vars: dict[str, object],
 ) -> list[str]:
-    """Record manifest entries for *addon_cfg*, upgrading MIGRATED entries.
+    """Record manifest entries for *addon_cfg*.
 
-    Returns a list of human-readable upgrade descriptions (e.g.
+    When an entry already exists with ``source == TEMPLATE``, it is adopted
+    (source changed to ADDON, addon set to the addon's id).
+
+    Returns a list of human-readable adoption descriptions (e.g.
     ``"env:REDIS_URL"``) that callers can display to the user.
     """
-    upgraded: list[str] = []
+    adopted: list[str] = []
     addon_id = addon_cfg.id
     for ev in addon_cfg.env_vars:
-        if upgrade_migrated_entry(manifest, ev.key, addon_id, "env"):
-            upgraded.append(f"env:{ev.key}")
-        else:
-            add_env_entry(manifest, ev.key, source=EntrySource.ADDON, addon=addon_id)
+        if add_env_entry(manifest, ev.key, source=EntrySource.ADDON, addon=addon_id):
+            adopted.append(f"env:{ev.key}")
     for svc in addon_cfg.compose_services:
-        if upgrade_migrated_entry(manifest, svc.name, addon_id, "compose_service"):
-            upgraded.append(f"compose_service:{svc.name}")
-        else:
-            add_compose_service(
-                manifest, svc.name, source=EntrySource.ADDON, addon=addon_id
-            )
+        if add_compose_service(
+            manifest, svc.name, source=EntrySource.ADDON, addon=addon_id
+        ):
+            adopted.append(f"compose_service:{svc.name}")
     for vol in addon_cfg.compose_volumes:
-        if upgrade_migrated_entry(manifest, vol, addon_id, "compose_volume"):
-            upgraded.append(f"compose_volume:{vol}")
-        else:
-            add_compose_volume(manifest, vol, source=EntrySource.ADDON, addon=addon_id)
+        if add_compose_volume(manifest, vol, source=EntrySource.ADDON, addon=addon_id):
+            adopted.append(f"compose_volume:{vol}")
     for dep in addon_cfg.deps:
         pkg = dep_package_name(dep)
-        if upgrade_migrated_entry(manifest, pkg, addon_id, "dependency"):
-            upgraded.append(f"dependency:{pkg}")
-        else:
-            add_dependency(
-                manifest,
-                pkg,
-                dep,
-                source=EntrySource.ADDON,
-                addon=addon_id,
-                dev=False,
-            )
+        if add_dependency(
+            manifest,
+            pkg,
+            dep,
+            source=EntrySource.ADDON,
+            addon=addon_id,
+            dev=False,
+        ):
+            adopted.append(f"dependency:{pkg}")
     for dep in addon_cfg.dev_deps:
         pkg = dep_package_name(dep)
-        if upgrade_migrated_entry(manifest, pkg, addon_id, "dependency"):
-            upgraded.append(f"dev_dependency:{pkg}")
-        else:
-            add_dependency(
-                manifest,
-                pkg,
-                dep,
-                source=EntrySource.ADDON,
-                addon=addon_id,
-                dev=True,
-            )
+        if add_dependency(
+            manifest,
+            pkg,
+            dep,
+            source=EntrySource.ADDON,
+            addon=addon_id,
+            dev=True,
+        ):
+            adopted.append(f"dev_dependency:{pkg}")
     for recipe_raw in addon_cfg.just_recipes:
         rendered = string_env.from_string(recipe_raw).render(**render_vars)
         m = _RECIPE_NAME_RE.search(rendered)
-        if m:
-            if upgrade_migrated_entry(manifest, m.group(1), addon_id, "just_recipe"):
-                upgraded.append(f"just_recipe:{m.group(1)}")
-            else:
-                add_just_recipe(
-                    manifest, m.group(1), source=EntrySource.ADDON, addon=addon_id
-                )
-    return upgraded
+        if m and add_just_recipe(
+            manifest, m.group(1), source=EntrySource.ADDON, addon=addon_id
+        ):
+            adopted.append(f"just_recipe:{m.group(1)}")
+    return adopted
 
 
 # ── Fingerprinting ────────────────────────────────────────────────────────────

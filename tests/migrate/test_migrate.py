@@ -14,7 +14,6 @@ from zenit.migrate.copier import (
     QuestionType,
 )
 from zenit.migrate.migrate import (
-    _addon_id_from_question,
     _inventory_compose,
     _inventory_deps,
     _inventory_env,
@@ -48,25 +47,6 @@ def test_normalise_local_path() -> None:
     assert _normalise_source("./local-template") == str(
         Path("./local-template").resolve()
     )
-
-
-# ── _addon_id_from_question ────────────────────────────────────────────────────
-
-
-def test_addon_id_strips_use_prefix() -> None:
-    assert _addon_id_from_question("use_postgres") == "postgres-migrated"
-
-
-def test_addon_id_strips_with_prefix() -> None:
-    assert _addon_id_from_question("with_redis") == "redis-migrated"
-
-
-def test_addon_id_strips_has_prefix() -> None:
-    assert _addon_id_from_question("has_docker") == "docker-migrated"
-
-
-def test_addon_id_no_prefix() -> None:
-    assert _addon_id_from_question("celery") == "celery-migrated"
 
 
 # ── _prompt_questions (non-interactive) ────────────────────────────────────────
@@ -347,10 +327,10 @@ def test_run_migration_local_template(
     # Check lockfile
     lockfile = read_lockfile(result.project_dir)
     assert lockfile is not None
-    assert lockfile.migrated is not None
-    assert "migrated" in lockfile.template
+    assert lockfile.template_source == "copier"
+    assert lockfile.template_uri != ""
 
-    # Check manifest has MIGRATED entries
+    # Check manifest has TEMPLATE entries
     manifest = read_manifest(result.project_dir)
     assert manifest is not None
 
@@ -378,10 +358,10 @@ def test_run_migration_without_addon(
 
     lockfile = read_lockfile(result.project_dir)
     assert lockfile is not None
-    assert lockfile.migrated is not None
+    assert lockfile.template_source == "copier"
 
 
-def test_run_migration_creates_lockfile_with_migrated_section(
+def test_run_migration_creates_lockfile_with_copier_section(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     template_dir = _create_copier_template(tmp_path)
@@ -394,10 +374,10 @@ def test_run_migration_creates_lockfile_with_migrated_section(
 
     lockfile = read_lockfile(result.project_dir)
     assert lockfile is not None
-    assert lockfile.migrated is not None
-    assert lockfile.migrated.source != ""
-    assert isinstance(lockfile.migrated.file_paths, list)
-    assert len(lockfile.migrated.file_paths) > 0
+    assert lockfile.template_source == "copier"
+    assert lockfile.template_uri != ""
+    assert isinstance(lockfile.template_file_paths, list)
+    assert len(lockfile.template_file_paths) > 0
 
 
 def test_run_migration_fails_when_dir_exists(

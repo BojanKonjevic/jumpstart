@@ -31,7 +31,7 @@ from zenit.core.context import Context
 from zenit.core.filesystem import RealFileSystem
 from zenit.core.generate import generate_all
 from zenit.core.git import init
-from zenit.core.lockfile import MigratedMeta, read_lockfile, write_lockfile
+from zenit.core.lockfile import read_lockfile, write_lockfile
 from zenit.core.render import build_render_vars
 from zenit.schema.models import OwnedEntry
 from zenit.templates._load_config import load_template_config
@@ -98,17 +98,15 @@ def _scaffold(tmp_path: Path, name: str, template: str, addons: list[str]) -> Pa
 def test_add_overwrite_warning_fires(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    """Addon file destinations overlapping with migrated.file_paths must warn."""
+    """Addon file destinations overlapping with template_file_paths must warn."""
     project_dir = _scaffold(tmp_path, "myapp", "blank", [])
     write_lockfile(
         project_dir,
-        "migrated:https://example.com/template",
+        "https://example.com/template",
         [],
-        migrated=MigratedMeta(
-            source="https://example.com/template",
-            has_tasks=False,
-            file_paths=["Dockerfile"],
-        ),
+        template_source="copier",
+        template_uri="https://example.com/template",
+        template_file_paths=["Dockerfile"],
     )
 
     with suppress_stdin():
@@ -122,43 +120,33 @@ def test_add_overwrite_warning_fires(
 def test_full_add_on_migrated_lifecycle(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Add an addon on a migrated project upgrades MIGRATED entries, then remove
-    correctly cleans up the upgraded (ADDON) entries without touching other
-    MIGRATED content."""
+    """Add an addon on a Copier project adopts TEMPLATE entries, then remove
+    correctly cleans up the adopted (ADDON) entries without touching other
+    TEMPLATE content."""
     from zenit.core.manifest import read_manifest as _rd
     from zenit.core.manifest import write_manifest as _wr
     from zenit.schema.models import EntrySource
 
     project_dir = _scaffold(tmp_path, "myapp", "blank", [])
 
-    # Write a MIGRATED compose_service entry into the manifest
-    manifest = _rd(project_dir)
-    manifest.compose_services.append(
-        OwnedEntry(name="redis", source=EntrySource.MIGRATED, addon="")
-    )
-    _wr(project_dir, manifest)
-
     # Ensure docker is "installed" so compose contributions are allowed
     with suppress_stdin():
         add_addon("docker", project_dir=project_dir)
 
-    # Also add a migrated compose service (simulating a Copier template that wrote compose entries)
+    # Write a TEMPLATE compose_service entry (simulating a Copier template that wrote compose entries)
     manifest = _rd(project_dir)
     manifest.compose_services.append(
-        OwnedEntry(name="redis", source=EntrySource.MIGRATED, addon="")
+        OwnedEntry(name="redis", source=EntrySource.TEMPLATE, addon="")
     )
     _wr(project_dir, manifest)
 
-    # Write lockfile with migrated metadata and docker installed
+    # Write lockfile with copier metadata and docker installed
     write_lockfile(
         project_dir,
-        "migrated:https://example.com/template",
+        "https://example.com/template",
         ["docker"],
-        migrated=MigratedMeta(
-            source="https://example.com/template",
-            has_tasks=False,
-            file_paths=[],
-        ),
+        template_source="copier",
+        template_uri="https://example.com/template",
     )
 
     monkeypatch.chdir(project_dir)
@@ -220,23 +208,21 @@ def test_add_lockfile_template_unchanged(tmp_path, monkeypatch):
     assert lockfile.template == "blank"
 
 
-def test_add_on_migrated_project_preserves_migration_template(tmp_path, monkeypatch):
+def test_add_on_migrated_project_preserves_template(tmp_path, monkeypatch):
     project_dir = _scaffold(tmp_path, "myapp", "blank", [])
     write_lockfile(
         project_dir,
-        "migrated:https://github.com/example/copier-template",
+        "https://github.com/example/copier-template",
         [],
-        migrated=MigratedMeta(
-            source="https://github.com/example/copier-template",
-            has_tasks=False,
-            file_paths=[],
-        ),
+        template_source="copier",
+        template_uri="https://github.com/example/copier-template",
     )
     monkeypatch.chdir(project_dir)
     with suppress_stdin():
         add_addon("docker")
     lockfile = read_lockfile(project_dir)
-    assert lockfile.template == "migrated:https://github.com/example/copier-template"
+    assert lockfile.template == "https://github.com/example/copier-template"
+    assert lockfile.template_source == "copier"
     assert "docker" in lockfile.addons
 
 

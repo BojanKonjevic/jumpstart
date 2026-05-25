@@ -32,7 +32,7 @@ from zenit.cli.ui import (
     warn,
 )
 from zenit.core._filenames import COMPOSE_FILE, ENV_FILES, PYPROJECT_FILE
-from zenit.core.lockfile import MigratedMeta, write_lockfile
+from zenit.core.lockfile import write_lockfile
 from zenit.core.manifest import (
     add_compose_service,
     add_compose_volume,
@@ -323,20 +323,6 @@ def _coerce_question_value(
             return float(value) if value.strip() else 0.0
         case _:
             return value
-
-
-def _addon_id_from_question(question_name: str) -> str:
-    """Derive an addon id from a Copier boolean question name.
-
-    Strips common prefixes (``use_``, ``with_``, ``has_``) and appends
-    ``-migrated`` to distinguish from native zenit addons.
-    """
-    name = question_name.lower()
-    for prefix in ("use_", "with_", "has_", "enable_"):
-        if name.startswith(prefix):
-            name = name[len(prefix) :]
-            break
-    return f"{name}-migrated"
 
 
 # ── Template rendering ────────────────────────────────────────────────────────
@@ -682,19 +668,19 @@ def _print_migration_report(result: MigrationResult) -> None:
     print()
 
     print(f"  {BOLD}Presence-tracked only:{RESET}")
-    print(f"    ~ {len(result.file_paths)} files tracked in [migrated].file_paths")
+    print(f"    ~ {len(result.file_paths)} files tracked via template_file_paths")
     if result.env_count > 0:
-        print(f"    ~ {result.env_count} env var(s) with source=migrated")
+        print(f"    ~ {result.env_count} env var(s) with source=template")
     if result.compose_service_count > 0:
         print(
-            f"    ~ {result.compose_service_count} compose service(s) with source=migrated"
+            f"    ~ {result.compose_service_count} compose service(s) with source=template"
         )
     if result.compose_volume_count > 0:
         print(
-            f"    ~ {result.compose_volume_count} compose volume(s) with source=migrated"
+            f"    ~ {result.compose_volume_count} compose volume(s) with source=template"
         )
     if result.dep_count > 0:
-        print(f"    ~ {result.dep_count} dependencies with source=migrated")
+        print(f"    ~ {result.dep_count} dependencies with source=template")
     print()
 
     if result.has_tasks:
@@ -861,24 +847,27 @@ def run_migration(
     manifest = read_manifest(project_dir)
 
     for key in env_keys:
-        add_env_entry(manifest, key, source=EntrySource.MIGRATED, addon="")
+        add_env_entry(manifest, key, source=EntrySource.TEMPLATE, addon="")
     for svc in compose_services:
-        add_compose_service(manifest, svc, source=EntrySource.MIGRATED, addon="")
+        add_compose_service(manifest, svc, source=EntrySource.TEMPLATE, addon="")
     for vol in compose_volumes:
-        add_compose_volume(manifest, vol, source=EntrySource.MIGRATED, addon="")
+        add_compose_volume(manifest, vol, source=EntrySource.TEMPLATE, addon="")
     for pkg, spec, dev in deps:
         add_dependency(
-            manifest, pkg, spec, source=EntrySource.MIGRATED, addon="", dev=dev
+            manifest, pkg, spec, source=EntrySource.TEMPLATE, addon="", dev=dev
         )
 
     write_manifest(project_dir, manifest)
 
-    migrated = MigratedMeta(
-        source=template_source,
-        has_tasks=bool(pending_tasks),
-        file_paths=sorted(set(file_paths)),
+    write_lockfile(
+        project_dir,
+        template_source,
+        [],
+        template_source="copier",
+        template_uri=template_source,
+        template_has_tasks=bool(pending_tasks),
+        template_file_paths=sorted(set(file_paths)),
     )
-    write_lockfile(project_dir, f"migrated:{template_source}", [], migrated=migrated)
 
     step("Processing tasks")
     if pending_tasks:

@@ -95,11 +95,7 @@ def apply_contributions(
         dest = resolve_dest_placeholder(fc.dest, pkg_name)
         _validate_no_path_traversal(dest, project_dir)
 
-        if (
-            lockfile is not None
-            and lockfile.migrated is not None
-            and dest in lockfile.migrated.file_paths
-        ):
+        if lockfile is not None and dest in lockfile.template_file_paths:
             _warn(
                 f"'{dest}' was written by the Copier template. "
                 f"Overwriting with addon-provided content."

@@ -32,7 +32,6 @@ from zenit.schema.models import (
     AddonConfig,
     Contributions,
     DependencyEntry,
-    EntrySource,
     EnvEntry,
     Manifest,
     ManifestBlock,
@@ -105,7 +104,7 @@ def run_doctor(project_dir: Path, *, thorough: bool = False) -> list[HealthResul
 
     results: list[HealthResult] = []
     results.append(_check_metadata(project_dir))
-    results.append(_check_migration_health(project_dir, lockfile, manifest))
+    results.append(_check_template_health(project_dir, lockfile, manifest))
     results.append(_check_manifest_schema(project_dir, lockfile, manifest))
     results.append(
         _check_dependencies(project_dir, lockfile, template_config, contributions)
@@ -163,9 +162,7 @@ def _check_manifest_schema(
         return {
             getattr(e, attr)
             for e in entries
-            if getattr(e, attr)
-            and getattr(e, attr) not in addon_ids
-            and getattr(e, "source", EntrySource.ADDON) != EntrySource.MIGRATED
+            if getattr(e, attr) and getattr(e, attr) not in addon_ids
         }
 
     orphan_addons = (
@@ -509,54 +506,24 @@ def _check_python_integrity(
     return result
 
 
-def _check_migration_health(
+def _check_template_health(
     project_dir: Path,
     lockfile: ZenitLockfile,
     manifest: Manifest | None = None,
 ) -> HealthResult:
-    """Check migration status for projects created via ``zenit migrate``.
+    """Check template health for Copier-sourced projects.
 
-    Reports warnings for unmanaged (MIGRATED-sourced) env vars, compose
-    services, dependencies, and file paths.  Reports an ERROR if the
-    migrated template had ``_tasks`` that were not executed.
+    For native projects, returns an OK result immediately.
+    For Copier projects, reports warnings about file path tracking and
+    an error if the template had ``_tasks`` that were not executed.
     """
-    result = HealthResult("Migration status")
+    result = HealthResult("Template health")
 
-    if lockfile.migrated is None:
-        result.ok("No migration metadata — project is native.")
+    if lockfile.template_source != "copier":
+        result.ok("Project uses a native template.")
         return result
 
-    if manifest is None:
-        manifest = read_manifest(project_dir)
-
-    migrated_env = [e for e in manifest.env if e.source == EntrySource.MIGRATED]
-    migrated_services = [
-        s for s in manifest.compose_services if s.source == EntrySource.MIGRATED
-    ]
-    migrated_deps = [
-        d for d in manifest.dependencies if d.source == EntrySource.MIGRATED
-    ]
-
-    for entry in migrated_env:
-        result.warn(
-            f"Env var '{entry.key}' is unmanaged (written by Copier template).",
-        )
-    for svc in migrated_services:
-        result.warn(
-            f"Compose service '{svc.name}' is unmanaged (written by Copier template).",
-        )
-    for dep in migrated_deps:
-        result.warn(
-            f"Dependency '{dep.package}' is unmanaged (written by Copier template).",
-        )
-
-    file_count = len(lockfile.migrated.file_paths)
-    result.warn(
-        f"{file_count} files are unmanaged (written by Copier template, "
-        f"not tracked by zenit).",
-    )
-
-    if lockfile.migrated.has_tasks:
+    if lockfile.template_has_tasks:
         result.error(
             "This project has pending manual steps from Copier _tasks that "
             "were not executed automatically.",
@@ -566,11 +533,16 @@ def _check_migration_health(
             ),
         )
 
-    result.warn(
-        "This project was migrated from a Copier template. Some content "
-        "is not under zenit's full lifecycle management.",
-        hint=f"Migrated from: {lockfile.migrated.source}.",
-    )
+    file_count = len(lockfile.template_file_paths)
+    if file_count > 0:
+        result.warn(
+            f"{file_count} file(s) are tracked as Copier template outputs "
+            f"(may not be managed by zenit add/remove).",
+        )
+    else:
+        result.ok("No Copier template file paths tracked.")
+
+    result.ok(f"Copier template source: {lockfile.template_uri or lockfile.template}.")
 
     return result
 
