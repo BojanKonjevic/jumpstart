@@ -5,12 +5,13 @@ from __future__ import annotations
 import sys
 from collections.abc import Mapping
 from dataclasses import dataclass
+from io import StringIO
 from pathlib import Path
 from typing import Any
 
 import tomlkit
 import typer
-import yaml
+from ruamel.yaml import YAML
 from tomlkit.items import Array
 
 from zenit.addons._registry import get_addon, list_addons
@@ -35,6 +36,7 @@ from zenit.core._paths import get_zenit_root
 from zenit.core.constants import _RECIPE_NAME_RE
 from zenit.core.context import Context
 from zenit.core.dependency import DependencyGraph
+from zenit.core.filesystem import atomic_write_text
 from zenit.core.handlers import HandlerDispatcher
 from zenit.core.lockfile import ZenitLockfile, read_lockfile, write_lockfile
 from zenit.core.manifest import (
@@ -48,8 +50,17 @@ from zenit.core.manifest import (
 )
 from zenit.core.pkg_name import normalise_pkg_name, resolve_dest_placeholder
 from zenit.schema.exceptions import ZenitError
-from zenit.schema.models import AddonConfig, ComposeService, Manifest
+from zenit.schema.models import AddonConfig, ComposeService, Manifest, ManifestBlock
 from zenit.templates._load_config import load_template_config
+
+_compose_yaml = YAML()
+_compose_yaml.default_flow_style = False
+
+
+def _yaml_dumps(data: object) -> str:
+    buf = StringIO()
+    _compose_yaml.dump(data, buf)
+    return buf.getvalue()
 
 
 def _check_fuzzy_blocks(
@@ -338,24 +349,26 @@ def _undo_injections_physical(
 
     dispatcher = HandlerDispatcher()
 
-    # Remove blocks from bottom to top within each file so that earlier
-    # removals don't shift the line numbers of blocks still to be removed.
-    blocks = sorted(
-        [b for b in manifest.python_blocks if b.addon == addon_id],
-        key=lambda b: (b.file, -int(b.lines.split("-")[0])),
-    )
+    # Group blocks by file and remove bottom-to-top within each file so
+    # that earlier removals don't shift the line numbers of later ones.
+    by_file: dict[str, list[ManifestBlock]] = {}
+    for b in manifest.python_blocks:
+        if b.addon == addon_id:
+            by_file.setdefault(b.file, []).append(b)
 
-    for block in blocks:
-        file_path = project_dir / block.file
+    for file, blocks in by_file.items():
+        blocks.sort(key=lambda b: -int(b.lines.split("-")[0]))
+        file_path = project_dir / file
         if not file_path.exists():
             print(
-                f"Warning: '{block.file}' is missing — skipping removal of "
-                f"'{block.point}' injection for addon '{addon_id}'. "
+                f"Warning: '{file}' is missing — skipping removal of "
+                f"'{blocks[0].point}' injection(s) for addon '{addon_id}'. "
                 f"Run 'zenit doctor' to verify project integrity.",
                 file=sys.stderr,
             )
             continue
-        dispatcher.remove(file_path, block)
+        for block in blocks:
+            dispatcher.remove(file_path, block)
 
 
 def _remove_compose_services(
@@ -375,7 +388,7 @@ def _remove_compose_services(
         return []
 
     data: dict[str, Any] = (
-        yaml.safe_load(compose_path.read_text(encoding="utf-8")) or {}
+        _compose_yaml.load(compose_path.read_text(encoding="utf-8")) or {}
     )
     services: dict[str, Any] = data.get("services", {})
 
@@ -397,10 +410,11 @@ def _remove_compose_services(
                 removed.append(svc.name)
 
     if removed:
-        compose_path.write_text(
-            yaml.dump(data, default_flow_style=False, sort_keys=False),
-            encoding="utf-8",
-        )
+        if not data.get("services"):
+            data.pop("services", None)
+        if not data.get("volumes"):
+            data.pop("volumes", None)
+        atomic_write_text(compose_path, _yaml_dumps(data))
 
     return removed
 
@@ -421,7 +435,7 @@ def _remove_compose_volumes(
         return
 
     data: dict[str, Any] = (
-        yaml.safe_load(compose_path.read_text(encoding="utf-8")) or {}
+        _compose_yaml.load(compose_path.read_text(encoding="utf-8")) or {}
     )
     vols: dict[str, Any] = data.get("volumes", {})
 
@@ -440,10 +454,11 @@ def _remove_compose_volumes(
                 removed_names.append(vol_name)
 
     if removed_names:
-        compose_path.write_text(
-            yaml.dump(data, default_flow_style=False, sort_keys=False),
-            encoding="utf-8",
-        )
+        if not data.get("services"):
+            data.pop("services", None)
+        if not data.get("volumes"):
+            data.pop("volumes", None)
+        atomic_write_text(compose_path, _yaml_dumps(data))
 
 
 def _remove_env_vars(
@@ -473,7 +488,7 @@ def _remove_env_vars(
                 removed.append(key)
                 continue
             new_lines.append(line)
-        env_path.write_text("".join(new_lines), encoding="utf-8")
+        atomic_write_text(env_path, "".join(new_lines))
 
     return list(dict.fromkeys(removed))
 
@@ -515,12 +530,10 @@ def _remove_deps(
 
     project_deps = doc.get("project", {}).get("dependencies", [])
     if isinstance(project_deps, Array):
-        removed, to_remove = _partition_deps(
-            [str(d) for d in project_deps], deps_to_remove
-        )
+        removed, kept = _partition_deps([str(d) for d in project_deps], deps_to_remove)
         if removed:
             del project_deps[:]
-            for d in to_remove:
+            for d in kept:
                 project_deps.append(d)
     else:
         removed = []
@@ -531,20 +544,20 @@ def _remove_deps(
         "optional-dependencies", {}
     ).get("dev")
     if isinstance(dev_group, (list, Array)):
-        removed_dev, new_dev = _partition_deps(
+        removed_dev, kept_dev = _partition_deps(
             [str(d) for d in dev_group], dev_deps_to_remove
         )
         if removed_dev:
             dep_groups = doc.get("dependency-groups")
             if isinstance(dep_groups, Mapping) and "dev" in dep_groups:
-                doc["dependency-groups"]["dev"] = new_dev
+                doc["dependency-groups"]["dev"] = kept_dev
             else:
-                doc["project"]["optional-dependencies"]["dev"] = new_dev
+                doc["project"]["optional-dependencies"]["dev"] = kept_dev
     else:
         removed_dev = []
 
     if removed or removed_dev:
-        pyproject_path.write_text(tomlkit.dumps(doc), encoding="utf-8")
+        atomic_write_text(pyproject_path, tomlkit.dumps(doc))
 
     return removed, removed_dev
 
@@ -553,7 +566,7 @@ def _remove_deps(
 class _JustBlock:
     """A parsed block from a justfile."""
 
-    kind: str  # "setting", "alias", "attribute", "recipe", "blank", "other"
+    kind: str  # "setting", "alias", "recipe", "blank", "other"
     lines: list[str]
     recipe_name: str = ""  # only for kind == "recipe"
 
@@ -661,7 +674,7 @@ def _remove_just_recipes(
         result_lines.extend(block.lines)
         prev_was_blank = is_blank
 
-    justfile_path.write_text("".join(result_lines), encoding="utf-8")
+    atomic_write_text(justfile_path, "".join(result_lines))
     return list(recipe_names)
 
 

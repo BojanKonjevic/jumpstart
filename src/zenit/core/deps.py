@@ -14,6 +14,7 @@ import tomlkit
 from tomlkit.container import Container
 
 from zenit.core._filenames import PYPROJECT_FILE
+from zenit.core.filesystem import atomic_write_text
 from zenit.core.manifest import dep_package_name
 
 
@@ -99,5 +100,5 @@ def inject_deps(
     else:
         added_dev_deps = []
 
-    pyproject_path.write_text(tomlkit.dumps(doc), encoding="utf-8")
+    atomic_write_text(pyproject_path, tomlkit.dumps(doc))
     return added_deps, added_dev_deps

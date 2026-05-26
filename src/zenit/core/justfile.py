@@ -6,11 +6,10 @@ Preserves all existing content and formatting exactly.
 
 from __future__ import annotations
 
-import re
 from pathlib import Path
 
 from zenit.core._filenames import JUSTFILE_NAME
-from zenit.core.constants import _recipe_name
+from zenit.core.constants import extract_recipe_name
 
 
 def inject_just_recipes(project_dir: Path, recipes: list[str]) -> list[str]:
@@ -26,7 +25,9 @@ def inject_just_recipes(project_dir: Path, recipes: list[str]) -> list[str]:
     existing_text = justfile_path.read_text(encoding="utf-8")
     existing_names = _extract_recipe_names(existing_text)
 
-    to_add = [r for r in recipes if r.strip() and _recipe_name(r) not in existing_names]
+    to_add = [
+        r for r in recipes if r.strip() and extract_recipe_name(r) not in existing_names
+    ]
     if not to_add:
         return []
 
@@ -35,7 +36,7 @@ def inject_just_recipes(project_dir: Path, recipes: list[str]) -> list[str]:
         appended += "\n" + recipe.strip("\n") + "\n"
 
     justfile_path.write_text(appended, encoding="utf-8")
-    return [name for r in to_add if (name := _recipe_name(r)) is not None]
+    return [name for r in to_add if (name := extract_recipe_name(r)) is not None]
 
 
 def _extract_recipe_names(text: str) -> set[str]:
@@ -43,9 +44,10 @@ def _extract_recipe_names(text: str) -> set[str]:
     names: set[str] = set()
     for line in text.splitlines():
         # Recipe lines start at column 0, are not indented, not comments,
-        # and contain a colon. This matches: `run:`, `migrate msg="":`, etc.
-        if line and not line[0].isspace() and not line.startswith("#") and ":" in line:
-            name = line.split(":")[0].strip().split()[0]
-            if name and re.match(r"^[a-zA-Z0-9_-]+$", name):
-                names.add(name)
+        # and contain a colon.
+        if not line or line[0].isspace() or line.startswith("#") or ":" not in line:
+            continue
+        name = extract_recipe_name(line)
+        if name is not None:
+            names.add(name)
     return names

@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING
 
 import libcst as cst
 
+from zenit.core.filesystem import atomic_write_text
 from zenit.core.handlers.base import FileHandler
 from zenit.core.handlers.locators import (
     _REGISTRY,
@@ -176,7 +177,7 @@ def apply(
     start_line = line_number + 1  # 1-based
     end_line = line_number + len(content_lines)
 
-    file.write_text(new_source, encoding="utf-8")
+    atomic_write_text(file, new_source)
     return new_source, start_line, end_line
 
 
@@ -354,8 +355,6 @@ def relocate_block(
 
     return None
 
-    return None
-
 
 def _remove_lines(
     file: Path,
@@ -367,7 +366,7 @@ def _remove_lines(
     new_lines = lines[:start] + lines[end + 1 :]
     cleaned = _collapse_blank_lines(new_lines)
 
-    file.write_text("".join(cleaned), encoding="utf-8")
+    atomic_write_text(file, "".join(cleaned))
 
 
 def _collapse_blank_lines(lines: list[str]) -> list[str]:

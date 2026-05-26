@@ -9,9 +9,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from zenit.core.constants import _recipe_name
 from zenit.core.justfile import (
     _extract_recipe_names,
-    _recipe_name,
     inject_just_recipes,
 )
 

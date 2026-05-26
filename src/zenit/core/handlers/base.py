@@ -4,6 +4,7 @@ from abc import ABC, abstractmethod
 from collections.abc import Callable
 from pathlib import Path
 
+from zenit.core.filesystem import atomic_write_text
 from zenit.schema.models import ManifestBlock
 
 
@@ -33,7 +34,7 @@ class FileHandler(ABC):
         if e >= len(lines):
             return
         new_lines = lines[:s] + lines[e + 1 :]
-        file.write_text("".join(new_lines), encoding="utf-8")
+        atomic_write_text(file, "".join(new_lines))
 
     def _append_text(
         self,
@@ -59,7 +60,7 @@ class FileHandler(ABC):
         end_line = start_line + len(content_lines) - 1
 
         new_source = "".join(lines + content_lines)
-        file.write_text(new_source, encoding="utf-8")
+        atomic_write_text(file, new_source)
         return new_source, start_line, end_line
 
 

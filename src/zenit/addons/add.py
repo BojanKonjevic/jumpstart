@@ -217,18 +217,27 @@ def _refresh_compose(
     3. Merges current entries into compose.yml.
     4. Records all entries as docker-owned in the manifest.
     """
+    from io import StringIO
+
+    from ruamel.yaml import YAML
+
     from zenit.addons._registry import get_addon as _get_addon
     from zenit.core._filenames import COMPOSE_FILE
-    from zenit.core.apply import merge_compose
-    from zenit.core.filesystem import RealFileSystem
+    from zenit.core.apply import merge_compose_into_data
     from zenit.core.manifest import add_compose_service, add_compose_volume
     from zenit.core.pkg_name import resolve_dest_placeholder
+
+    _compose_yaml = YAML()
+    _compose_yaml.default_flow_style = False
+
+    def _dump(data: object) -> str:
+        buf = StringIO()
+        _compose_yaml.dump(data, buf)
+        return buf.getvalue()
 
     compose_path = project_dir / COMPOSE_FILE
     if not compose_path.exists():
         return
-
-    import yaml
 
     # 1. Collect compose from all installed addons
     services: list[ComposeService] = []
@@ -256,7 +265,7 @@ def _refresh_compose(
                         watch["path"], ctx.pkg_name
                     )
 
-    # 2. Remove stale ADDON-source entries from compose.yml
+    # 2. Single read-modify-write cycle
     old_service_names = {
         e.name for e in manifest.compose_services if e.source == EntrySource.ADDON
     }
@@ -264,7 +273,7 @@ def _refresh_compose(
         e.name for e in manifest.compose_volumes if e.source == EntrySource.ADDON
     }
     data: dict[str, object] = (
-        yaml.safe_load(compose_path.read_text(encoding="utf-8")) or {}
+        _compose_yaml.load(compose_path.read_text(encoding="utf-8")) or {}
     )
     svc_section: dict[str, object] = data.get("services", {})  # type: ignore[assignment]
     vol_section: dict[str, object] = data.get("volumes", {})  # type: ignore[assignment]
@@ -273,15 +282,12 @@ def _refresh_compose(
     for name in old_volume_names:
         vol_section.pop(name, None)
 
-    # 3. Merge current entries using merge_compose (handles the block building)
-    fs = RealFileSystem(project_dir)
-    compose_path.write_text(
-        yaml.dump(data, default_flow_style=False, sort_keys=False),
-        encoding="utf-8",
-    )
-    merge_compose(ctx, fs, services, volumes)
+    merge_compose_into_data(data, services, volumes)
+    from zenit.core.filesystem import atomic_write_text
 
-    # 4. Update manifest — record all entries as docker-owned
+    atomic_write_text(compose_path, _dump(data))
+
+    # 3. Update manifest — record all entries as docker-owned
     manifest.compose_services = [
         e for e in manifest.compose_services if e.source != EntrySource.ADDON
     ]

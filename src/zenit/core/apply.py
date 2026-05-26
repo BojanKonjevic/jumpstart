@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
+from io import StringIO
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 import jinja2
-import yaml
+from ruamel.yaml import YAML
 
 from zenit.cli.ui import warn as _warn
 from zenit.core._filenames import COMPOSE_FILE, ENV_FILES
@@ -35,6 +36,16 @@ if TYPE_CHECKING:
         EnvVar,
         InjectionPoint,
     )
+
+
+_compose_yaml = YAML()
+_compose_yaml.default_flow_style = False
+
+
+def _yaml_dumps(data: object) -> str:
+    buf = StringIO()
+    _compose_yaml.dump(data, buf)
+    return buf.getvalue()
 
 
 def apply_contributions(
@@ -227,23 +238,17 @@ def apply_contributions(
 # ── Internal helpers ──────────────────────────────────────────────────────────
 
 
-def merge_compose(
-    ctx: Context,
-    fs: FileSystem,
+def merge_compose_into_data(
+    data: dict[str, Any],
     services: list[ComposeService],
     volumes: list[str],
     replace: bool = False,
 ) -> None:
-    """Add *services* and *volumes* to ``compose.yml``, skipping duplicates.
+    """Merge *services* and *volumes* into *data* dict in-place.
 
     When *replace* is True, remove any service or volume **not** in the
     provided lists before adding missing ones (full reconciliation).
     """
-    compose_path = ctx.project_dir / COMPOSE_FILE
-    data: dict[str, Any] = (
-        yaml.safe_load(compose_path.read_text(encoding="utf-8")) or {}
-    )
-
     if replace:
         svc_names = {s.name for s in services}
         data["services"] = {
@@ -288,10 +293,25 @@ def merge_compose(
         if vol_name not in vols_section:
             vols_section[vol_name] = None
 
-    fs.write_file(
-        COMPOSE_FILE,
-        yaml.dump(data, default_flow_style=False, sort_keys=False),
+
+def merge_compose(
+    ctx: Context,
+    fs: FileSystem,
+    services: list[ComposeService],
+    volumes: list[str],
+    replace: bool = False,
+) -> None:
+    """Add *services* and *volumes* to ``compose.yml``, skipping duplicates.
+
+    When *replace* is True, remove any service or volume **not** in the
+    provided lists before adding missing ones (full reconciliation).
+    """
+    compose_path = ctx.project_dir / COMPOSE_FILE
+    data: dict[str, Any] = (
+        _compose_yaml.load(compose_path.read_text(encoding="utf-8")) or {}
     )
+    merge_compose_into_data(data, services, volumes, replace=replace)
+    fs.write_file(COMPOSE_FILE, _yaml_dumps(data))
 
 
 def _merge_env_vars(

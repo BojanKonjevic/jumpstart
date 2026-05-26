@@ -142,11 +142,18 @@ def after_last_class_attribute(module: cst.Module, *, class_name: str) -> int:
                 raise LocatorError(f"Class '{class_name}' has an unexpected body type.")
             stmts = body.body
             last_attr_idx = -1
+            last_real_idx = -1
             for i, stmt in enumerate(stmts):
                 if _is_class_attribute(stmt):
                     last_attr_idx = i
+                if not (_is_docstring(stmt) or _is_placeholder(stmt)):
+                    last_real_idx = i
             if last_attr_idx == -1:
-                # No attributes found; insert at 1 (after docstring if present)
+                # No attributes found; insert after the last non-placeholder
+                # statement (e.g. after a nested class or function), or at
+                # position 0 (after docstring if present) if body is empty.
+                if last_real_idx >= 0:
+                    return last_real_idx + 1
                 if stmts and _is_docstring(stmts[0]):
                     return 1
                 return 0
@@ -307,6 +314,18 @@ def _is_class_attribute(stmt: cst.BaseStatement) -> bool:
     if len(stmt.body) != 1:
         return False
     return isinstance(stmt.body[0], (cst.Assign, cst.AnnAssign))
+
+
+def _is_placeholder(stmt: cst.BaseStatement) -> bool:
+    """Return True if *stmt* is a no-op (pass, ...)."""
+    if not isinstance(stmt, cst.SimpleStatementLine):
+        return False
+    if len(stmt.body) != 1:
+        return False
+    inner = stmt.body[0]
+    return isinstance(inner, cst.Pass) or (
+        isinstance(inner, cst.Expr) and isinstance(inner.value, cst.Ellipsis)
+    )
 
 
 def _is_docstring(stmt: cst.BaseStatement) -> bool:
