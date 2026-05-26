@@ -818,6 +818,116 @@ class TestRunDoctor:
         all_errors = [i for r in results for i in _errors(r)]
         assert any("main.py" in i.message for i in all_errors)
 
+    @staticmethod
+    def _failing_load(*args: object, **kwargs: object) -> None:
+        raise FileNotFoundError("Template not found")
+
+    def test_skips_dependent_checks_when_template_fails_to_load(
+        self, tmp_path, monkeypatch
+    ):
+        project_dir = _scaffold(tmp_path, template="fastapi")
+
+        monkeypatch.setattr(
+            "zenit.doctor.doctor.load_template_config",
+            self._failing_load,
+        )
+        results = run_doctor(project_dir)
+        categories = {r.category for r in results}
+
+        assert "Template configuration" in categories, (
+            "Should add a consolidated 'Template configuration' section "
+            "when template loading fails"
+        )
+
+        assert "Dependencies" not in categories, (
+            "Should skip template-dependent Dependencies check"
+        )
+        assert "Generated files" not in categories, (
+            "Should skip template-dependent Generated files check"
+        )
+        assert "Compose" not in categories, (
+            "Should skip template-dependent Compose check"
+        )
+        assert "Env vars" not in categories, (
+            "Should skip template-dependent Env vars check"
+        )
+
+        assert "Metadata" in categories
+        assert "Template health" in categories
+        assert "Manifest schema" in categories
+        assert "Addon integrity" in categories
+        assert "Manifest env integrity" in categories
+        assert "Manifest compose integrity" in categories
+        assert "Manifest dependency integrity" in categories
+        assert "Manifest just-recipe integrity" in categories
+        assert "Python block line presence" in categories
+
+    def test_native_template_message_when_not_found(self, tmp_path, monkeypatch):
+        project_dir = _scaffold(tmp_path, template="fastapi")
+
+        monkeypatch.setattr(
+            "zenit.doctor.doctor.load_template_config",
+            self._failing_load,
+        )
+        results = run_doctor(project_dir)
+        config_section = next(
+            r for r in results if r.category == "Template configuration"
+        )
+
+        assert any(
+            "not available locally" in i.message for i in config_section.issues
+        ), "Native template failure should mention 'not available locally'"
+        assert any(
+            "imported from Copier" not in i.message for i in config_section.issues
+        ), "Native template failure should not mention Copier"
+
+    def test_copier_template_message_when_not_found(self, tmp_path, monkeypatch):
+        project_dir = _scaffold(tmp_path, template="fastapi")
+
+        lf = read_lockfile(project_dir)
+        assert lf is not None
+        lf.template_source = "copier"
+        lf.template_uri = "https://github.com/user/my-template"
+        from zenit.core.lockfile import write_lockfile as _write
+
+        _write(
+            project_dir,
+            template=lf.template,
+            addons=lf.addons,
+            template_source="copier",
+            template_uri=lf.template_uri,
+            template_has_tasks=lf.template_has_tasks,
+            template_file_paths=lf.template_file_paths,
+        )
+
+        monkeypatch.setattr(
+            "zenit.doctor.doctor.load_template_config",
+            self._failing_load,
+        )
+        results = run_doctor(project_dir)
+        config_section = next(
+            r for r in results if r.category == "Template configuration"
+        )
+
+        assert any(
+            "imported from Copier" in i.message for i in config_section.issues
+        ), "Copier template failure should mention 'imported from Copier'"
+
+    def test_no_stderr_when_template_fails_to_load(self, tmp_path, monkeypatch, capsys):
+        project_dir = _scaffold(tmp_path, template="fastapi")
+
+        monkeypatch.setattr(
+            "zenit.doctor.doctor.load_template_config",
+            self._failing_load,
+        )
+
+        run_doctor(project_dir)
+        stderr = capsys.readouterr().err
+        assert "Warning:" not in stderr, (
+            "Template loading errors should not be printed to stderr; "
+            "they should be embedded in a HealthResult"
+        )
+
     def test_detects_removed_runtime_dep(self, tmp_path):
         project_dir = _scaffold(tmp_path, template="fastapi", addons=["docker"])
         pyproject_path = project_dir / "pyproject.toml"

@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import re
-import sys
 import tomllib
 from collections.abc import Sequence
 from dataclasses import dataclass, field
@@ -90,6 +89,7 @@ def run_doctor(project_dir: Path, *, thorough: bool = False) -> list[HealthResul
     template_config: TemplateConfig | None = None
     addon_configs: list[AddonConfig] = []
     contributions: Contributions | None = None
+    template_load_error: str | None = None
 
     if lockfile.template:
         try:
@@ -97,26 +97,47 @@ def run_doctor(project_dir: Path, *, thorough: bool = False) -> list[HealthResul
             addon_configs = [c for c in available_configs if c.id in lockfile.addons]
             contributions = collect_all(template_config, addon_configs)
         except Exception as exc:
-            print(
-                f"Warning: could not load template config or contributions: {exc}",
-                file=sys.stderr,
-            )
+            template_load_error = str(exc)
 
     results: list[HealthResult] = []
     results.append(_check_metadata(project_dir))
     results.append(_check_template_health(project_dir, lockfile, manifest))
     results.append(_check_manifest_schema(project_dir, lockfile, manifest))
-    results.append(
-        _check_dependencies(project_dir, lockfile, template_config, contributions)
-    )
-    results.append(_check_files(project_dir, lockfile, template_config, addon_configs))
-    results.append(_check_addon_health(project_dir, lockfile, available_configs))
-    results.append(
-        _check_compose(
-            project_dir, lockfile, template_config, addon_configs, contributions
+
+    if template_load_error:
+        unavailable = HealthResult("Template configuration")
+        if lockfile.template_source == "copier":
+            source = lockfile.template_uri or lockfile.template
+            unavailable.warn(
+                f"Template '{source}' was imported from Copier and is not "
+                f"available as a local zenit template.",
+                hint="Migrated templates are snapshots. zenit cannot reload them. "
+                "Template-dependent checks are skipped.",
+            )
+        else:
+            unavailable.warn(
+                f"Template '{lockfile.template}' is not available locally.",
+                hint="The template file may have been deleted or renamed. "
+                "Template-dependent checks are skipped.",
+            )
+        results.append(unavailable)
+    else:
+        results.append(
+            _check_dependencies(project_dir, lockfile, template_config, contributions)
         )
-    )
-    results.append(_check_env(project_dir, lockfile, template_config, contributions))
+        results.append(
+            _check_files(project_dir, lockfile, template_config, addon_configs)
+        )
+        results.append(
+            _check_compose(
+                project_dir, lockfile, template_config, addon_configs, contributions
+            )
+        )
+        results.append(
+            _check_env(project_dir, lockfile, template_config, contributions)
+        )
+
+    results.append(_check_addon_health(project_dir, lockfile, available_configs))
     results.append(_check_manifest_env(project_dir, manifest))
     results.append(_check_manifest_compose(project_dir, manifest))
     results.append(_check_manifest_deps(project_dir, manifest))
@@ -321,17 +342,24 @@ def _check_manifest_deps(
     installed = {dep_package_name(d) for d in raw_deps}
     installed_dev = {dep_package_name(d) for d in dev_group}
 
+    missing: list[DependencyEntry] = []
     for dep in manifest.dependencies:
         bucket = installed_dev if dep.dev else installed
         if dep_package_name(dep.package) not in bucket:
+            missing.append(dep)
+
+    if missing:
+        for dep in missing:
             kind = "dev " if dep.dev else ""
             result.error(
                 f"Manifest {kind}dependency '{dep.package}' "
                 f"(owned by '{dep.addon or 'template'}') is missing from pyproject.toml.",
                 hint=f"Run 'uv add {dep.spec}' or 'zenit add {dep.addon}' to restore it.",
             )
-        else:
-            result.ok(f"Dependency '{dep.package}' is present.")
+    else:
+        total = len(manifest.dependencies)
+        label = "manifest dependency" if total == 1 else "manifest dependencies"
+        result.ok(f"All {total} {label} are present.")
 
     return result
 
@@ -359,15 +387,22 @@ def _check_manifest_recipes(
     text = justfile_path.read_text(encoding="utf-8")
     existing_names = set(_RECIPE_NAME_RE.findall(text))
 
+    missing: list[OwnedEntry] = []
     for entry in manifest.just_recipes:
         if entry.name not in existing_names:
+            missing.append(entry)
+
+    if missing:
+        for entry in missing:
             result.error(
                 f"Manifest just-recipe '{entry.name}' (owned by '{entry.addon or 'template'}') "
                 f"is missing from the justfile.",
                 hint=f"Run 'zenit add {entry.addon}' to restore it.",
             )
-        else:
-            result.ok(f"Just-recipe '{entry.name}' is present.")
+    else:
+        total = len(manifest.just_recipes)
+        label = "manifest just-recipe" if total == 1 else "manifest just-recipes"
+        result.ok(f"All {total} {label} are present.")
 
     return result
 
@@ -983,6 +1018,6 @@ def print_results(results: list[HealthResult]) -> bool:
                 has_errors = True
             print(f"    {symbol}  {issue.message}")
             if issue.hint:
-                print(f"         {DIM}{issue.hint}{RESET}")
+                print(f"       {DIM}{issue.hint}{RESET}")
 
     return has_errors
