@@ -186,8 +186,9 @@ class TestRemoveAddonUnit:
             remove_addon("redis", project_dir=project_dir)
 
         compose = yaml.safe_load((project_dir / "compose.yml").read_text())
-        # Docker owns compose — removing redis does NOT remove compose entries
-        assert "redis" in compose.get("services", {})
+        # Docker owns compose entries but _refresh_compose reconciles
+        # compose.yml based on currently installed addons.
+        assert "redis" not in compose.get("services", {})
 
     def test_remove_cleans_env_vars(self, tmp_path):
         project_dir = _scaffold(tmp_path, "myapp", "blank", ["redis"])
@@ -509,9 +510,9 @@ class TestRemoveAddonIntegration:
             remove_addon("redis", project_dir=project_dir)
 
         compose = yaml.safe_load((project_dir / "compose.yml").read_text())
-        # Docker owns compose — removing redis does NOT remove compose entries
-        assert "redis" in compose.get("services", {})
-        assert "redis-data" in compose.get("volumes", {})
+        # _refresh_compose reconciles compose.yml with remaining addons
+        assert "redis" not in compose.get("services", {})
+        assert "redis-data" not in compose.get("volumes", {})
 
         env = (project_dir / ".env").read_text()
         assert "REDIS_URL" not in env

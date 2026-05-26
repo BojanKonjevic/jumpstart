@@ -33,6 +33,7 @@ from zenit.cli.ui import (
 from zenit.core._filenames import COMPOSE_FILE, ENV_FILES, JUSTFILE_NAME, PYPROJECT_FILE
 from zenit.core._paths import get_zenit_root
 from zenit.core.constants import _RECIPE_NAME_RE
+from zenit.core.context import Context
 from zenit.core.dependency import DependencyGraph
 from zenit.core.handlers import HandlerDispatcher
 from zenit.core.lockfile import ZenitLockfile, read_lockfile, write_lockfile
@@ -167,13 +168,24 @@ def remove_addon(
     _undo_injections_physical(project_dir, manifest, addon_id)
 
     # ── compose services ────────────────────────────────────────────────────
-    # Docker owns all compose entries. Non-docker addons never touch compose
-    # when docker is installed.
+    # Docker owns all compose entries in the manifest, but _refresh_compose
+    # keeps compose.yml in sync with the current set of installed addons.
     if addon_id == "docker":
         # Docker removal: _remove_files deletes compose.yml entirely.
         removed_services = []
     elif "docker" in lockfile.addons:
-        # Docker owns compose — don't let non-docker addons remove entries.
+        # Reconcile compose.yml based on remaining addons.
+        from zenit.addons.add import _refresh_compose
+
+        ctx_for_refresh = Context(
+            name=project_dir.name,
+            pkg_name=pkg_name,
+            template=lockfile.template,
+            addons=[a for a in lockfile.addons if a != addon_id],
+            zenit_root=get_zenit_root(),
+            project_dir=project_dir,
+        )
+        _refresh_compose(ctx_for_refresh, project_dir, manifest)
         removed_services = [s.name for s in addon_cfg.compose_services]
     else:
         # Legacy: no docker installed, remove per-addon as before.

@@ -173,9 +173,8 @@ def test_full_add_on_migrated_lifecycle(
     redis_entry = next(
         (e for e in manifest.compose_services if e.name == "redis"), None
     )
-    # Docker owns compose — removing redis does NOT remove compose entries
-    assert redis_entry is not None
-    assert redis_entry.addon == "docker"
+    # _refresh_compose reconciles compose entries with installed addons
+    assert redis_entry is None
 
 
 # ── add_addon — lockfile ──────────────────────────────────────────────────────
