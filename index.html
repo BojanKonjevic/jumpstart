@@ -183,25 +183,6 @@
 
         /* ── Hero ──────────────────────────────────────────────────────── */
         .hero { padding: 5.5rem 0 2rem; position: relative; }
-
-        .hero-eyebrow {
-            display: inline-flex;
-            align-items: center;
-            gap: 0.5rem;
-            font-family: 'Geist Mono', monospace;
-            font-size: 0.68rem;
-            color: var(--text-muted);
-            letter-spacing: 0.07em;
-            margin-bottom: 2rem;
-        }
-        .hero-eyebrow-dot {
-            width: 5px;
-            height: 5px;
-            border-radius: 50%;
-            background: var(--amber);
-            flex-shrink: 0;
-        }
-
         .hero h1 {
             font-family: 'Instrument Serif', serif;
             font-size: clamp(2.1rem, 5.2vw, 3.2rem);
@@ -682,13 +663,9 @@
 <div class="container">
 
     <div class="hero">
-        <div class="hero-eyebrow">
-            <span class="hero-eyebrow-dot"></span>
-            v1.0.9 &mdash; open source
-        </div>
         <h1>Scaffold Python projects.<br><em>Own every line of it.</em></h1>
         <p class="hero-lead">
-            Zenit generates a complete, working project you control entirely. Add features incrementally, verify integrity over time, or remove Zenit completely &mdash; your codebase keeps running either way.
+            Scaffold a fresh project from scratch or bring in an existing Copier template &mdash; you own every line either way. Add features incrementally, verify integrity over time, or remove Zenit completely; your codebase keeps running without it.
         </p>
         <div class="hero-actions">
             <a href="docs/getting-started" class="btn-primary">Read the docs →</a>
@@ -744,12 +721,13 @@
                 </tr>
             </thead>
             <tbody>
-                <tr><td>Runtime dependency</td><td class="no">Required</td><td class="yes">None</td></tr>
-                <tr><td>Remove addons cleanly</td><td class="no">Manual cleanup</td><td class="yes"><code>zenit remove</code></td></tr>
+                <tr><td>Add features post-generation</td><td class="no">Re-generate (overwrites changes)</td><td class="yes"><code>zenit add</code></td></tr>
+                <tr><td>Remove features cleanly</td><td class="no">Manual cleanup</td><td class="yes"><code>zenit remove</code></td></tr>
                 <tr><td>Verify project health</td><td class="no">Not available</td><td class="yes"><code>zenit doctor</code></td></tr>
-                <tr><td>Code injection method</td><td class="no">Regex / string replace</td><td class="yes">AST-aware (libcst)</td></tr>
-                <tr><td>Uninstall safely</td><td class="no">Breaks your project</td><td class="yes"><code>uv remove zenit</code></td></tr>
-                <tr class="highlight-row"><td>Lock-in</td><td class="no">Permanent</td><td class="yes">Zero</td></tr>
+                <tr><td>Code injection into existing files</td><td class="no">Template expansion only</td><td class="yes">AST-aware via libcst</td></tr>
+                <tr><td>Feature state manifest</td><td class="no">Not tracked</td><td class="yes"><code>.zenit.toml</code></td></tr>
+                <tr><td>Import Copier-format templates</td><td class="no">Copier only</td><td class="yes"><code>zenit migrate</code></td></tr>
+                <tr class="highlight-row"><td>Post-generation lifecycle</td><td class="no">One-shot generation</td><td class="yes">Ongoing CLI suite</td></tr>
             </tbody>
         </table>
 
@@ -791,7 +769,7 @@
     <div class="section reveal">
         <div class="section-kicker">Operations</div>
         <h2 class="section-title">Stay in control</h2>
-        <p class="section-sub">Four commands for the full lifecycle. Use them on day one or day one hundred.</p>
+        <p class="section-sub">Every command you need, from scaffold to production. Use them on day one or day one hundred.</p>
 
         <div class="ops-grid">
             <div class="ops-card">
@@ -809,6 +787,14 @@
             <div class="ops-card">
                 <span class="ops-cmd">zenit list</span>
                 <p>See all available templates and addons. Check what's installed and what you can add next.</p>
+            </div>
+            <div class="ops-card">
+                <span class="ops-cmd">zenit create &lt;project&gt;</span>
+                <p>Scaffold a new project from a zenit-native template. Includes <code>blank</code> and <code>fastapi</code> with optional addons.</p>
+            </div>
+            <div class="ops-card">
+                <span class="ops-cmd">zenit migrate &lt;copier-source&gt;</span>
+                <p>Import any <strong>Copier</strong> template into Zenit. Prompts for questions, scans env &amp; deps, bootstraps a manifest.</p>
             </div>
         </div>
     </div>
@@ -846,13 +832,14 @@
     <div class="section reveal">
         <div class="section-kicker">Components</div>
         <h2 class="section-title">What's included</h2>
-        <p class="section-sub">A small, intentional set of templates and addons to scaffold production-ready Python projects.</p>
+        <p class="section-sub">Native templates and addons for Python projects &mdash; plus the ability to import any <strong>Copier</strong> template.</p>
 
         <div class="component-box">
             <div class="component-label">Templates</div>
             <div class="tag-row">
                 <span class="tag">blank</span>
                 <span class="tag">fastapi</span>
+                <span class="tag">any Copier template</span>
             </div>
         </div>
 
@@ -879,7 +866,7 @@
             <a href="docs/getting-started" class="btn-primary">Quickstart guide →</a>
             <a href="https://github.com/BojanKonjevic/zenit" class="btn-ghost" target="_blank">
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 22v-4a4.8 4.8 0 0 0-1-3.5c3 0 6-2 6-5.5.08-1.25-.27-2.48-1-3.5.28-1.15.28-2.35 0-3.5 0 0-1 0-3 1.5-2.64-.5-5.36-.5-8 0C6 2 5 2 5 2c-.3 1.15-.3 2.35 0 3.5A5.403 5.403 0 0 0 4 9c0 3.5 3 5.5 6 5.5-.39.49-.68 1.05-.85 1.65-.17.6-.22 1.23-.15 1.85v4"/><path d="M9 18c-4.51 2-5-2-7-2"/></svg>
-                Star on GitHub
+                View on GitHub
             </a>
         </div>
     </div>
