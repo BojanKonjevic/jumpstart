@@ -13,7 +13,7 @@ zenit graph [--all] [--reverse] [--dot] [--json]
 Without flags, `zenit graph` shows the dependency tree of addons installed in the current project:
 
 ```
-╭─ Zenit Graph ──────────────────────────────╮
+╭─ Zenit Graph ───────────────────────────────╮
 │                                             │
 │   ● redis                                   │
 │     ● hiredis                               │

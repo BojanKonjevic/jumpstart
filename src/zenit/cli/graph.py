@@ -184,13 +184,25 @@ def render_terminal(
 
     content_lines.append("")
 
-    all_ids = _collect_ids(forest)
-    installed_count = sum(1 for aid in all_ids if aid in installed_ids)
-    available_count = len(all_ids) - installed_count
-    summary = (
-        f"  {GREEN}◉{RESET} installed {installed_count}"
-        f"   {DIM}○{RESET} available {available_count}"
-    )
+    if reverse:
+        root_count = len(forest)
+        all_deps: set[str] = set()
+        for node in forest:
+            for child in node.children:
+                all_deps.add(child.addon.id)
+        parts = [f"{root_count} {'addon' if root_count == 1 else 'addons'}"]
+        if root_count != 0:
+            dep_word = "dependency" if len(all_deps) == 1 else "dependencies"
+            parts.append(f"{len(all_deps)} unique {dep_word}")
+        summary = "  " + ", ".join(parts)
+    else:
+        all_ids = _collect_ids(forest)
+        installed_count = sum(1 for aid in all_ids if aid in installed_ids)
+        available_count = len(all_ids) - installed_count
+        summary = (
+            f"  {GREEN}◉{RESET} installed {installed_count}"
+            f"   {DIM}○{RESET} available {available_count}"
+        )
     content_lines.append(summary)
 
     if project_name and project_dir:
