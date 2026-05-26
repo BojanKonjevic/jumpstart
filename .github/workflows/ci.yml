@@ -38,5 +38,5 @@ jobs:
       - name: Type check
         run: uv run mypy src/
 
-      - name: Test (fast)
+      - name: Test
         run: uv run pytest -v

@@ -79,6 +79,7 @@ class TestTtyAvailable:
             assert tty_available() is False
 
 
+@pytest.mark.skipif(sys.platform == "win32", reason="Unix-specific test")
 class TestReadKeyUnix:
     """read_key() Unix path — replaces sys.modules entries so that the
     lazy ``import termios`` / ``import tty`` inside the function body
