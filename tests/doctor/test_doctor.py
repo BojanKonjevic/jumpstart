@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import sys
 import unittest.mock as mock
 from pathlib import Path
 
@@ -37,6 +36,7 @@ from zenit.doctor.doctor import (
     _check_python_integrity,
     _check_python_line_presence,
     _check_template_health,
+    _fix_python_blocks,
     print_results,
     run_doctor,
 )
@@ -1058,7 +1058,7 @@ class TestCheckPythonLinePresence:
         assert not result.has_errors
 
 
-# ── _check_python_integrity — thorough tier ───────────────────────────────────
+# ── _check_python_integrity ────────────────────────────────────────────────────
 
 
 class TestCheckPythonIntegrity:
@@ -1156,54 +1156,84 @@ class TestCheckPythonIntegrity:
             ) from exc
 
 
-# ── Thorough tier — run_doctor integration ─────────────────────────────────────
+# ── _fix_python_blocks ─────────────────────────────────────────────────────────
 
 
-class TestRunDoctorThoroughFlag:
-    def test_thorough_flag_enables_python_integrity_check(self, tmp_path: Path) -> None:
-        """run_doctor(thorough=True) must include a 'Python block integrity' section
-        that is absent from the default fast run."""
+class TestFixPythonBlocks:
+    def test_fix_updates_stale_lines(self, tmp_path: Path) -> None:
+        """_fix_python_blocks must re-sync line numbers when blocks have drifted
+        without modifying user code."""
+        from zenit.core.manifest import read_manifest
+
+        project_dir = _scaffold(tmp_path, template="fastapi", addons=["redis"])
+        m = read_manifest(project_dir)
+        block = next(
+            (b for b in m.python_blocks if (project_dir / b.file).exists()), None
+        )
+        assert block is not None
+
+        file_path = project_dir / block.file
+        start_str, _ = block.lines.split("-")
+        insert_before = int(start_str) - 1  # 0-based
+
+        text = file_path.read_text(encoding="utf-8")
+        lines = text.splitlines(keepends=True)
+        lines.insert(insert_before, "# zenit-test-drift\n")
+        file_path.write_text("".join(lines), encoding="utf-8")
+
+        original_lines = block.lines
+
+        fixed = _fix_python_blocks(project_dir, m)
+        assert fixed >= 1
+
+        new_m = read_manifest(project_dir)
+        new_block = next(
+            b
+            for b in new_m.python_blocks
+            if b.addon == block.addon
+            and b.point == block.point
+            and b.file == block.file
+        )
+        assert new_block.lines != original_lines
+
+        result = _check_python_integrity(project_dir)
+        assert not result.has_errors
+        assert not result.has_warnings
+
+    def test_fix_does_not_touch_user_code(self, tmp_path: Path) -> None:
+        """_fix_python_blocks must only update the manifest — never the file."""
+        from zenit.core.manifest import read_manifest
+
+        project_dir = _scaffold(tmp_path, template="fastapi", addons=["redis"])
+        m = read_manifest(project_dir)
+        block = next(
+            (b for b in m.python_blocks if (project_dir / b.file).exists()), None
+        )
+        assert block is not None
+
+        file_path = project_dir / block.file
+        original_content = file_path.read_text(encoding="utf-8")
+
+        _fix_python_blocks(project_dir, m)
+        assert file_path.read_text(encoding="utf-8") == original_content
+
+
+# ── Integrity check always runs ─────────────────────────────────────────────────
+
+
+class TestDoctorAlwaysRunsIntegrityCheck:
+    def test_python_integrity_check_included_by_default(self, tmp_path: Path) -> None:
+        """The Python block integrity check must be included in every doctor run."""
         project_dir = _scaffold(tmp_path, template="fastapi", addons=["redis"])
 
-        fast_results = run_doctor(project_dir, thorough=False)
-        thorough_results = run_doctor(project_dir, thorough=True)
+        results = run_doctor(project_dir)
+        categories = {r.category for r in results}
 
-        fast_categories = {r.category for r in fast_results}
-        thorough_categories = {r.category for r in thorough_results}
-
-        integrity_category = "Python block integrity (thorough)"
-        assert integrity_category not in fast_categories, (
-            f"Fast run must not include '{integrity_category}'"
-        )
-        assert integrity_category in thorough_categories, (
-            f"Thorough run must include '{integrity_category}'"
+        assert "Python block integrity" in categories, (
+            "Integrity check must be included by default"
         )
 
-    def test_fast_tier_does_not_import_libcst(self, tmp_path: Path) -> None:
-        """The fast doctor path must not trigger a libcst import.
-
-        This is a performance contract: the fast tier must complete without
-        pulling in the libcst parse machinery, which is expensive to import
-        and should stay isolated to the thorough tier.
-        """
-        project_dir = _scaffold(tmp_path, template="fastapi", addons=["redis"])
-
-        # Evict libcst from sys.modules so we can detect a fresh import.
-        libcst_keys = [
-            k for k in sys.modules if k == "libcst" or k.startswith("libcst.")
-        ]
-        saved = {k: sys.modules.pop(k) for k in libcst_keys}
-
-        try:
-            run_doctor(project_dir, thorough=False)
-            assert "libcst" not in sys.modules, (
-                "Fast doctor tier must not import libcst. "
-                "Move libcst usage into _check_python_integrity (thorough only)."
-            )
-        finally:
-            sys.modules.update(saved)
-
-    def test_fast_tier_python_line_check_does_not_parse(self, tmp_path: Path) -> None:
+    def test_python_line_check_does_not_parse(self, tmp_path: Path) -> None:
         """The fast-tier line-presence check must perform only a file-length
         comparison — it must not call libcst.parse_module at any point.
 

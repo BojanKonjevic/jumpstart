@@ -25,7 +25,7 @@ from zenit.core._paths import get_zenit_root
 from zenit.core.collect import collect_all
 from zenit.core.constants import _RECIPE_NAME_RE
 from zenit.core.lockfile import SCHEMA_VERSION, ZenitLockfile, read_lockfile
-from zenit.core.manifest import dep_package_name, read_manifest
+from zenit.core.manifest import dep_package_name, read_manifest, write_manifest
 from zenit.core.pkg_name import normalise_pkg_name, resolve_dest_placeholder
 from zenit.schema.models import (
     AddonConfig,
@@ -76,12 +76,21 @@ class HealthResult:
         return any(i.severity == Severity.WARN for i in self.issues)
 
 
-def run_doctor(project_dir: Path, *, thorough: bool = False) -> list[HealthResult]:
+def run_doctor(
+    project_dir: Path,
+    *,
+    fix: bool = False,
+) -> list[HealthResult]:
     lockfile = read_lockfile(project_dir)
     if lockfile is None:
         return [_check_metadata(project_dir)]
 
     manifest = read_manifest(project_dir)
+
+    if fix:
+        _fix_python_blocks(project_dir, manifest)
+        manifest = read_manifest(project_dir)
+
     available_meta = list_addons()
     available_configs = [get_addon(m.id) for m in available_meta]
 
@@ -143,9 +152,7 @@ def run_doctor(project_dir: Path, *, thorough: bool = False) -> list[HealthResul
     results.append(_check_manifest_deps(project_dir, manifest))
     results.append(_check_manifest_recipes(project_dir, manifest))
     results.append(_check_python_line_presence(project_dir, manifest))
-
-    if thorough:
-        results.append(_check_python_integrity(project_dir, manifest))
+    results.append(_check_python_integrity(project_dir, manifest))
 
     return results
 
@@ -445,14 +452,13 @@ def _check_python_line_presence(
                 f"Block '{block.point}' for addon '{block.addon}' records lines up to "
                 f"{end_line}, but '{block.file}' only has {line_count} lines.",
                 hint=(
-                    f"The file may have been truncated. Run 'zenit doctor --thorough' "
-                    f"for a full fingerprint check, or 'zenit remove {block.addon}' to clean up."
+                    f"The file may have been truncated. Run 'zenit doctor' "
+                    f"for a full check, or 'zenit remove {block.addon}' to clean up."
                 ),
             )
         else:
             result.ok(
-                f"Block '{block.point}' for '{block.addon}' at lines {block.lines} "
-                f"is within '{block.file}'."
+                f"Block '{block.point}' for '{block.addon}' is present in '{block.file}'."
             )
 
     return result
@@ -464,14 +470,16 @@ def _check_python_line_presence(
 def _check_python_integrity(
     project_dir: Path, manifest: Manifest | None = None
 ) -> HealthResult:
-    """Thorough check: parse each file, extract block, recompute fingerprints.
+    """Parse each file, extract block, recompute fingerprints.
 
-    Only imported when --thorough is passed to avoid libcst in the fast-tier
-    hot path.
+    Reports the actual position of each block, not the potentially stale
+    recorded position.  Uses ``relocate_block`` (which re-runs the locator)
+    to find where the block currently is.
     """
+    from zenit.core.handlers.python_handler import relocate_block
     from zenit.core.manifest import fingerprint as compute_fingerprint
 
-    result = HealthResult("Python block integrity (thorough)")
+    result = HealthResult("Python block integrity")
     if manifest is None:
         manifest = read_manifest(project_dir)
 
@@ -519,26 +527,91 @@ def _check_python_integrity(
 
         if fp == block.fingerprint:
             result.ok(
-                f"Block '{block.point}' for '{block.addon}' in '{block.file}' is unchanged."
+                f"Block '{block.point}' for '{block.addon}' in '{block.file}' "
+                f"at lines {block.lines} is unchanged."
             )
         elif fp_norm == block.fingerprint_normalised:
             result.warn(
-                f"Block '{block.point}' for '{block.addon}' in '{block.file}' was reformatted "
+                f"Block '{block.point}' for '{block.addon}' in '{block.file}' "
+                f"at lines {block.lines} was reformatted "
                 f"(normalised fingerprint matches).",
-                hint="This is safe — run 'zenit doctor --thorough' after reformatting to confirm.",
+                hint="Run 'zenit doctor' after reformatting to confirm.",
             )
         else:
-            result.error(
-                f"Block '{block.point}' for '{block.addon}' in '{block.file}' has been modified "
-                f"(fingerprint mismatch at lines {block.lines}).",
-                hint=(
-                    f"If the change is intentional, run 'zenit remove {block.addon}' and "
-                    f"'zenit add {block.addon}' to re-inject. "
-                    f"Otherwise restore the original block."
-                ),
-            )
+            actual = relocate_block(file_path, block)
+            if actual is not None:
+                actual_str = f"{actual[0]}-{actual[1]}"
+                result.warn(
+                    f"Block '{block.point}' for '{block.addon}' in '{block.file}' "
+                    f"has drifted — recorded at lines {block.lines}, "
+                    f"actually at lines {actual_str}.",
+                    hint="Run 'zenit doctor --fix' to update the manifest's line tracking.",
+                )
+            else:
+                result.error(
+                    f"Block '{block.point}' for '{block.addon}' in '{block.file}' "
+                    f"has been modified (fingerprint mismatch at lines {block.lines}).",
+                    hint=(
+                        f"Run 'zenit doctor --fix' to re-sync line tracking. "
+                        f"If it persists, the block content was changed — "
+                        f"run 'zenit remove {block.addon}' and 'zenit add {block.addon}' "
+                        f"to re-inject, or restore the original block."
+                    ),
+                )
 
     return result
+
+
+def _fix_python_blocks(project_dir: Path, manifest: Manifest) -> int:
+    """Re-sync stale line numbers and fingerprints in *manifest*.
+
+    For each ``ManifestBlock``, re-runs the stored locator to find where the
+    block actually is in the current file, then updates ``block.lines`` and
+    recomputes ``fingerprint`` / ``fingerprint_normalised`` from the actual
+    content at that location.  Only modifies zenit tracking data — never
+    touches user code.
+
+    Returns the number of blocks whose tracking data was updated.
+    """
+    from zenit.core.handlers.python_handler import relocate_block
+    from zenit.core.manifest import fingerprint as compute_fingerprint
+
+    fixed = 0
+    for block in manifest.python_blocks:
+        file_path = project_dir / block.file
+        if not file_path.exists():
+            continue
+
+        try:
+            actual = relocate_block(file_path, block)
+        except Exception:
+            continue
+
+        if actual is None:
+            continue
+
+        actual_str = f"{actual[0]}-{actual[1]}"
+        if actual_str != block.lines:
+            block.lines = actual_str
+            fixed += 1
+
+        text = file_path.read_text(encoding="utf-8")
+        all_lines = text.splitlines(keepends=True)
+        start_idx = actual[0] - 1
+        block_lines = all_lines[start_idx : actual[1]]
+        content = "".join(block_lines)
+        fp, fp_norm = compute_fingerprint(content)
+        if fp != block.fingerprint:
+            block.fingerprint = fp
+            fixed += 1
+        if fp_norm != block.fingerprint_normalised:
+            block.fingerprint_normalised = fp_norm
+            fixed += 1
+
+    if fixed > 0:
+        write_manifest(project_dir, manifest)
+
+    return fixed
 
 
 def _check_template_health(

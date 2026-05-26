@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 import sys
 from collections.abc import Sequence as _Seq
 from difflib import SequenceMatcher
@@ -262,6 +263,98 @@ def remove(
         f"    - Find the code added by the '{block.addon}' addon for point '{block.point}'\n"
         f"    - Remove it, then run: zenit doctor"
     )
+
+
+def relocate_block(
+    file: Path,
+    block: ManifestBlock,
+    window: int = 20,
+) -> tuple[int, int] | None:
+    """Find a block's current position in *file* by re-running its locator.
+
+    The locator's insertion point can be either before the block
+    (``after_last_import``) or after the block (``before_yield_in_function``),
+    depending on the locator.  This function tries both directions and also
+    handles blocks whose line count has shifted by up to ±2 lines due to
+    blank-line insertions or removals.
+
+    Returns (start_line, end_line) 1-based inclusive, or None if the block
+    cannot be found (it may have been deleted or significantly modified).
+    """
+    source = file.read_text(encoding="utf-8")
+    try:
+        module = cst.parse_module(source)
+    except (SyntaxError, cst.ParserSyntaxError):
+        return None
+
+    try:
+        insert_index = locate(module, block.locator.name, block.locator.args)
+    except LocatorError:
+        return None
+
+    try:
+        locator_line = _locate_line(
+            module, block.locator.name, block.locator.args, insert_index
+        )
+    except InjectionError:
+        return None
+
+    lines = source.splitlines(keepends=True)
+
+    try:
+        start_str, end_str = block.lines.split("-")
+        base_len = int(end_str) - int(start_str) + 1
+    except (ValueError, OverflowError):
+        return None
+
+    if base_len <= 0:
+        return None
+
+    def _matches(candidate: str) -> bool:
+        _, fp_norm = _fingerprint(candidate)
+        if fp_norm == block.fingerprint_normalised:
+            return True
+        compacted = re.sub(r"\n\s*\n", "\n", candidate)
+        if compacted != candidate:
+            _, fp_norm = _fingerprint(compacted)
+            if fp_norm == block.fingerprint_normalised:
+                return True
+        return False
+
+    def _try_range(start: int, end: int) -> tuple[int, int] | None:
+        max_len = min(max(base_len + 4, 6), len(lines))
+        for attempt_len in range(1, max_len + 1):
+            for s in range(start, min(end + 1, len(lines) - attempt_len + 1)):
+                candidate = "".join(lines[s : s + attempt_len])
+                if _matches(candidate):
+                    return (s, s + attempt_len)
+        return None
+
+    # The block may be on either side of the locator insertion point.
+    # Try "after" first (e.g. after_last_import), then "before".
+    after_end = min(locator_line + window, len(lines))
+    result = _try_range(locator_line, after_end - 1)
+
+    if result is None:
+        before_start = max(0, locator_line - window)
+        before_end = max(0, locator_line - 1)
+        result = _try_range(before_start, before_end)
+
+    if result is not None:
+        start, end = result
+        return (start + 1, end)
+
+    # Broader search centred on locator_line.
+    search_start = max(0, locator_line - window)
+    search_end = min(len(lines) - 1, locator_line + window)
+    result = _try_range(search_start, search_end)
+    if result is not None:
+        start, end = result
+        return (start + 1, end)
+
+    return None
+
+    return None
 
 
 def _remove_lines(

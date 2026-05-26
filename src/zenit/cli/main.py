@@ -391,11 +391,9 @@ def cmd_remove(
 
 @app.command("doctor")
 def cmd_doctor(
-    thorough: Annotated[
+    fix: Annotated[
         bool,
-        typer.Option(
-            "--thorough", help="Run full Python block integrity checks (slower)"
-        ),
+        typer.Option("--fix", help="Fix stale line numbers in the manifest"),
     ] = False,
 ) -> None:
     """Check that the current project matches zenit's expectations."""
@@ -414,10 +412,10 @@ def cmd_doctor(
         raise typer.Exit(1)
 
     print(f"\n  Checking project '{project_dir.name}'…")
-    if thorough:
-        print(f"  {DIM}Thorough mode — parsing Python files with libcst.{RESET}")
+    if fix:
+        print(f"  {DIM}Fixing stale line numbers in the manifest.{RESET}")
 
-    results = run_doctor(project_dir, thorough=thorough)
+    results = run_doctor(project_dir, fix=fix)
 
     if not results:
         print("\n  No checks registered yet.\n")
