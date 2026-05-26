@@ -71,13 +71,7 @@ If you need richer hooks (lifespan, router registration, test fixtures), use the
 
 ## Dependencies
 
-The `blank` template adds one runtime dependency:
-
-| Package | Purpose |
-|---|---|
-| `python-dotenv` | Loads `.env` at startup |
-
-Dev tooling (`pytest`, `mypy`, `ruff`, `pytest-cov`) is added under `[dependency-groups] dev` and is the same across all templates.
+The `blank` template has no runtime dependencies. Dev tooling (`pytest`, `mypy`, `ruff`, `pytest-cov`) is added under `[dependency-groups] dev` and is the same across all templates.
 
 ---
 

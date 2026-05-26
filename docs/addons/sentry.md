@@ -49,6 +49,7 @@ sentry_environment: str = "development"
 ### Dependencies
 
 - `sentry-sdk[fastapi]` — Sentry SDK with FastAPI integration
+- `python-dotenv` — `.env` file loading
 
 ### Just recipes
 

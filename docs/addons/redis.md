@@ -74,6 +74,7 @@ redis_url: str = "redis://localhost:6379/0"
 
 - `redis>=5` — Redis Python client
 - `hiredis` — C parser for performance
+- `python-dotenv` — `.env` file loading
 
 ### Dev dependencies
 

@@ -57,6 +57,7 @@ class AddonConfig:
     dev_deps: list[str]
     just_recipes: list[str]
     injections: list[Injection]
+    tool_overrides: dict[str, list[dict[str, object]]]  # tool config overrides
     _module: AddonHooks | None           # populated by registry; not set manually
 ```
 
@@ -101,12 +102,15 @@ FileContribution(
 ```python
 @dataclass
 class Injection:
-    point: str     # named injection point declared by the template
-    content: str   # the code to inject (a string, including indentation)
-    addon_id: str  # set automatically by the pipeline; leave as default ""
+    point: str          # named injection point declared by the template
+    content: str        # the code to inject (a string, including indentation)
+    addon_id: str       # set automatically by the pipeline; leave as default ""
+    templates: list[str]  # restrict to these templates; empty = all
 ```
 
 The `point` must be one of the injection points declared by the target template. The `content` string is inserted verbatim — include the correct indentation for the target scope.
+
+The `templates` field restricts which templates this injection applies to. When empty (the default), the injection applies to all compatible templates. Set it to `["fastapi"]` to limit the injection to fastapi projects only.
 
 See [Code Injection](./injection.md) for the full locator reference and cookbook.
 
@@ -127,6 +131,31 @@ class ComposeService:
     develop_watch: list[dict[str, object]]
     healthcheck: dict[str, object] | None
 ```
+
+### `tool_overrides`
+
+Tool-specific configuration overrides that get merged into the project's `pyproject.toml`. The key is the tool name (e.g. `"mypy"`) and the value is a list of configuration table entries:
+
+```python
+tool_overrides = {
+    "mypy": [
+        {"module": ["jose.*"], "ignore_missing_imports": True, "ignore_errors": True},
+    ],
+}
+```
+
+This generates the following in `pyproject.toml`:
+
+```toml
+[[tool.mypy.overrides]]
+module = ["jose.*"]
+ignore_missing_imports = true
+ignore_errors = true
+```
+
+Used when an addon introduces a dependency whose type stubs are incomplete or missing, preventing mypy errors from leaking into the user's project without requiring manual configuration.
+
+---
 
 ### `EnvVar`
 
@@ -225,9 +254,12 @@ class Contributions:
     template_dev_deps: list[str]   # dev deps from the template
     recipes: RecipeCollection
     injections: list[Injection]
+    tool_overrides: dict[str, list[dict[str, object]]]
 ```
 
 The `template_dev_deps` field holds dev dependencies declared by the template, kept separate from addon dev deps for clean removal.
+
+`tool_overrides` collects tool configuration overrides from all active addons, keyed by tool name (e.g. `"mypy"`). The pipeline merges these into `pyproject.toml`'s `[tool.*]` sections during scaffold and add operations, and removes them on remove.
 
 ---
 

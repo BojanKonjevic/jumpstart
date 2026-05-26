@@ -1,6 +1,7 @@
 # auth-manual
 
-> **Template:** `fastapi` only
+> **Template:** `fastapi` only  
+> **Requires:** `sqlalchemy` addon
 
 The `auth-manual` addon adds complete JWT-based authentication to a FastAPI project: registration, login, token refresh, logout, and a current-user endpoint. It is designed for projects that need authentication without relying on external identity providers.
 
@@ -82,7 +83,14 @@ refresh_token_expire_days: int = 30
 ### Dependencies
 
 - `bcrypt` — password hashing
-- `python-jose[cryptography]` — JWT encoding/decoding
+- `pyjwt[cryptography]` — JWT encoding/decoding
+- `email-validator` — email validation
+- `python-multipart` — form data parsing
+- `python-dotenv` — `.env` file loading
+
+### Requirements
+
+- `sqlalchemy` addon — provides the database layer for user and refresh token models
 
 ### Just recipes
 
@@ -137,7 +145,7 @@ just gen-secret             # Generate a SECRET_KEY and add it to .env
 
 - Delete all auth files (security.py, dependencies.py, models, schemas, routes, tests)
 - Remove injected settings fields, router imports/includes, test fixtures, and exception classes
-- Remove `bcrypt` and `python-jose` from `pyproject.toml`
+- Remove `bcrypt`, `pyjwt[cryptography]`, `email-validator`, `python-multipart`, and `python-dotenv` from `pyproject.toml`
 - Remove env vars from `.env.example`
 - Remove the `gen-secret` recipe from the justfile
 

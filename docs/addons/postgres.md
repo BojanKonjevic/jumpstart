@@ -48,6 +48,7 @@ When the `docker` addon is also installed, the following service is added to `co
 | Package | Purpose |
 |---|---|
 | `asyncpg` | Async PostgreSQL driver |
+| `python-dotenv` | `.env` file loading |
 
 ### Justfile recipes
 

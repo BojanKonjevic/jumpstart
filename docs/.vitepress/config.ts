@@ -43,6 +43,7 @@ export default defineConfig({
           { text: 'zenit remove', link: '/commands/remove' },
           { text: 'zenit doctor', link: '/commands/doctor' },
           { text: 'zenit list', link: '/commands/list' },
+          { text: 'zenit graph', link: '/commands/graph' },
           { text: 'zenit config', link: '/configuration' },
         ],
       },
@@ -86,12 +87,12 @@ export default defineConfig({
     },
 
     editLink: {
-      pattern: 'https://github.com/your-org/zenit/edit/main/docs/:path',
+      pattern: 'https://github.com/BojanKonjevic/zenit/edit/main/docs/:path',
       text: 'Edit this page on GitHub',
     },
 
     footer: {
-      message: 'Released under the <a href="https://github.com/your-org/zenit/blob/main/LICENSE">MIT License</a>.',
+      message: 'Released under the <a href="https://github.com/BojanKonjevic/zenit/blob/main/LICENSE">MIT License</a>.',
       copyright: 'Copyright © 2024–present zenit contributors',
     },
   },

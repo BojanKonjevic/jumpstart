@@ -17,7 +17,7 @@ A `fastapi` project with `docker` and `redis` installed:
 template = "fastapi"
 addons = ["docker", "redis"]
 zenit_version = "1.0.8"
-schema_version = 2
+schema_version = 4
 
 # One entry per injected Python block
 [[manifest.python_blocks]]
@@ -102,17 +102,10 @@ One entry per environment variable added by an addon.
 
 `key` — the variable name, e.g. `REDIS_URL`.
 
-`source` — one of the `EntrySource` enum values:
-
-- `"addon"` — added by an addon. Full lifecycle management.
-- `"template"` — written by the scaffold template.
-- `"migrated"` — presence-tracked from a Copier template migration. Not under
-  full lifecycle management. Upgraded to `"addon"` the first time you run
-  `zenit add <addon>` for the addon that owns that entry. See
-  [EntrySource](./addons-and-templates.md#entrysource-enum).
+`source` — one of the `EntrySource` enum values (`"template"` or `"addon"`).
 
 `addon` — the addon that added this variable. Empty string for template-owned
-and migrated entries.
+entries.
 
 ---
 

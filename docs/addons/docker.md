@@ -31,7 +31,7 @@ Choose `docker` when you want to:
 
 The generated Dockerfile:
 
-- Uses `python:3.14-slim` as the base image
+- Uses `python:3.12-slim` as the base image
 - Installs `uv` from the official Astral container image
 - Creates a non-root `app` user for security
 - Copies `pyproject.toml` and `uv.lock` first for layer caching

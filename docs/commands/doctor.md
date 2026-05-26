@@ -6,7 +6,7 @@ Verify that the project's current state matches what `.zenit.toml` records.
 zenit doctor
 ```
 
-`doctor` is read-only. It never modifies any file. It exits with code `0` if everything is consistent, and code `1` if any check fails.
+Without `--fix`, `doctor` is read-only. It never modifies any file. It exits with code `0` if everything is consistent, and code `1` if any check fails.
 
 ---
 
@@ -92,27 +92,27 @@ $ zenit doctor
 
 ---
 
-## `--thorough`
+## `--fix`
 
 ```
-zenit doctor --thorough
+zenit doctor --fix
 ```
 
-Adds a full fingerprint integrity pass for every Python injection recorded in the manifest. In a standard `doctor` run, the fingerprint check stops as soon as one strategy succeeds (exact → normalised → fuzzy). With `--thorough`, all three strategies are always evaluated and their results are reported individually:
+Re-syncs stale line numbers and fingerprints in the manifest from the current file content. After editing files or running formatters, the line ranges recorded in `.zenit.toml` may be outdated — `--fix` recalculates them without changing any source file.
 
 ```
-  ✔ my_project/lifecycle.py  injection: lifespan_startup
-      exact fingerprint:       ✔ match
-      normalised fingerprint:  — (not checked, exact matched)
-      fuzzy match:             — (not checked, exact matched)
+$ zenit doctor --fix
 
-  ⚠ my_project/settings.py  injection: settings_fields
-      exact fingerprint:       ✗ mismatch
-      normalised fingerprint:  ✔ match (file was reformatted)
-      fuzzy match:             — (not checked, normalised matched)
+  Fixing stale line numbers in the manifest.
+  ✔ my_project/redis.py  exists
+  ✔ my_project/redis.py  content hash matches
+  ✔ redis>=5  in pyproject.toml
+  ✔ REDIS_URL  in .env.example
+
+  0 warnings, 0 errors.
 ```
 
-Use `--thorough` after running a formatter over the project, or when preparing to run `zenit remove` and you want confidence about what will be found.
+Use `--fix` after editing or reformatting a Zenit-managed file to keep the manifest accurate for future `remove` operations.
 
 ---
 
@@ -129,9 +129,9 @@ Use `--thorough` after running a formatter over the project, or when preparing t
 
 **After pulling changes from collaborators.** If a teammate edited a file that Zenit manages, `doctor` will surface the mismatch before it causes a problem at `remove` time.
 
-**Before running `zenit remove`.** Confirm that all injections are locatable so removal proceeds cleanly. Use `--thorough` if the project has been formatted recently.
+**Before running `zenit remove`.** Confirm that all injections are locatable so removal proceeds cleanly. Use `--fix` if the project has been formatted recently to re-sync fingerprints.
 
-**After running a formatter.** Formatters can change whitespace inside injected blocks enough to fail the exact fingerprint check. `doctor --thorough` tells you whether the normalised fingerprint still matches, and therefore whether `remove` will be silent or will warn.
+**After running a formatter.** Formatters can change whitespace inside injected blocks enough to fail the exact fingerprint check. `doctor --fix` recalculates the line ranges and fingerprints so `remove` will proceed cleanly.
 
 **When something seems wrong.** If the app behaves unexpectedly after an `add`, `doctor` gives you a complete picture of the project's managed state.
 

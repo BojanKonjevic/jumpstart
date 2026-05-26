@@ -12,4 +12,5 @@ All commands that modify files support `--dry-run`, which prints exactly what wo
 | [`zenit remove`](./remove.md) | Remove one or more addons from the current project |
 | [`zenit doctor`](./doctor.md) | Verify the project's state matches `.zenit.toml` |
 | [`zenit list`](./list.md) | List available templates and addons, or what is installed |
+| [`zenit graph`](./graph.md) | Render the addon dependency graph |
 | [`zenit config`](../configuration.md) | Show the config file path and current settings |

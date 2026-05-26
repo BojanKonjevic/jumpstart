@@ -27,7 +27,7 @@ Addons are optional capabilities you layer on top of a Zenit template. Each addo
 | `docker` | ✓ | ✓ | — |
 | `redis` | ✓ | ✓ | — |
 | `celery` | ✓ | ✓ | `redis` |
-| `auth-manual` | — | ✓ | — |
+| `auth-manual` | — | ✓ | `sqlalchemy` |
 | `sentry` | ✓ | ✓ | — |
 | `github-actions` | ✓ | ✓ | — |
 | `sqlalchemy` | ✓ | ✓ | — |

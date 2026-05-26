@@ -6,7 +6,7 @@ Get a project running in under five minutes.
 
 ## Requirements
 
-- **Python 3.14+**
+- **Python 3.12+**
 - **uv 0.4+** — [install](https://docs.astral.sh/uv/getting-started/installation/)
 - **git**
 - **just** — optional, but generated projects use it heavily
@@ -121,7 +121,7 @@ my-api/
 `.zenit.toml` is the only file that links this project to Zenit. The rest is plain Python — no Zenit-specific imports, no runtime dependency.
 
 > [!NOTE]
-> Zenit's core pipeline is validated by 986+ tests covering injection, removal, round-trip integrity, and edge cases. What you see in `.zenit.toml` matches what actually happened.
+> Zenit's core pipeline is validated by 1200+ tests covering injection, removal, round-trip integrity, and edge cases. What you see in `.zenit.toml` matches what actually happened.
 
 ---
 
@@ -172,4 +172,4 @@ The project continues to work exactly as before.
 
 - [Architecture Overview](./architecture/index.md) — understand how Zenit works and why it was designed this way
 - [Building an addon](./architecture/addons-and-templates.md) — write your own addon
-- [Commands Reference](./commands/index.md) — every flag and option for all five commands
+- [Commands Reference](./commands/index.md) — every flag and option for all commands

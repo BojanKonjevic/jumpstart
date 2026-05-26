@@ -133,6 +133,14 @@ Addons inject into `test_imports` and `test_fixtures` to add addon-specific fixt
 
 ---
 
+## Environment variables
+
+| Key | Default | Description |
+|---|---|---|
+| `DEBUG` | `false` | Enable debug mode (e.g. verbose error pages) |
+
+---
+
 ## Dependencies
 
 | Package | Purpose |
@@ -140,9 +148,6 @@ Addons inject into `test_imports` and `test_fixtures` to add addon-specific fixt
 | `fastapi` | Web framework |
 | `uvicorn[standard]` | ASGI server |
 | `pydantic-settings` | Settings management from environment |
-| `email-validator` | Email validation for Pydantic |
-| `python-multipart` | Form data parsing |
-| `python-dotenv` | `.env` file loading |
 
 The `sqlalchemy`, `postgres`, and `sqlmodel` addons add additional dependencies (`sqlalchemy[asyncio]`, `alembic`, `asyncpg`, `sqlmodel`, etc.) when selected.
 
