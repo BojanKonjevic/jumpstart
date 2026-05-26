@@ -46,7 +46,13 @@ from zenit.core.pkg_name import normalise_pkg_name, resolve_dest_placeholder
 from zenit.core.render import build_recipe_render_vars, build_render_vars, make_env
 from zenit.core.rollback import addon_or_rollback
 from zenit.schema.exceptions import ZenitError
-from zenit.schema.models import AddonConfig, Manifest, TemplateConfig
+from zenit.schema.models import (
+    AddonConfig,
+    ComposeService,
+    EntrySource,
+    Manifest,
+    TemplateConfig,
+)
 from zenit.templates._load_config import load_template_config
 
 
@@ -104,16 +110,10 @@ def _run_add_pipeline(
         template_config = TemplateConfig(id="migrated", description="migrated project")
     contributions = collect_addon_only([addon_cfg])
 
-    # Non-docker addons only contribute compose entries when the zenit docker
-    # addon already manages compose.  This keeps merge_compose, manifest
-    # recording, and removal (which looks up the manifest to find what to
-    # delete from compose.yml) in sync.  Copier-template Docker files
-    # (presence-tracked but not managed) do not count.
-    if (
-        addon_cfg.id != "docker"
-        and installed_addons is not None
-        and "docker" not in installed_addons
-    ):
+    # Docker owns all compose services and volumes. Non-docker addons declare
+    # their compose needs in AddonConfig but never directly merge or own
+    # compose entries — that is docker's job via _refresh_compose.
+    if addon_cfg.id != "docker":
         contributions.compose_services = []
         contributions.compose_volumes = []
 
@@ -202,6 +202,96 @@ def _run_add_pipeline(
         added_recipes=added_recipes,
         recorded_files=recorded_files,
     )
+
+
+def _refresh_compose(
+    ctx: Context,
+    project_dir: Path,
+    manifest: Manifest,
+) -> None:
+    """Reconcile compose.yml and manifest with all installed addons' compose entries.
+
+    Docker owns all compose entries. This function:
+    1. Collects compose services/volumes from all installed addons.
+    2. Removes stale ADDON-source entries from compose.yml.
+    3. Merges current entries into compose.yml.
+    4. Records all entries as docker-owned in the manifest.
+    """
+    from zenit.addons._registry import get_addon as _get_addon
+    from zenit.core._filenames import COMPOSE_FILE
+    from zenit.core.apply import merge_compose
+    from zenit.core.filesystem import RealFileSystem
+    from zenit.core.manifest import add_compose_service, add_compose_volume
+    from zenit.core.pkg_name import resolve_dest_placeholder
+
+    compose_path = project_dir / COMPOSE_FILE
+    if not compose_path.exists():
+        return
+
+    import yaml
+
+    # 1. Collect compose from all installed addons
+    services: list[ComposeService] = []
+    volumes: list[str] = []
+    for addon_id in ctx.addons:
+        addon_cfg = _get_addon(addon_id)
+        services.extend(addon_cfg.compose_services)
+        volumes.extend(addon_cfg.compose_volumes)
+
+    # Resolve {{pkg_name}} placeholders in service fields
+    for svc in services:
+        if svc.command and "{{pkg_name}}" in svc.command:
+            svc.command = resolve_dest_placeholder(svc.command, ctx.pkg_name)
+        if svc.environment:
+            svc.environment = {
+                k: resolve_dest_placeholder(v, ctx.pkg_name)
+                if isinstance(v, str)
+                else v
+                for k, v in svc.environment.items()
+            }
+        if svc.develop_watch:
+            for watch in svc.develop_watch:
+                if "path" in watch and isinstance(watch["path"], str):
+                    watch["path"] = resolve_dest_placeholder(
+                        watch["path"], ctx.pkg_name
+                    )
+
+    # 2. Remove stale ADDON-source entries from compose.yml
+    old_service_names = {
+        e.name for e in manifest.compose_services if e.source == EntrySource.ADDON
+    }
+    old_volume_names = {
+        e.name for e in manifest.compose_volumes if e.source == EntrySource.ADDON
+    }
+    data: dict[str, object] = (
+        yaml.safe_load(compose_path.read_text(encoding="utf-8")) or {}
+    )
+    svc_section: dict[str, object] = data.get("services", {})  # type: ignore[assignment]
+    vol_section: dict[str, object] = data.get("volumes", {})  # type: ignore[assignment]
+    for name in old_service_names:
+        svc_section.pop(name, None)
+    for name in old_volume_names:
+        vol_section.pop(name, None)
+
+    # 3. Merge current entries using merge_compose (handles the block building)
+    fs = RealFileSystem(project_dir)
+    compose_path.write_text(
+        yaml.dump(data, default_flow_style=False, sort_keys=False),
+        encoding="utf-8",
+    )
+    merge_compose(ctx, fs, services, volumes)
+
+    # 4. Update manifest — record all entries as docker-owned
+    manifest.compose_services = [
+        e for e in manifest.compose_services if e.source != EntrySource.ADDON
+    ]
+    manifest.compose_volumes = [
+        e for e in manifest.compose_volumes if e.source != EntrySource.ADDON
+    ]
+    for svc in services:
+        add_compose_service(manifest, svc.name, EntrySource.ADDON, "docker")
+    for vol in volumes:
+        add_compose_volume(manifest, vol, EntrySource.ADDON, "docker")
 
 
 def add_addon(
@@ -332,6 +422,12 @@ def add_addon(
             template_has_tasks=lockfile.template_has_tasks,
             template_file_paths=lockfile.template_file_paths,
         )
+
+    # ── Refresh compose (docker-owned reconciliation) ─────────────────────────
+    if "docker" in ctx.addons:
+        manifest = read_manifest(project_dir)
+        _refresh_compose(ctx, project_dir, manifest)
+        write_manifest(project_dir, manifest)
 
     # ── Output ────────────────────────────────────────────────────────────────
     print()

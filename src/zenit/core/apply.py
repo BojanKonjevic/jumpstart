@@ -232,12 +232,27 @@ def merge_compose(
     fs: FileSystem,
     services: list[ComposeService],
     volumes: list[str],
+    replace: bool = False,
 ) -> None:
-    """Add *services* and *volumes* to ``compose.yml``, skipping duplicates."""
+    """Add *services* and *volumes* to ``compose.yml``, skipping duplicates.
+
+    When *replace* is True, remove any service or volume **not** in the
+    provided lists before adding missing ones (full reconciliation).
+    """
     compose_path = ctx.project_dir / COMPOSE_FILE
     data: dict[str, Any] = (
         yaml.safe_load(compose_path.read_text(encoding="utf-8")) or {}
     )
+
+    if replace:
+        svc_names = {s.name for s in services}
+        data["services"] = {
+            k: v for k, v in data.get("services", {}).items() if k in svc_names
+        }
+        vol_set = set(volumes)
+        data["volumes"] = {
+            k: v for k, v in data.get("volumes", {}).items() if k in vol_set
+        }
 
     existing: dict[str, Any] = data.setdefault("services", {})
     for svc in services:

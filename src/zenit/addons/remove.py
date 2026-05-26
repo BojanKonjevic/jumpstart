@@ -167,18 +167,28 @@ def remove_addon(
     _undo_injections_physical(project_dir, manifest, addon_id)
 
     # ── compose services ────────────────────────────────────────────────────
-    removed_services = _remove_compose_services(
-        project_dir,
-        manifest,
-        addon_id,
-        addon_services=addon_cfg.compose_services,
-    )
-    _remove_compose_volumes(
-        project_dir,
-        manifest,
-        addon_id,
-        addon_volumes=addon_cfg.compose_volumes,
-    )
+    # Docker owns all compose entries. Non-docker addons never touch compose
+    # when docker is installed.
+    if addon_id == "docker":
+        # Docker removal: _remove_files deletes compose.yml entirely.
+        removed_services = []
+    elif "docker" in lockfile.addons:
+        # Docker owns compose — don't let non-docker addons remove entries.
+        removed_services = [s.name for s in addon_cfg.compose_services]
+    else:
+        # Legacy: no docker installed, remove per-addon as before.
+        removed_services = _remove_compose_services(
+            project_dir,
+            manifest,
+            addon_id,
+            addon_services=addon_cfg.compose_services,
+        )
+        _remove_compose_volumes(
+            project_dir,
+            manifest,
+            addon_id,
+            addon_volumes=addon_cfg.compose_volumes,
+        )
 
     # ── env vars ─────────────────────────────────────────────────────────────
     removed_env_vars = _remove_env_vars(project_dir, manifest, addon_id)

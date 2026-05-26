@@ -1,15 +1,11 @@
 from pathlib import Path
 
-from zenit.addons._registry import get_addon
 from zenit.core._filenames import COMPOSE_FILE
-from zenit.core.apply import merge_compose
-from zenit.core.collect import collect_all
 from zenit.core.context import Context
 from zenit.core.filesystem import FileSystem
 from zenit.core.lockfile import ZenitLockfile
 from zenit.doctor.doctor import HealthIssue, Severity
 from zenit.schema.models import AddonConfig, FileContribution
-from zenit.templates._load_config import load_template_config
 
 _HERE = Path(__file__).parent.absolute()
 
@@ -54,30 +50,10 @@ def health_check(project_dir: Path, lockfile: ZenitLockfile) -> list[HealthIssue
 
 
 def post_apply(ctx: Context, fs: FileSystem) -> None:  # noqa: ARG001
-    # Runs inside apply_contributions, before write_manifest.
-    # compose.yml has already been created by the file-contributions loop
-    # and merge_compose at this point, and the manifest entries for compose
-    # services are recorded AFTER this hook returns (by record_addon_manifest_entries
-    # in the caller), so the manifest stays consistent with compose.yml.
-    try:
-        template_config = load_template_config(ctx.zenit_root, ctx.template)
-    except (FileNotFoundError, Exception):
-        # Copier templates (URIs) cannot be loaded as native configs.
-        # Fall back to an empty config — compose contributions are
-        # still applied via the addon's own contributions.
-        template_config = None
-    if template_config is None:
-        return
-    active_configs = [get_addon(a) for a in ctx.addons]
-    contributions = collect_all(template_config, active_configs)
-    if not contributions.compose_services and not contributions.compose_volumes:
-        return
-    compose_path = ctx.project_dir / COMPOSE_FILE
-    if not compose_path.exists():
-        return
-    merge_compose(
-        ctx, fs, contributions.compose_services, contributions.compose_volumes
-    )
+    # Compose merge is fully handled by _refresh_compose in add.py.
+    # Docker post_apply is intentionally a no-op for compose — the
+    # reconciliation is done once after the full add pipeline completes.
+    return
 
 
 def can_apply(project_dir: Path, lockfile: ZenitLockfile) -> str | None:

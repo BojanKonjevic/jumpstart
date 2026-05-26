@@ -161,7 +161,7 @@ def test_full_add_on_migrated_lifecycle(
     )
     assert redis_entry is not None
     assert redis_entry.source == EntrySource.ADDON
-    assert redis_entry.addon == "redis"
+    assert redis_entry.addon == "docker"
 
     # ── Step 2: Remove redis ───────────────────────────────────────────────
     with suppress_stdin():
@@ -173,8 +173,9 @@ def test_full_add_on_migrated_lifecycle(
     redis_entry = next(
         (e for e in manifest.compose_services if e.name == "redis"), None
     )
-    # After upgrade to ADDON followed by remove, the entry is gone entirely
-    assert redis_entry is None
+    # Docker owns compose — removing redis does NOT remove compose entries
+    assert redis_entry is not None
+    assert redis_entry.addon == "docker"
 
 
 # ── add_addon — lockfile ──────────────────────────────────────────────────────
