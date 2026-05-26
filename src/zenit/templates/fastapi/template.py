@@ -83,6 +83,10 @@ config = TemplateConfig(
             file="src/{{pkg_name}}/exceptions.py",
             locator=LocatorSpec(name=LOCATOR_AT_MODULE_END, args={}),
         ),
+        "model_imports": InjectionPoint(
+            file="src/{{pkg_name}}/models/__init__.py",
+            locator=LocatorSpec(name=LOCATOR_AFTER_LAST_IMPORT, args={}),
+        ),
     },
     dirs=[
         "src/{{pkg_name}}/api/routes",
@@ -105,7 +109,7 @@ config = TemplateConfig(
         FileContribution(dest="src/{{pkg_name}}/schemas/__init__.py", content=""),
         FileContribution(
             dest="src/{{pkg_name}}/models/__init__.py",
-            content="# Import all models here so Alembic can discover them.\n",
+            content="# Model discovery for Alembic \u2014 addons inject their imports here.\n",
         ),
         FileContribution(
             dest="src/{{pkg_name}}/main.py",

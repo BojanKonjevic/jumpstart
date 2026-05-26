@@ -1,14 +1,31 @@
-from collections.abc import AsyncGenerator
+from __future__ import annotations
 
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from collections.abc import AsyncGenerator
+from typing import Optional
+
+from sqlalchemy.ext.asyncio import (
+    AsyncEngine,
+    AsyncSession,
+    async_sessionmaker,
+    create_async_engine,
+)
 
 from ..settings import settings
 
-DATABASE_URL = getattr(settings, "database_url", "sqlite+aiosqlite:///./dev.db")
-engine = create_async_engine(DATABASE_URL, echo=getattr(settings, "debug", False))
-AsyncSessionLocal = async_sessionmaker(engine, expire_on_commit=False)
+
+def _make_engine() -> AsyncEngine:
+    database_url = getattr(settings, "database_url", "sqlite+aiosqlite:///./dev.db")
+    return create_async_engine(database_url, echo=getattr(settings, "debug", False))
+
+
+engine: Optional[AsyncEngine] = None
+AsyncSessionLocal: Optional[async_sessionmaker[AsyncSession]] = None
 
 
 async def get_session() -> AsyncGenerator[AsyncSession]:
+    global engine, AsyncSessionLocal
+    if engine is None:
+        engine = _make_engine()
+        AsyncSessionLocal = async_sessionmaker(engine, expire_on_commit=False)
     async with AsyncSessionLocal() as session:
         yield session

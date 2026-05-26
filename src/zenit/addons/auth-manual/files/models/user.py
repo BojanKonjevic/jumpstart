@@ -1,13 +1,16 @@
 from __future__ import annotations
 
 import uuid
+from typing import TYPE_CHECKING
 
 from sqlalchemy import Boolean, String, Uuid
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from ..db.base import Base
 from .mixins import TimestampMixin
-from .refresh_token import RefreshToken
+
+if TYPE_CHECKING:
+    from .refresh_token import RefreshToken
 
 
 class User(TimestampMixin, Base):

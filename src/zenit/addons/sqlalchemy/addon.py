@@ -89,7 +89,7 @@ config = AddonConfig(
         ),
         Injection(
             point="lifespan_shutdown",
-            content="    await engine.dispose()",
+            content="    if engine:\n        await engine.dispose()",
         ),
     ],
 )

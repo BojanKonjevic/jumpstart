@@ -11,7 +11,9 @@ import os
 import sentry_sdk
 [% if template == "fastapi" %]
 from sentry_sdk.integrations.fastapi import FastApiIntegration
+[% if "sqlalchemy" in addon_ids or "sqlmodel" in addon_ids %]
 from sentry_sdk.integrations.sqlalchemy import SqlalchemyIntegration
+[% endif %]
 [% endif %]
 
 
@@ -28,7 +30,9 @@ def init_sentry() -> None:
 [% if template == "fastapi" %]
         integrations=[
             FastApiIntegration(),
+[% if "sqlalchemy" in addon_ids or "sqlmodel" in addon_ids %]
             SqlalchemyIntegration(),
+[% endif %]
         ],
 [% endif %]
         send_default_pii=False,

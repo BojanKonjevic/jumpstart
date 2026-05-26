@@ -1,4 +1,4 @@
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -67,7 +67,7 @@ async def login(
 
     access_token = create_access_token(user.id)
     raw_refresh = generate_refresh_token()
-    expires = datetime.now(UTC) + timedelta(days=settings.refresh_token_expire_days)
+    expires = datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(days=settings.refresh_token_expire_days)
 
     session.add(RefreshToken(token=raw_refresh, expires_at=expires, user_id=user.id))
     await session.commit()
@@ -85,7 +85,7 @@ async def refresh(
     )
     stored = result.scalar_one_or_none()
 
-    if not stored or stored.is_revoked or stored.expires_at < datetime.now(UTC):
+    if not stored or stored.is_revoked or stored.expires_at < datetime.now(timezone.utc).replace(tzinfo=None):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid or expired refresh token",
@@ -94,7 +94,7 @@ async def refresh(
     stored.is_revoked = True
 
     raw_refresh = generate_refresh_token()
-    expires = datetime.now(UTC) + timedelta(days=settings.refresh_token_expire_days)
+    expires = datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(days=settings.refresh_token_expire_days)
     session.add(
         RefreshToken(token=raw_refresh, expires_at=expires, user_id=stored.user_id)
     )
