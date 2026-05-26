@@ -1,5 +1,6 @@
 """Tests for the migration pipeline."""
 
+import sys
 from pathlib import Path
 
 import pytest
@@ -397,6 +398,10 @@ def test_run_migration_fails_when_dir_exists(
         run_migration(str(template_dir))
 
 
+@pytest.mark.skipif(
+    sys.platform == "win32",
+    reason="Template path contains | which is illegal on Windows",
+)
 def test_run_migration_renders_unsuffixed_pyproject_and_templated_paths(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:

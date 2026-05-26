@@ -33,17 +33,17 @@ class ZenitConfig:
 def config_path() -> Path:
     """Return the platform-appropriate config file path.
 
-    Respects XDG_CONFIG_HOME on Linux/macOS.
-    Uses %APPDATA% on Windows, falling back to ~/AppData/Roaming.
+    XDG_CONFIG_HOME is respected on all platforms if set (explicit override).
+    Falls back to %APPDATA% on Windows, ~/.config on Linux/macOS.
     """
-    if sys.platform == "win32":
+    xdg = os.environ.get("XDG_CONFIG_HOME")
+    if xdg:
+        base = Path(xdg)
+    elif sys.platform == "win32":
         appdata = os.environ.get("APPDATA")
         base = Path(appdata) if appdata else Path.home() / "AppData" / "Roaming"
     else:
-        # XDG on Linux; macOS doesn't set XDG_CONFIG_HOME by default but
-        # respects it if set, otherwise falls back to ~/.config (same as Linux).
-        xdg = os.environ.get("XDG_CONFIG_HOME")
-        base = Path(xdg) if xdg else Path.home() / ".config"
+        base = Path.home() / ".config"
 
     return base / "zenit" / "zenit.toml"
 

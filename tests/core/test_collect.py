@@ -158,7 +158,7 @@ def test_collect_all_dedup_source_vs_content_different(tmp_path):
     addon_fc = FileContribution(dest="x.py", source=str(source_file))
     with pytest.raises(
         ZenitError,
-        match=r"Conflict: both 'template' and 'myaddon' want to write 'x\.py'\.\n  'template' source: inline content\n  'myaddon' source: .*/x\.py\nFix: remove or rename the conflicting file in one of the addons/templates\.",
+        match=r"Conflict: both 'template' and 'myaddon' want to write 'x\.py'\.\n  'template' source: inline content\n  'myaddon' source: .*[/\\]x\.py\nFix: remove or rename the conflicting file in one of the addons/templates\.",
     ):
         collect_all(
             _template(files=[template_fc]),

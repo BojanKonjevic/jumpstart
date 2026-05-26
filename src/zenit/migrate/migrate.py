@@ -520,7 +520,7 @@ def _rewrite_contribution_prefixes(
     rewritten: list[FileContribution] = []
 
     for contribution in contributions:
-        current = contribution.dest
+        current = contribution.dest.replace("\\", "/")
         if current == source_prefix:
             current = dest_prefix
         elif current.startswith(f"{source_prefix}/"):
@@ -542,12 +542,13 @@ def _remove_contribution_targets(
     targets: list[str],
 ) -> list[FileContribution]:
     """Drop contributions matched by a safe ``rm -f`` or ``rm -rf`` task."""
-    normalized = [target.rstrip("/") for target in targets]
+    normalized = [target.rstrip("/").replace("\\", "/") for target in targets]
     kept: list[FileContribution] = []
 
     for contribution in contributions:
+        norm_dest = contribution.dest.replace("\\", "/")
         if any(
-            contribution.dest == target or contribution.dest.startswith(f"{target}/")
+            norm_dest == target or norm_dest.startswith(f"{target}/")
             for target in normalized
         ):
             continue
