@@ -17,7 +17,7 @@ if sys.platform == "win32":
     try:
         import ctypes
 
-        kernel32 = ctypes.windll.kernel32  # type: ignore[attr-defined]
+        kernel32 = ctypes.windll.kernel32
         # Flags: ENABLE_PROCESSED_OUTPUT | ENABLE_WRAP_AT_EOL_OUTPUT |
         #        ENABLE_VIRTUAL_TERMINAL_PROCESSING
         kernel32.SetConsoleMode(kernel32.GetStdHandle(-11), 7)
