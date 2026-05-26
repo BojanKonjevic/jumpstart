@@ -121,6 +121,7 @@ def _run_add_pipeline(
         contributions.compose_services = []
         contributions.compose_volumes = []
 
+    python_version = f"{sys.version_info.major}.{sys.version_info.minor}"
     render_vars = build_render_vars(
         name=ctx.name,
         pkg_name=pkg_name,
@@ -128,6 +129,7 @@ def _run_add_pipeline(
         addons=ctx.addons,
         deps=contributions.deps,
         dev_deps=contributions.dev_deps,
+        python_version=python_version,
     )
 
     # Read .zenit.toml once and pass it down to avoid redundant parse.
@@ -166,6 +168,7 @@ def _run_add_pipeline(
         addons=ctx.addons,
         deps=contributions.deps,
         dev_deps=contributions.dev_deps,
+        python_version=python_version,
     )
     string_env = make_env()
     rendered_recipes = [

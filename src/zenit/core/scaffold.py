@@ -151,6 +151,7 @@ def scaffold_project(
 
         contributions = collect_all(template_config, selected_addon_configs)
 
+        python_version = f"{sys.version_info.major}.{sys.version_info.minor}"
         render_vars = build_render_vars(
             name=name,
             pkg_name=pkg_name,
@@ -158,6 +159,7 @@ def scaffold_project(
             addons=adns,
             deps=contributions.deps,
             dev_deps=contributions.template_dev_deps + contributions.dev_deps,
+            python_version=python_version,
         )
 
         write_lockfile(project_dir, tpl, adns)
@@ -169,7 +171,7 @@ def scaffold_project(
             template_config.injection_points,
             render_vars,
         )
-        generate_all(ctx, fs, contributions)
+        generate_all(ctx, fs, contributions, python_version=python_version)
         init(project_dir)
 
         manifest = read_manifest(project_dir)

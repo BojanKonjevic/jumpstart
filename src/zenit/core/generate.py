@@ -13,6 +13,7 @@ if TYPE_CHECKING:
     from zenit.core.context import Context
     from zenit.schema.models import Contributions
 
+
 _GENERATE_FILES: list[tuple[str, str]] = [
     ("pyproject.toml.j2", PYPROJECT_FILE),
     ("justfile.j2", JUSTFILE_NAME),
@@ -23,6 +24,7 @@ def generate_all(
     ctx: Context,
     fs: FileSystem,
     contributions: Contributions,
+    python_version: str = "3.12",
 ) -> None:
     """Render ``pyproject.toml`` and ``justfile`` and write them to the project."""
     step("Generating config files")
@@ -36,6 +38,7 @@ def generate_all(
         addons=ctx.addons,
         deps=contributions.deps,
         dev_deps=contributions.template_dev_deps + contributions.dev_deps,
+        python_version=python_version,
     )
 
     rendered_template_recipes = [
@@ -60,6 +63,7 @@ def generate_all(
         "template_just_recipes": rendered_template_recipes,
         "extra_just_recipes": rendered_addon_recipes,
         "tool_overrides": contributions.tool_overrides,
+        "python_version": python_version,
     }
 
     for template_name, dest_rel in _GENERATE_FILES:

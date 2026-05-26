@@ -67,6 +67,7 @@ def build_render_vars(
     addons: list[str] | None = None,
     deps: list[str] | None = None,
     dev_deps: list[str] | None = None,
+    python_version: str = "3.12",
 ) -> dict[str, object]:
     """Build the standard render-variables dict for template rendering.
 
@@ -77,6 +78,9 @@ def build_render_vars(
     ``deps`` and ``dev_deps`` let template files use ``(( deps ))`` and
     ``(( dev_deps ))`` in their content — e.g. to list dependencies in a
     README or generate an ``__init__.py`` that re-exports them.
+
+    ``python_version`` should be ``"major.minor"`` (e.g. ``"3.14"``).
+    Defaults to ``"3.12"`` as a safe fallback.
     """
     addon_list = addons or []
     addon_ids = set(addon_list)
@@ -89,6 +93,7 @@ def build_render_vars(
         "addon_ids": addon_ids,
         "deps": deps or [],
         "dev_deps": dev_deps or [],
+        "python_version": python_version,
     }
 
 
@@ -99,6 +104,7 @@ def build_recipe_render_vars(
     addons: list[str],
     deps: list[str] | None = None,
     dev_deps: list[str] | None = None,
+    python_version: str = "3.12",
 ) -> dict[str, object]:
     """Build render-variables for Justfile recipe rendering only."""
     return {
@@ -108,4 +114,5 @@ def build_recipe_render_vars(
         "addons": addons,
         "deps": deps or [],
         "dev_deps": dev_deps or [],
+        "python_version": python_version,
     }
