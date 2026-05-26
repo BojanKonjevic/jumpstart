@@ -119,7 +119,7 @@ Addons inject into `test_imports` and `test_fixtures` to add addon-specific fixt
 ## Injection points
 
 | Point | File | Locator | What goes here |
-|---|---|---|---|---|
+|---|---|---|---|
 | `settings_fields` | `src/{{pkg_name}}/settings.py` | `after_last_class_attribute` (`Settings`) | Configuration fields |
 | `lifespan_imports` | `src/{{pkg_name}}/lifecycle.py` | `after_last_import` | Import statements needed by lifespan hooks |
 | `lifespan_startup` | `src/{{pkg_name}}/lifecycle.py` | `before_yield_in_function` (`lifespan`) | Startup logic |

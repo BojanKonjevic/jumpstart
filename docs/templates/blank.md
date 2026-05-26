@@ -60,7 +60,7 @@ just run
 The `blank` template is intentionally minimal. It exposes two injection points:
 
 | Point | File | Locator | What goes here |
-|---|---|---|---|---|
+|---|---|---|---|
 | `settings_fields` | `src/{{pkg_name}}/settings.py` | `after_last_class_attribute` (`Settings`) | Pydantic settings fields |
 | `main_startup` | `src/{{pkg_name}}/main.py` | `before_return_in_function` (`main`) | Startup calls — e.g. `init_sentry()` |
 | `env_vars` | `.env` | `at_file_end` | Key=value pairs appended to the env file |
