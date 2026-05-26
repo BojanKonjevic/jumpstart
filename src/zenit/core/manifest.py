@@ -49,13 +49,6 @@ from zenit.schema.models import (
     OwnedEntry,
 )
 
-# NOTE: MANIFEST_SCHEMA_VERSION is NEVER written to disk and never read back.
-# It exists purely as a developer-facing annotation that gates fingerprint
-# normalisation (_normalise()).  If you change the normalisation algorithm,
-# bump this constant to signal that existing normalised fingerprints are
-# stale.  It is intentionally separate from SCHEMA_VERSION in lockfile.py,
-# which gates the on-disk .zenit.toml [project] structure — those are
-# independent events that should not be coupled.
 MANIFEST_SCHEMA_VERSION = 2
 
 
@@ -109,6 +102,36 @@ def write_manifest(project_dir: Path, manifest: Manifest) -> None:
 # ── Manifest mutation helpers ─────────────────────────────────────────────────
 
 
+def _add_owned_entry(
+    container: list[Any],
+    key_attr: str,
+    entry: Any,
+    *,
+    source: EntrySource,
+    addon: str,
+) -> bool:
+    """Record *entry* in *container*, adopting TEMPLATE-sourced entries.
+
+    If an entry with the same *key_attr* value already exists and has
+    ``source == TEMPLATE``, it is adopted (source changed, addon set).
+    Returns True if adoption occurred.
+    """
+    existing = next(
+        (e for e in container if getattr(e, key_attr) == getattr(entry, key_attr)),
+        None,
+    )
+    if existing is not None:
+        if existing.source == EntrySource.TEMPLATE:
+            existing.source = source
+            existing.addon = addon
+            return True
+        return False
+    entry.source = source
+    entry.addon = addon
+    container.append(entry)
+    return False
+
+
 def add_python_block(manifest: Manifest, block: ManifestBlock) -> None:
     manifest.python_blocks.append(block)
 
@@ -132,46 +155,39 @@ def add_env_entry(
 ) -> bool:
     """Record *key* in the manifest.
 
-    If the entry already exists with ``source == TEMPLATE``, it is adopted
-    (source changed to ADDON, addon set).  Returns True if adoption occurred.
+    Delegates to ``_add_owned_entry`` for adoption and dedup.
     """
-    existing = next((e for e in manifest.env if e.key == key), None)
-    if existing is not None:
-        if existing.source == EntrySource.TEMPLATE:
-            existing.source = source
-            existing.addon = addon
-            return True
-        return False
-    manifest.env.append(EnvEntry(key=key, source=source, addon=addon))
-    return False
+    return _add_owned_entry(
+        manifest.env,
+        "key",
+        EnvEntry(key=key, source=source, addon=addon),
+        source=source,
+        addon=addon,
+    )
 
 
 def add_compose_service(
     manifest: Manifest, name: str, source: EntrySource, addon: str
 ) -> bool:
-    existing = next((s for s in manifest.compose_services if s.name == name), None)
-    if existing is not None:
-        if existing.source == EntrySource.TEMPLATE:
-            existing.source = source
-            existing.addon = addon
-            return True
-        return False
-    manifest.compose_services.append(OwnedEntry(name=name, source=source, addon=addon))
-    return False
+    return _add_owned_entry(
+        manifest.compose_services,
+        "name",
+        OwnedEntry(name=name, source=source, addon=addon),
+        source=source,
+        addon=addon,
+    )
 
 
 def add_compose_volume(
     manifest: Manifest, name: str, source: EntrySource, addon: str
 ) -> bool:
-    existing = next((v for v in manifest.compose_volumes if v.name == name), None)
-    if existing is not None:
-        if existing.source == EntrySource.TEMPLATE:
-            existing.source = source
-            existing.addon = addon
-            return True
-        return False
-    manifest.compose_volumes.append(OwnedEntry(name=name, source=source, addon=addon))
-    return False
+    return _add_owned_entry(
+        manifest.compose_volumes,
+        "name",
+        OwnedEntry(name=name, source=source, addon=addon),
+        source=source,
+        addon=addon,
+    )
 
 
 def add_dependency(
@@ -182,31 +198,27 @@ def add_dependency(
     addon: str,
     dev: bool,
 ) -> bool:
-    existing = next((d for d in manifest.dependencies if d.package == package), None)
-    if existing is not None:
-        if existing.source == EntrySource.TEMPLATE:
-            existing.source = source
-            existing.addon = addon
-            return True
-        return False
-    manifest.dependencies.append(
-        DependencyEntry(package=package, spec=spec, source=source, addon=addon, dev=dev)
+    return _add_owned_entry(
+        manifest.dependencies,
+        "package",
+        DependencyEntry(
+            package=package, spec=spec, source=source, addon=addon, dev=dev
+        ),
+        source=source,
+        addon=addon,
     )
-    return False
 
 
 def add_just_recipe(
     manifest: Manifest, name: str, source: EntrySource, addon: str
 ) -> bool:
-    existing = next((r for r in manifest.just_recipes if r.name == name), None)
-    if existing is not None:
-        if existing.source == EntrySource.TEMPLATE:
-            existing.source = source
-            existing.addon = addon
-            return True
-        return False
-    manifest.just_recipes.append(OwnedEntry(name=name, source=source, addon=addon))
-    return False
+    return _add_owned_entry(
+        manifest.just_recipes,
+        "name",
+        OwnedEntry(name=name, source=source, addon=addon),
+        source=source,
+        addon=addon,
+    )
 
 
 def dep_package_name(dep: str) -> str:

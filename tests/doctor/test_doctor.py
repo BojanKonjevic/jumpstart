@@ -9,7 +9,7 @@ import tomlkit
 import yaml
 from helpers import ZENIT_ROOT, write_test_manifest
 
-from zenit.addons._registry import get_available_addons
+from zenit.addons._registry import get_addon
 from zenit.core._apply_loader import load_apply
 from zenit.core.apply import apply_contributions
 from zenit.core.collect import collect_all
@@ -74,9 +74,8 @@ def _scaffold(
     fs = RealFileSystem(project_dir)
 
     load_apply(ZENIT_ROOT / "templates" / "_common" / "apply.py")(ctx, fs)
-    available = get_available_addons()
     template_config = load_template_config(ZENIT_ROOT, template)
-    selected_addon_configs = [cfg for cfg in available if cfg.id in addons]
+    selected_addon_configs = [get_addon(aid) for aid in addons]
     render_vars = build_render_vars(
         name=name,
         pkg_name=pkg_name,

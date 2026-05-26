@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Annotated
 
 if TYPE_CHECKING:
+    from zenit.core.lockfile import ZenitLockfile
     from zenit.schema.models import AddonMeta
 
 import typer
@@ -180,18 +181,19 @@ def _print_available(
     print()
 
 
-def _print_installed(
-    lockfile: object,
-    project_dir: Path,
-) -> None:
-    from zenit.core.lockfile import ZenitLockfile
-
-    assert isinstance(lockfile, ZenitLockfile)
-
+def _print_project_header(lockfile: ZenitLockfile, project_dir: Path) -> None:
+    """Print the project name, template, and version header."""
     version_label = lockfile.zenit_version or "unknown"
     print(f"\n  {BOLD}Project{RESET}   {project_dir.name}")
     print(f"  {BOLD}Template{RESET}  {CYAN}{lockfile.template}{RESET}")
     print(f"  {BOLD}Version{RESET}   {DIM}zenit {version_label}{RESET}")
+
+
+def _print_installed(
+    lockfile: ZenitLockfile,
+    project_dir: Path,
+) -> None:
+    _print_project_header(lockfile, project_dir)
 
     if lockfile.addons:
         print(f"\n  {BOLD}Installed addons{RESET}")
@@ -203,18 +205,11 @@ def _print_installed(
 
 
 def _print_default(
-    lockfile: object,
+    lockfile: ZenitLockfile,
     addons: Sequence[AddonMeta],
     project_dir: Path,
 ) -> None:
-    from zenit.core.lockfile import ZenitLockfile
-
-    assert isinstance(lockfile, ZenitLockfile)
-
-    version_label = lockfile.zenit_version or "unknown"
-    print(f"\n  {BOLD}Project{RESET}   {project_dir.name}")
-    print(f"  {BOLD}Template{RESET}  {CYAN}{lockfile.template}{RESET}")
-    print(f"  {BOLD}Version{RESET}   {DIM}zenit {version_label}{RESET}")
+    _print_project_header(lockfile, project_dir)
 
     if lockfile.addons:
         print(f"\n  {BOLD}Installed{RESET}")

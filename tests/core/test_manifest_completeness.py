@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from zenit.addons._registry import get_available_addons
+from zenit.addons._registry import get_addon
 from zenit.core._apply_loader import load_apply
 from zenit.core.apply import apply_contributions
 from zenit.core.collect import collect_all
@@ -105,9 +105,8 @@ def _scaffold(tmp_path: Path, name: str, template: str, addons: list[str]) -> Pa
 
     load_apply(_ZENIT_ROOT / "templates" / "_common" / "apply.py")(ctx, fs)
 
-    available = get_available_addons()
     template_config = load_template_config(_ZENIT_ROOT, template)
-    selected_addon_configs = [cfg for cfg in available if cfg.id in addons]
+    selected_addon_configs = [get_addon(aid) for aid in addons]
 
     render_vars = build_render_vars(
         name=name,

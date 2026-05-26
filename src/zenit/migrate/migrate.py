@@ -756,7 +756,7 @@ def run_migration(
                 f"Any matching files were written unconditionally."
             )
 
-    non_interactive = name is not None or (data is not None and len(data) > 0)
+    non_interactive = name is not None or data
 
     if non_interactive:
         step("Resolving template answers (non-interactive)")

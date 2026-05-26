@@ -12,7 +12,6 @@ from zenit.migrate.copier import (
     classify_file,
     classify_questions,
     parse_copier_yml,
-    translate_delimiters,
 )
 
 # ── parse_copier_yml ───────────────────────────────────────────────────────────
@@ -270,85 +269,3 @@ def test_classify_excluded_file(tmp_path: Path) -> None:
     )
     result = classify_file(p, cfg)
     assert result == FileJinjaClass.STATIC
-
-
-# ── translate_delimiters ───────────────────────────────────────────────────────
-
-
-def test_translate_variable() -> None:
-    result = translate_delimiters("{{ project_name }}")
-    assert result == "((project_name))"
-
-
-def test_translate_block_if() -> None:
-    result = translate_delimiters("{% if use_redis %}content{% endif %}")
-    assert result == "[% if use_redis %]content[% endif %]"
-
-
-def test_translate_block_for() -> None:
-    result = translate_delimiters("{% for item in items %}{{ item }}{% endfor %}")
-    assert result == "[% for item in items %]((item))[% endfor %]"
-
-
-def test_translate_raw_block() -> None:
-    result = translate_delimiters("before{% raw %}{{ literal }}{% endraw %}after")
-    assert result == "before{{ literal }}after"
-
-
-def test_translate_comment_dropped() -> None:
-    result = translate_delimiters("before{# comment #}after")
-    assert result == "beforeafter"
-
-
-def test_translate_mixed_content() -> None:
-    result = translate_delimiters(
-        "{% if x %}{{ a }}{% endif %}{# c #}{% raw %}{{ b }}{% endraw %}"
-    )
-    assert result == "[% if x %]((a))[% endif %]{{ b }}"
-
-
-def test_translate_invalid_template_raises() -> None:
-    """Unclosed block should raise TemplateSyntaxError."""
-    import jinja2
-
-    with pytest.raises(jinja2.exceptions.TemplateSyntaxError):
-        translate_delimiters("{% if x %}")
-
-
-def test_translate_nested_blocks() -> None:
-    result = translate_delimiters(
-        "{% for u in users %}{{ u.name }}{% if u.active %}(active){% endif %}{% endfor %}"
-    )
-    assert result == (
-        "[% for u in users %]((u.name))[% if u . active %](active)[% endif %][% endfor %]"
-    )
-
-
-def test_translate_line_comment_ignored() -> None:
-    """Zenit disables line comments, but Copier's ## should not break translation."""
-    result = translate_delimiters("before\n## this is a comment\n{{ var }}")
-    assert "((var))" in result
-    assert "## this is a comment" in result
-
-
-def test_translate_empty_content() -> None:
-    assert translate_delimiters("") == ""
-
-
-def test_translate_no_jinja() -> None:
-    text = "plain text no jinja"
-    assert translate_delimiters(text) == text
-
-
-def test_translate_multiple_lines() -> None:
-    text = """line1
-{{ var1 }}
-{% if cond %}
-{{ var2 }}
-{% endif %}
-"""
-    result = translate_delimiters(text)
-    assert "((var1))" in result
-    assert "[% if cond %]" in result or "[%if cond%]" in result
-    assert "[% endif %]" in result or "[%endif%]" in result
-    assert "((var2))" in result

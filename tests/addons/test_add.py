@@ -20,7 +20,7 @@ import yaml
 from click.exceptions import Exit as ClickExit
 from helpers import ZENIT_ROOT, write_test_manifest
 
-from zenit.addons._registry import get_available_addons
+from zenit.addons._registry import get_addon
 from zenit.addons.add import add_addon, add_addon_interactive
 from zenit.addons.remove import remove_addon
 from zenit.cli.prompt._single import prompt_single_addon
@@ -71,9 +71,8 @@ def _scaffold(tmp_path: Path, name: str, template: str, addons: list[str]) -> Pa
 
     load_apply(ZENIT_ROOT / "templates" / "_common" / "apply.py")(ctx, fs)
 
-    available = get_available_addons()
     template_config = load_template_config(ZENIT_ROOT, template)
-    selected = [c for c in available if c.id in addons]
+    selected = [get_addon(aid) for aid in addons]
     render_vars = build_render_vars(
         name=name,
         pkg_name=pkg_name,

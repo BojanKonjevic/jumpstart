@@ -21,10 +21,6 @@ def extract_recipe_name(text: str) -> str | None:
     return None
 
 
-# Backward-compat alias
-_recipe_name = extract_recipe_name
-
-
 DEFAULT_DEV_DEPS: list[str] = [
     "pytest>=8",
     "pytest-cov",

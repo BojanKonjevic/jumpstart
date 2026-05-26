@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from zenit.core.handlers.base import FileHandler
+from zenit.core.handlers.base import FileHandler, _ensure_trailing_newline
 
 
 class EnvHandler(FileHandler):
@@ -21,9 +21,7 @@ class EnvHandler(FileHandler):
         source = file.read_text(encoding="utf-8") if file.exists() else ""
         lines = source.splitlines(keepends=True)
 
-        content_lines = content.splitlines(keepends=True)
-        if content_lines and not content_lines[-1].endswith("\n"):
-            content_lines[-1] += "\n"
+        content_lines = _ensure_trailing_newline(content.splitlines(keepends=True))
 
         existing_keys = {
             ln.split("=")[0].strip()

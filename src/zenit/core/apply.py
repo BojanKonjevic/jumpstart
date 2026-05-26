@@ -22,6 +22,7 @@ from zenit.core.manifest import (
 )
 from zenit.core.pkg_name import (
     _validate_no_path_traversal,
+    resolve_compose_placeholders,
     resolve_dest_placeholder,
 )
 from zenit.core.render import make_env
@@ -59,8 +60,6 @@ def apply_contributions(
     lockfile: ZenitLockfile | None = None,
 ) -> None:
     """Modify the generated project directory in-place according to *contributions*.
-
-    Assumes common files have already been placed via ``_common/apply.py``.
     Steps (in order):
 
     1. Create directories.
@@ -87,18 +86,7 @@ def apply_contributions(
         fs.create_dir(dest)
 
     # Pre-render {{pkg_name}} placeholders in compose service fields
-    for svc in contributions.compose_services:
-        if svc.command and "{{pkg_name}}" in svc.command:
-            svc.command = resolve_dest_placeholder(svc.command, pkg_name)
-        if svc.environment:
-            svc.environment = {
-                k: resolve_dest_placeholder(v, pkg_name) if isinstance(v, str) else v
-                for k, v in svc.environment.items()
-            }
-        if svc.develop_watch:
-            for watch in svc.develop_watch:
-                if "path" in watch and isinstance(watch["path"], str):
-                    watch["path"] = resolve_dest_placeholder(watch["path"], pkg_name)
+    resolve_compose_placeholders(contributions.compose_services, pkg_name)
 
     string_env = make_env()
     file_envs: dict[Path, jinja2.Environment] = {}

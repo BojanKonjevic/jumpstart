@@ -30,7 +30,7 @@ from zenit.cli.ui import (
 from zenit.core._paths import get_zenit_root
 from zenit.core.apply import apply_contributions
 from zenit.core.collect import collect_addon_only
-from zenit.core.constants import _recipe_name
+from zenit.core.constants import extract_recipe_name
 from zenit.core.context import Context
 from zenit.core.dependency import DependencyGraph
 from zenit.core.deps import inject_deps
@@ -42,7 +42,11 @@ from zenit.core.manifest import (
     record_addon_manifest_entries,
     write_manifest,
 )
-from zenit.core.pkg_name import normalise_pkg_name, resolve_dest_placeholder
+from zenit.core.pkg_name import (
+    normalise_pkg_name,
+    resolve_compose_placeholders,
+    resolve_dest_placeholder,
+)
 from zenit.core.render import build_recipe_render_vars, build_render_vars, make_env
 from zenit.core.rollback import addon_or_rollback
 from zenit.schema.exceptions import ZenitError
@@ -170,7 +174,7 @@ def _run_add_pipeline(
     ]
 
     if ctx.dry_run:
-        added_recipes = [n for r in rendered_recipes if (n := _recipe_name(r))]
+        added_recipes = [n for r in rendered_recipes if (n := extract_recipe_name(r))]
     else:
         added_recipes = inject_just_recipes(project_dir, rendered_recipes)
 
@@ -225,7 +229,6 @@ def _refresh_compose(
     from zenit.core._filenames import COMPOSE_FILE
     from zenit.core.apply import merge_compose_into_data
     from zenit.core.manifest import add_compose_service, add_compose_volume
-    from zenit.core.pkg_name import resolve_dest_placeholder
 
     _compose_yaml = YAML()
     _compose_yaml.default_flow_style = False
@@ -248,22 +251,7 @@ def _refresh_compose(
         volumes.extend(addon_cfg.compose_volumes)
 
     # Resolve {{pkg_name}} placeholders in service fields
-    for svc in services:
-        if svc.command and "{{pkg_name}}" in svc.command:
-            svc.command = resolve_dest_placeholder(svc.command, ctx.pkg_name)
-        if svc.environment:
-            svc.environment = {
-                k: resolve_dest_placeholder(v, ctx.pkg_name)
-                if isinstance(v, str)
-                else v
-                for k, v in svc.environment.items()
-            }
-        if svc.develop_watch:
-            for watch in svc.develop_watch:
-                if "path" in watch and isinstance(watch["path"], str):
-                    watch["path"] = resolve_dest_placeholder(
-                        watch["path"], ctx.pkg_name
-                    )
+    resolve_compose_placeholders(services, ctx.pkg_name)
 
     # 2. Single read-modify-write cycle
     old_service_names = {

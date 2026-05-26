@@ -11,9 +11,7 @@ from pathlib import Path
 from typing import Any
 
 import jinja2
-import jinja2.lexer
 import jinja2.meta
-import jinja2.nodes
 import yaml
 
 # ── Question types ─────────────────────────────────────────────────────────────
@@ -336,83 +334,3 @@ def classify_file(
             return FileJinjaClass.JINJA2_TEMPLATE
 
     return FileJinjaClass.STATIC
-
-
-# ── Delimiter translator ───────────────────────────────────────────────────────
-
-
-def translate_delimiters(content: str) -> str:
-    """Translate Copier-style Jinja2 delimiters to zenit-style delimiters.
-
-    - ``{{ expr }}`` → ``(( expr ))``
-    - ``{% tag %}`` → ``[% tag %]``
-    - ``{# comment #}`` → removed entirely
-    - ``{% raw %}...{% endraw %}`` → content preserved verbatim, markers removed
-
-    Raises ``jinja2.TemplateSyntaxError`` if the content is not valid Jinja2
-    (e.g. unclosed blocks).
-
-    NOTE: Currently unused during migration. When activated, this translates
-    migrated template content so it can be re-rendered by zenit's Jinja2
-    environment (which uses ``(( ))`` / ``[% %]`` delimiters).
-    """
-    if not content.strip():
-        return content
-
-    # Parse with Copier's Jinja2 to validate template structure
-    try:
-        COPIER_ENV.parse(content)
-    except jinja2.TemplateSyntaxError:
-        raise
-    except Exception:
-        pass
-
-    lexer = jinja2.lexer.get_lexer(COPIER_ENV)
-    tokens = list(lexer.tokenize(content))
-
-    return _process_token_stream(tokens)
-
-
-def _process_token_stream(
-    tokens: list[jinja2.lexer.Token],
-) -> str:
-    """Walk the token stream and emit translated output.
-
-    The Jinja2 tokenizer handles ``{% raw %}...{% endraw %}`` blocks by
-    emitting their content as ``data`` tokens, so they pass through verbatim
-    without any special handling here.  Comments are already stripped by the
-    tokenizer and never appear in the output.
-
-    We reconstruct proper spacing inside blocks and variables because the
-    tokenizer strips whitespace between tokens.
-    """
-    result: list[str] = []
-    i = 0
-    while i < len(tokens):
-        token = tokens[i]
-        tt = token.type
-
-        if tt == "block_begin":
-            inner: list[str] = []
-            i += 1
-            while i < len(tokens) and tokens[i].type != "block_end":
-                inner.append(tokens[i].value)
-                i += 1
-            result.append(f"[% {' '.join(inner)} %]")
-        elif tt == "variable_begin":
-            var_inner: list[str] = []
-            i += 1
-            while i < len(tokens) and tokens[i].type != "variable_end":
-                var_inner.append(tokens[i].value)
-                i += 1
-            result.append(f"(({''.join(var_inner)}))")
-        elif tt in ("comment_begin", "comment_end"):
-            pass
-        elif tt == "data":
-            result.append(token.value)
-        else:
-            result.append(token.value)
-
-        i += 1
-
-    return "".join(result)

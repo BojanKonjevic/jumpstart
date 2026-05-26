@@ -539,7 +539,7 @@ def _remove_deps(
         removed = []
 
     _dev_doc = doc.get("dependency-groups", {})
-    _dev_group = _dev_doc.get("dev") if hasattr(_dev_doc, "get") else None
+    _dev_group = _dev_doc.get("dev")
     dev_group = _dev_group or doc.get("project", {}).get(
         "optional-dependencies", {}
     ).get("dev")
@@ -645,7 +645,7 @@ def _remove_just_recipes(
 
     Uses a two-pass block parser (``_parse_justfile_blocks``) that correctly
     handles recipe attributes (``[private]``), aliases, settings, and blank
-    lines — unlike the old whitespace heuristic.
+    lines.
     """
 
     justfile_path = project_dir / JUSTFILE_NAME

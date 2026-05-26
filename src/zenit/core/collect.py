@@ -16,6 +16,27 @@ if TYPE_CHECKING:
     from zenit.schema.models import AddonConfig, TemplateConfig
 
 
+def _merge_addon_contributions(
+    c: Contributions, addon_configs: list[AddonConfig]
+) -> None:
+    """Merge contributions from all addon configs into *c*."""
+    for addon in addon_configs:
+        c.dirs.extend(addon.dirs)
+        c.files.extend(addon.files)
+        c.compose_services.extend(addon.compose_services)
+        c.compose_volumes.extend(addon.compose_volumes)
+        c.env_vars.extend(addon.env_vars)
+        c.deps.extend(addon.deps)
+        c.dev_deps.extend(addon.dev_deps)
+        c.recipes.addon.extend(addon.just_recipes)
+        for section, overrides in addon.tool_overrides.items():
+            c.tool_overrides.setdefault(section, []).extend(overrides)
+        for inj in addon.injections:
+            inj.addon_id = addon.id
+            c.injections.append(inj)
+    c._addon_configs = addon_configs
+
+
 def _resolve_content(fc: FileContribution) -> str | None:
     """Return the literal content of a FileContribution.
 
@@ -54,22 +75,7 @@ def collect_all(
         inj.addon_id = "template"
         c.injections.append(inj)
 
-    for addon in addon_configs:
-        c.dirs.extend(addon.dirs)
-        c.files.extend(addon.files)
-        c.compose_services.extend(addon.compose_services)
-        c.compose_volumes.extend(addon.compose_volumes)
-        c.env_vars.extend(addon.env_vars)
-        c.deps.extend(addon.deps)
-        c.dev_deps.extend(addon.dev_deps)
-        c.recipes.addon.extend(addon.just_recipes)
-        for section, overrides in addon.tool_overrides.items():
-            c.tool_overrides.setdefault(section, []).extend(overrides)
-        for inj in addon.injections:
-            inj.addon_id = addon.id
-            c.injections.append(inj)
-
-    c._addon_configs = addon_configs
+    _merge_addon_contributions(c, addon_configs)
 
     # ---- deduplicate file contributions ----
     seen: dict[str, tuple[str, FileContribution]] = {}
@@ -126,19 +132,5 @@ def collect_addon_only(addon_configs: list[AddonConfig]) -> Contributions:
     re-renders and overwrites files that the template already wrote at scaffold time.
     """
     c = Contributions()
-    for addon in addon_configs:
-        c.dirs.extend(addon.dirs)
-        c.files.extend(addon.files)
-        c.compose_services.extend(addon.compose_services)
-        c.compose_volumes.extend(addon.compose_volumes)
-        c.env_vars.extend(addon.env_vars)
-        c.deps.extend(addon.deps)
-        c.dev_deps.extend(addon.dev_deps)
-        c.recipes.addon.extend(addon.just_recipes)
-        for section, overrides in addon.tool_overrides.items():
-            c.tool_overrides.setdefault(section, []).extend(overrides)
-        for inj in addon.injections:
-            inj.addon_id = addon.id
-            c.injections.append(inj)
-    c._addon_configs = addon_configs
+    _merge_addon_contributions(c, addon_configs)
     return c

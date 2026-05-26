@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING
 import libcst as cst
 
 from zenit.core.filesystem import atomic_write_text
-from zenit.core.handlers.base import FileHandler
+from zenit.core.handlers.base import FileHandler, _ensure_trailing_newline
 from zenit.core.handlers.locators import (
     _REGISTRY,
     LocatorError,
@@ -63,13 +63,7 @@ def _locate_line(
             return positions[body[-1]].end.line
         return 0
 
-    locator_fn = _REGISTRY.get(locator_name)
-    if locator_fn is None:
-        raise InjectionError(
-            f"Locator '{locator_name}' is not registered. "
-            f"Add it to _REGISTRY in locators.py."
-        )
-
+    locator_fn = _REGISTRY[locator_name]  # locate() already validates existence
     scope: LocatorScope = locator_fn.__locator_scope__  # type: ignore[attr-defined]
     if scope == LocatorScope.MODULE_BODY:
         return _split_for(module.body, insert_index)
@@ -167,9 +161,7 @@ def apply(
     line_number = _locate_line(module, locator_name, locator_args, insert_index)
 
     lines = source.splitlines(keepends=True)
-    content_lines = content.splitlines(keepends=True)
-    if content_lines and not content_lines[-1].endswith("\n"):
-        content_lines[-1] += "\n"
+    content_lines = _ensure_trailing_newline(content.splitlines(keepends=True))
 
     new_lines = lines[:line_number] + content_lines + lines[line_number:]
     new_source = "".join(new_lines)

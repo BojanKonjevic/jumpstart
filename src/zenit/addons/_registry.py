@@ -70,18 +70,6 @@ def get_addon(addon_id: str) -> AddonConfig:
     return dataclasses.replace(cfg, _module=hooks)
 
 
-# ── Backward-compatible full-ecosystem loader ─────────────────────────────
-
-
-@functools.cache
-def get_available_addons() -> list[AddonConfig]:
-    """Return one ``AddonConfig`` for every addon directory (legacy).
-
-    Reimplemented via ``list_addons()`` + ``get_addon()`` for lazy exec.
-    """
-    return [get_addon(m.id) for m in list_addons()]
-
-
 def _validate_addons(addons: list[AddonConfig]) -> None:
     """Check all registered addons for cycles / missing deps; warn on failure."""
     graph = DependencyGraph.build(addons)

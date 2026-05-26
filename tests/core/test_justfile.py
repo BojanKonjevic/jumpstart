@@ -1,6 +1,6 @@
 """Tests for zenit.justfile — injecting just recipes into existing justfiles.
 
-Covers inject_just_recipes, _recipe_name, and _extract_recipe_names for all
+Covers inject_just_recipes, extract_recipe_name, and _extract_recipe_names for all
 relevant cases: adding new recipes, skipping duplicates, preserving formatting,
 and edge cases.
 """
@@ -9,56 +9,56 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from zenit.core.constants import _recipe_name
+from zenit.core.constants import extract_recipe_name
 from zenit.core.justfile import (
     _extract_recipe_names,
     inject_just_recipes,
 )
 
-# ── _recipe_name ──────────────────────────────────────────────────────────────
+# ── extract_recipe_name ──────────────────────────────────────────────────────
 
 
 def test_recipe_name_simple():
-    assert _recipe_name("test:\n    uv run pytest") == "test"
+    assert extract_recipe_name("test:\n    uv run pytest") == "test"
 
 
 def test_recipe_name_with_comment():
-    assert _recipe_name("# run tests\ntest:\n    uv run pytest") == "test"
+    assert extract_recipe_name("# run tests\ntest:\n    uv run pytest") == "test"
 
 
 def test_recipe_name_with_multiple_comments():
-    assert _recipe_name("# comment 1\n# comment 2\ntest:\n    cmd") == "test"
+    assert extract_recipe_name("# comment 1\n# comment 2\ntest:\n    cmd") == "test"
 
 
 def test_recipe_name_with_args():
-    assert _recipe_name('migrate msg="":\n    uv run alembic') == "migrate"
+    assert extract_recipe_name('migrate msg="":\n    uv run alembic') == "migrate"
 
 
 def test_recipe_name_with_deps():
-    assert _recipe_name("upgrade: wait-db\n    cmd") == "upgrade"
+    assert extract_recipe_name("upgrade: wait-db\n    cmd") == "upgrade"
 
 
 def test_recipe_name_strips_whitespace():
-    assert _recipe_name("  run  :\n    cmd") == "run"
+    assert extract_recipe_name("  run  :\n    cmd") == "run"
 
 
 def test_recipe_name_hyphenated():
-    assert _recipe_name("docker-up:\n    docker compose up") == "docker-up"
+    assert extract_recipe_name("docker-up:\n    docker compose up") == "docker-up"
 
 
 def test_recipe_name_with_leading_newline():
-    assert _recipe_name("\nrun:\n    cmd") == "run"
+    assert extract_recipe_name("\nrun:\n    cmd") == "run"
 
 
 def test_recipe_name_all_comments_returns_none():
-    assert _recipe_name("# just a comment\n# another comment") is None
+    assert extract_recipe_name("# just a comment\n# another comment") is None
 
 
 def test_recipe_name_empty_string_returns_none():
-    assert _recipe_name("") is None
+    assert extract_recipe_name("") is None
 
 
-# ── _extract_recipe_names ─────────────────────────────────────────────────────
+# ── _extract_recipe_names ────────────────────────────────────────────────────
 
 
 def test_extract_recipe_names_simple():
@@ -118,14 +118,13 @@ def test_extract_recipe_names_empty_justfile():
 
 
 def test_extract_recipe_names_set_header():
-    # set windows-shell := [...] should not be treated as a recipe
     text = 'set windows-shell := ["cmd", "/C"]\ntest:\n    pytest\n'
     names = _extract_recipe_names(text)
     assert "test" in names
     assert "set windows-shell" not in names
 
 
-# ── inject_just_recipes — basic behaviour ─────────────────────────────────────
+# ── inject_just_recipes — basic behaviour ────────────────────────────────────
 
 
 def _write_justfile(tmp_path: Path, content: str) -> Path:
@@ -257,7 +256,6 @@ def test_inject_idempotent(tmp_path):
 
 
 def test_inject_hyphenated_recipe_name_not_confused_with_existing(tmp_path):
-    # "docker-up" and "docker-down" are different names
     _write_justfile(tmp_path, "docker-up:\n    docker compose up\n")
     added = inject_just_recipes(tmp_path, ["docker-down:\n    docker compose down"])
     assert "docker-down" in added

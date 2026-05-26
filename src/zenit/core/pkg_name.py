@@ -15,8 +15,12 @@ from __future__ import annotations
 
 import re
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from zenit.schema.exceptions import ZenitError
+
+if TYPE_CHECKING:
+    from zenit.schema.models import ComposeService
 
 
 def normalise_pkg_name(project_name: str) -> str:
@@ -49,6 +53,22 @@ def _validate_no_path_traversal(dest: str, project_dir: Path) -> None:
             f"which is outside the project directory '{resolved_project}'. "
             f"This is a security issue in the template or addon — please report it."
         ) from None
+
+
+def resolve_compose_placeholders(services: list[ComposeService], pkg_name: str) -> None:
+    """Resolve ``{{pkg_name}}`` placeholders in compose service fields in-place."""
+    for svc in services:
+        if svc.command and "{{pkg_name}}" in svc.command:
+            svc.command = resolve_dest_placeholder(svc.command, pkg_name)
+        if svc.environment:
+            svc.environment = {
+                k: resolve_dest_placeholder(v, pkg_name) if isinstance(v, str) else v
+                for k, v in svc.environment.items()
+            }
+        if svc.develop_watch:
+            for watch in svc.develop_watch:
+                if "path" in watch and isinstance(watch["path"], str):
+                    watch["path"] = resolve_dest_placeholder(watch["path"], pkg_name)
 
 
 def resolve_dest_placeholder(text: str, pkg_name: str) -> str:

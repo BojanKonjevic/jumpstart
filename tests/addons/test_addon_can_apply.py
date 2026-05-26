@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from zenit.addons._registry import get_available_addons
+from zenit.addons._registry import get_addon
 from zenit.core.lockfile import ZenitLockfile
 
 # ── helpers ───────────────────────────────────────────────────────────────────
@@ -27,13 +27,9 @@ def _project_dir(tmp_path: Path, name: str = "myapp") -> Path:
 
 def _get_can_apply(addon_id: str):
     """Return the can_apply function for an addon, or None if it doesn't have one."""
-    available = get_available_addons()
-    for cfg in available:
-        if cfg.id == addon_id:
-            hooks = cfg._module
-            if hooks is not None and hooks.can_apply is not None:
-                return hooks.can_apply
-            return None
+    cfg = get_addon(addon_id)
+    hooks = cfg._module
+    return hooks.can_apply if hooks is not None else None
     return None
 
 

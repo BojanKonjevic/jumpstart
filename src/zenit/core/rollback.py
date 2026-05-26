@@ -87,25 +87,9 @@ def addon_or_rollback(project_dir: Path, addon_id: str) -> Generator[None]:
 # These directories are never modified by addons.  Excluding them from the
 # snapshot eliminates the dominant performance bottleneck (copying a large
 # virtualenv or .git directory can take seconds).
+# _IGNORED_DIR_NAMES is the single source of truth for directory-name patterns;
+# _SNAPSHOT_IGNORE adds the glob pattern for egg-info directories.
 
-_SNAPSHOT_IGNORE = shutil.ignore_patterns(
-    ".venv",
-    "venv",
-    "env",
-    ".git",
-    "__pycache__",
-    ".mypy_cache",
-    ".pytest_cache",
-    ".ruff_cache",
-    ".tox",
-    "node_modules",
-    ".eggs",
-    "*.egg-info",
-)
-
-# Exact-name subset of the above patterns, used by _remove_orphans to
-# distinguish "ignored but pre-existing" from "created by addon".
-# The *.egg-info glob is handled via _is_ignored_dir below.
 _IGNORED_DIR_NAMES = frozenset(
     {
         ".venv",
@@ -121,6 +105,8 @@ _IGNORED_DIR_NAMES = frozenset(
         ".eggs",
     }
 )
+
+_SNAPSHOT_IGNORE = shutil.ignore_patterns(*_IGNORED_DIR_NAMES, "*.egg-info")
 
 
 def _is_ignored_dir(name: str) -> bool:

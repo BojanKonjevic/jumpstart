@@ -17,7 +17,7 @@ from pathlib import Path
 import pytest
 from click.exceptions import Exit as ClickExit
 
-from zenit.addons._registry import get_available_addons
+from zenit.addons._registry import get_addon
 from zenit.core._apply_loader import load_apply
 from zenit.core.apply import apply_contributions
 from zenit.core.collect import collect_all
@@ -74,7 +74,6 @@ def write_test_manifest(
     Reads any existing manifest (``apply_contributions`` may have already
     recorded ``python_blocks``) and appends addon-owned entries to it.
     """
-    from zenit.addons._registry import get_available_addons
     from zenit.core.manifest import (
         read_manifest,
         record_addon_manifest_entries,
@@ -84,9 +83,8 @@ def write_test_manifest(
 
     manifest = read_manifest(project_dir)
     string_env = make_env()
-    available = get_available_addons()
     for addon_id in addons:
-        cfg = next(c for c in available if c.id == addon_id)
+        cfg = get_addon(addon_id)
         record_addon_manifest_entries(manifest, cfg, string_env, render_vars)
     write_manifest(project_dir, manifest)
 
@@ -116,9 +114,8 @@ def scaffold_project_at(
 
     load_apply(ZENIT_ROOT / "templates" / "_common" / "apply.py")(ctx, fs)
 
-    available = get_available_addons()
     template_config = load_template_config(ZENIT_ROOT, template)
-    selected_addon_configs = [cfg for cfg in available if cfg.id in addons]
+    selected_addon_configs = [get_addon(aid) for aid in addons]
 
     contributions = collect_all(template_config, selected_addon_configs)
 

@@ -1,9 +1,4 @@
-"""Import a template's declarative config from its template.py file.
-
-Also provides limited support for loading Copier template configuration
-from ``copier.yml``, converting it to a ``TemplateConfig`` for compatibility
-with the rest of the zenit system.
-"""
+"""Import a template's declarative config from its template.py file."""
 
 from __future__ import annotations
 
@@ -11,8 +6,6 @@ import functools
 import importlib.util
 import tomllib
 from pathlib import Path
-
-import yaml
 
 from zenit.schema.exceptions import ZenitError
 from zenit.schema.models import TemplateConfig, TemplateMeta
@@ -67,26 +60,3 @@ def load_template_config(zenit_root: Path, template_id: str) -> TemplateConfig:
             f"template.py for '{template_id}' must export a 'config' object"
         )
     return mod.config
-
-
-# ── Copier template config ─────────────────────────────────────────────────
-
-
-def load_copier_template_config(copier_yml_path: Path) -> TemplateConfig:
-    """Load a Copier template's ``copier.yml`` and return a minimal ``TemplateConfig``.
-
-    This makes Copier templates transparent to the rest of the zenit system
-    by providing a standard ``TemplateConfig`` derived from the Copier metadata.
-
-    Only basic fields (id, description) are populated from the Copier config.
-    """
-    with open(copier_yml_path, "rb") as f:
-        yaml.safe_load(f) or {}
-
-    template_id = copier_yml_path.parent.name
-    description = f"Copier template: {template_id}"
-
-    return TemplateConfig(
-        id=template_id,
-        description=description,
-    )

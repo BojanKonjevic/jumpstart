@@ -28,12 +28,6 @@ import tomlkit
 from zenit.core._filenames import LOCKFILE_NAME
 from zenit.core.filesystem import atomic_write_text
 
-# NOTE: SCHEMA_VERSION is written to disk as the schema_version field in the
-# [project] section of .zenit.toml.  It gates the on-disk project-structure
-# contract: if a project file's stored value doesn't match this constant,
-# doctor warns the user.  It is intentionally separate from
-# MANIFEST_SCHEMA_VERSION in manifest.py, which gates fingerprint
-# normalisation — those are independent events that should not be coupled.
 SCHEMA_VERSION = 4
 
 

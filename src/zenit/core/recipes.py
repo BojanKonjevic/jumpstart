@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from zenit.core.constants import _recipe_name
+from zenit.core.constants import extract_recipe_name as _recipe_name
 
 
 @dataclass

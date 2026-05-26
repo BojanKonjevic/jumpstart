@@ -6,7 +6,6 @@ from typing import TYPE_CHECKING
 
 from zenit.cli.ui import step, success
 from zenit.core._filenames import JUSTFILE_NAME, PYPROJECT_FILE
-from zenit.core.constants import _recipe_name
 from zenit.core.filesystem import FileSystem
 from zenit.core.render import build_recipe_render_vars, make_env
 
@@ -44,24 +43,11 @@ def generate_all(
         for raw in contributions.recipes.template
     ]
 
+    # Use RecipeCollection.resolve() to dedup addon recipes by name against templates
+    combined = contributions.recipes.resolve()
+    unique_addon_raw = combined[len(contributions.recipes.template) :]
     rendered_addon_recipes = [
-        string_env.from_string(raw).render(**render_vars)
-        for raw in contributions.recipes.addon
-    ]
-
-    # Drop addon recipes whose name already appears in the template set so
-    # that addon authors can override a template recipe without duplication.
-    template_recipe_names = {
-        n
-        for r in rendered_template_recipes
-        if r.strip()
-        for n in (_recipe_name(r),)
-        if n is not None
-    }
-    unique_addon_recipes = [
-        r
-        for r in rendered_addon_recipes
-        if r.strip() and _recipe_name(r) not in template_recipe_names
+        string_env.from_string(raw).render(**render_vars) for raw in unique_addon_raw
     ]
 
     template_vars = {
@@ -72,7 +58,7 @@ def generate_all(
         "deps": contributions.deps,
         "dev_deps": contributions.template_dev_deps + contributions.dev_deps,
         "template_just_recipes": rendered_template_recipes,
-        "extra_just_recipes": unique_addon_recipes,
+        "extra_just_recipes": rendered_addon_recipes,
         "tool_overrides": contributions.tool_overrides,
     }
 

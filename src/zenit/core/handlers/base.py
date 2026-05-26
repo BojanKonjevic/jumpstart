@@ -8,6 +8,13 @@ from zenit.core.filesystem import atomic_write_text
 from zenit.schema.models import ManifestBlock
 
 
+def _ensure_trailing_newline(content_lines: list[str]) -> list[str]:
+    """Ensure the last line ends with a newline."""
+    if content_lines and not content_lines[-1].endswith("\n"):
+        content_lines[-1] += "\n"
+    return content_lines
+
+
 class FileHandler(ABC):
     """Base class for all file-type handlers."""
 
@@ -45,9 +52,7 @@ class FileHandler(ABC):
         source = file.read_text(encoding="utf-8") if file.exists() else ""
         lines = source.splitlines(keepends=True)
 
-        content_lines = content.splitlines(keepends=True)
-        if content_lines and not content_lines[-1].endswith("\n"):
-            content_lines[-1] += "\n"
+        content_lines = _ensure_trailing_newline(content.splitlines(keepends=True))
 
         if dedup_check is not None and dedup_check(lines, content_lines):
             end = len(lines)

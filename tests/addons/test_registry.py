@@ -7,7 +7,7 @@ from textwrap import dedent
 
 import pytest
 
-from zenit.addons._registry import get_addon, get_available_addons, list_addons
+from zenit.addons._registry import get_addon, list_addons
 from zenit.schema.exceptions import ZenitError
 
 # ── list_addons() — metadata only, no exec ────────────────────────────────
@@ -116,11 +116,11 @@ def test_get_addon_filenotfound_for_missing_addon():
         get_addon("nonexistent_addon_id_xyz")
 
 
-# ── get_available_addons() — backward compatible ────────────────────────────
+# ── get_available_addons — backward compatible ─────────────────────────────
 
 
 def test_available_addons_still_load():
     """All real addons in the repo load without error (backward compat)."""
-    get_available_addons.cache_clear()
-    addons = get_available_addons()
-    assert len(addons) > 0
+    addon_ids = [m.id for m in list_addons()]
+    for aid in addon_ids:
+        get_addon(aid)  # smoke test: each loads without error
