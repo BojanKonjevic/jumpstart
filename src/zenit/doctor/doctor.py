@@ -404,7 +404,7 @@ def _check_manifest_recipes(
             result.error(
                 f"Manifest just-recipe '{entry.name}' (owned by '{entry.addon or 'template'}') "
                 f"is missing from the justfile.",
-                hint=f"Run 'zenit add {entry.addon}' to restore it.",
+                hint=f"Run 'zenit remove {entry.addon} && zenit add {entry.addon}' to reinstall it.",
             )
     else:
         total = len(manifest.just_recipes)
