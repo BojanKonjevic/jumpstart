@@ -1,9 +1,6 @@
 """Tests for zenit.assembler — collecting and merging contributions."""
 
-import pytest
-
 from zenit.core.collect import collect_all
-from zenit.schema.exceptions import ZenitError
 from zenit.schema.models import (
     AddonConfig,
     ComposeService,
@@ -151,19 +148,16 @@ def test_collect_all_dedup_source_vs_content_identical(tmp_path):
     )
 
 
-def test_collect_all_dedup_source_vs_content_different(tmp_path):
+def test_collect_all_dedup_addon_overrides_template(tmp_path):
     source_file = tmp_path / "x.py"
     source_file.write_text("print('goodbye')", encoding="utf-8")
     template_fc = FileContribution(dest="x.py", content="print('hello')")
     addon_fc = FileContribution(dest="x.py", source=str(source_file))
-    with pytest.raises(
-        ZenitError,
-        match=r"Conflict: both 'template' and 'myaddon' want to write 'x\.py'\.\n  'template' source: inline content\n  'myaddon' source: .*[/\\]x\.py\nFix: remove or rename the conflicting file in one of the addons/templates\.",
-    ):
-        collect_all(
-            _template(files=[template_fc]),
-            [_addon(id="myaddon", files=[addon_fc])],
-        )
+    # Should not raise — addon overrides template for same dest
+    collect_all(
+        _template(files=[template_fc]),
+        [_addon(id="myaddon", files=[addon_fc])],
+    )
 
 
 # ── just_recipes ──────────────────────────────────────────────────────────────

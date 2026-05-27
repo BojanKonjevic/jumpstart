@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from collections.abc import AsyncGenerator
-from typing import Optional
 
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
@@ -18,8 +17,8 @@ def _make_engine() -> AsyncEngine:
     return create_async_engine(database_url, echo=getattr(settings, "debug", False))
 
 
-engine: Optional[AsyncEngine] = None
-AsyncSessionLocal: Optional[async_sessionmaker[AsyncSession]] = None
+engine: AsyncEngine | None = None
+AsyncSessionLocal: async_sessionmaker[AsyncSession] | None = None
 
 
 async def get_session() -> AsyncGenerator[AsyncSession]:
@@ -27,5 +26,6 @@ async def get_session() -> AsyncGenerator[AsyncSession]:
     if engine is None:
         engine = _make_engine()
         AsyncSessionLocal = async_sessionmaker(engine, expire_on_commit=False)
+    assert AsyncSessionLocal is not None
     async with AsyncSessionLocal() as session:
         yield session

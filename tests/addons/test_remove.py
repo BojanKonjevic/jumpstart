@@ -608,6 +608,31 @@ class TestRemoveAddonIntegration:
         assert not (project_dir / "compose.yml").exists()
         assert not (project_dir / "Dockerfile").exists()
 
+    def test_remove_sqlalchemy_restores_template_conftest(self, tmp_path, monkeypatch):
+        """Removing sqlalchemy must restore the template's base conftest."""
+        project_dir = _scaffold(tmp_path, "myapi", "fastapi", ["sqlalchemy"])
+        monkeypatch.chdir(project_dir)
+
+        conftest = project_dir / "tests" / "conftest.py"
+        assert conftest.exists()
+        before = conftest.read_text()
+        # Sqlalchemy conftest has the session fixture and DB-aware client
+        assert "async def session" in before
+        assert "async def client" in before
+
+        with suppress_stdin():
+            remove_addon("sqlalchemy", project_dir=project_dir)
+
+        assert conftest.exists(), "Template conftest must be restored after removal"
+        after = conftest.read_text()
+        # Template's base conftest has the simple client fixture (no session)
+        assert "async def client" in after
+        assert "async def session" not in after
+        # Must be valid Python
+        import libcst as cst
+
+        cst.parse_module(after)
+
 
 # ── Migrated-project tests ──────────────────────────────────────────────────────
 

@@ -365,14 +365,76 @@ def test_remove_stage_d_file_deleted_raises(tmp_path: Path) -> None:
         remove(f, block)
 
 
-def test_remove_stage_d_file_truncated_raises(tmp_path: Path) -> None:
+def test_remove_stage_c1_relocates_truncated_line_number(tmp_path: Path) -> None:
+    """Stage C1 relocates a block whose recorded line number is past the file end."""
     injection = "import redis\n"
     f = tmp_path / "mod.py"
     f.write_text("import os\nimport redis\n", encoding="utf-8")
     block = _block(f, "50-50", injection)  # line 50 doesn't exist
 
-    with pytest.raises(RemovalError):
+    # relocate_block should find `import redis` via its locator (after_last_import).
+    remove(f, block)
+    assert "import redis" not in f.read_text()
+    assert "import os" in f.read_text()
+
+
+# ── remove() post-removal syntax validation ───────────────────────────────
+
+
+def test_remove_raises_on_invalid_result(tmp_path: Path) -> None:
+    """Removal that leaves invalid Python must raise RemovalError."""
+    f = tmp_path / "mod.py"
+    original = "def foo():\n    x = 1\n"
+    f.write_text(original, encoding="utf-8")
+    # Block claims line 2 (the `x = 1`).  Removing it leaves `def foo():`
+    # with no body, which is a syntax error.
+    block = _block(f, "2-2", "    x = 1\n")
+    with pytest.raises(RemovalError) as exc_info:
         remove(f, block)
+    msg = str(exc_info.value)
+    assert str(f) in msg
+    assert "invalid Python" in msg
+
+
+def test_remove_raises_on_invalid_result_stage_c(tmp_path: Path) -> None:
+    """Fuzzy removal that leaves invalid Python must raise RemovalError."""
+    f = tmp_path / "mod.py"
+    original = "def foo():\n    x = 1\n"
+    f.write_text(original, encoding="utf-8")
+    # Record block at a shifted position so Stage A/B fail → Stage C fires.
+    # The false-positive fuzzy match finds a window that includes `x = 1`,
+    # removes it, and leaves `def foo():` with no body.
+    block = _block(f, "1-1", "def foo():\n")
+    with pytest.raises(RemovalError) as exc_info:
+        remove(f, block)
+    msg = str(exc_info.value)
+    assert "invalid Python" in msg
+
+
+# ── remove() Stage C — variable-length fuzzy match ────────────────────────
+
+
+def test_remove_stage_c_locator_mismatch_falls_through_to_c2(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """When relocate_block fails, Stage C2 text-level fuzzy match still works.
+
+    Example: a renamed variable changes the AST so the normalised fingerprint
+    doesn't match, but the text-level similarity is above threshold.
+    """
+    injection = '    redis_url: str = "redis://localhost"\n'
+    f, block = _inject_and_record(tmp_path, injection)
+
+    # Rename the variable so relocate_block can't find it (FP changes).
+    edited = '    redis_val: str = "redis://localhost"\n'
+    src = f.read_text()
+    f.write_text(src.replace(injection, edited), encoding="utf-8")
+
+    remove(f, block)
+
+    captured = capsys.readouterr()
+    assert "similarity" in captured.err
+    assert "redis_val" not in f.read_text()
 
 
 def test_remove_empty_block_is_noop(tmp_path: Path) -> None:

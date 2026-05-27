@@ -53,6 +53,11 @@ config = AddonConfig(
             dest="alembic/script.py.mako",
             source=str(_HERE / "files" / "alembic" / "script.py.mako"),
         ),
+        FileContribution(
+            dest="tests/conftest.py",
+            source=str(_HERE / "files" / "tests" / "conftest.py.j2"),
+            template=True,
+        ),
     ],
     deps=[
         "sqlalchemy[asyncio]",

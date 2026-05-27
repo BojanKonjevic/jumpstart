@@ -49,8 +49,14 @@ from zenit.core.manifest import (
     fingerprint as _fingerprint,
 )
 from zenit.core.pkg_name import normalise_pkg_name, resolve_dest_placeholder
+from zenit.core.render import build_render_vars, make_env
 from zenit.schema.exceptions import ZenitError
-from zenit.schema.models import AddonConfig, ComposeService, Manifest, ManifestBlock
+from zenit.schema.models import (
+    AddonConfig,
+    ComposeService,
+    Manifest,
+    ManifestBlock,
+)
 from zenit.templates._load_config import load_template_config
 
 _compose_yaml = YAML()
@@ -174,6 +180,17 @@ def remove_addon(
 
     # ── files ──────────────────────────────────────────────────────────────
     removed_files = _remove_files(project_dir, addon_cfg, pkg_name)
+
+    # ── restore template files that this addon had overridden ──────────────
+    remaining_addons = [a for a in lockfile.addons if a != addon_id]
+    _restore_overridden_template_files(
+        project_dir,
+        template,
+        pkg_name,
+        project_dir.name,
+        removed_files,
+        remaining_addons,
+    )
 
     # ── injections (physical removal only — manifest written at the end) ────
     _undo_injections_physical(project_dir, manifest, addon_id)
@@ -318,6 +335,59 @@ def _remove_files(
             _prune_empty_parents(parent, project_dir)
 
     return removed
+
+
+def _restore_overridden_template_files(
+    project_dir: Path,
+    template_id: str,
+    pkg_name: str,
+    project_name: str,
+    removed_files: list[str],
+    remaining_addons: list[str],
+) -> None:
+    """Re-create template-owned files that were overridden by the removed addon.
+
+    When an addon contributes a file at the same destination as the template
+    (e.g. ``tests/conftest.py``), the addon's version wins at add time.  On
+    removal, the addon's file is deleted; this function restores the template's
+    original version so that the project remains functional.
+    """
+    try:
+        template_config = load_template_config(get_zenit_root(), template_id)
+    except (FileNotFoundError, ZenitError):
+        return
+
+    env = make_env()
+    render_vars = build_render_vars(
+        name=project_name,
+        pkg_name=pkg_name,
+        template=template_id,
+        addons=remaining_addons,
+    )
+
+    removed_set = set(removed_files)
+    for fc in template_config.files:
+        dest = resolve_dest_placeholder(fc.dest, pkg_name)
+        if dest not in removed_set:
+            continue
+
+        full_path = project_dir / dest
+        if fc.source is not None:
+            src = Path(fc.source)
+            if fc.template:
+                loader = make_env(src.parent)
+                content = loader.get_template(src.name).render(**render_vars)
+            else:
+                content = src.read_text(encoding="utf-8")
+            full_path.parent.mkdir(parents=True, exist_ok=True)
+            atomic_write_text(full_path, content)
+        elif fc.content is not None:
+            if fc.template:
+                content = env.from_string(fc.content).render(**render_vars)
+            else:
+                content = fc.content
+            full_path.parent.mkdir(parents=True, exist_ok=True)
+            atomic_write_text(full_path, content)
 
 
 def _prune_empty_parents(directory: Path, stop_at: Path) -> None:

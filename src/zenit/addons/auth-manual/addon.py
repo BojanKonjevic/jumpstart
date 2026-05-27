@@ -64,7 +64,7 @@ config = AddonConfig(
     ],
     deps=[
         "bcrypt",
-        "pyjwt[cryptography]",
+        "pyjwt",
         "email-validator",
         "python-multipart",
         "python-dotenv",

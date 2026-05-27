@@ -97,6 +97,11 @@ def collect_all(
         if fc.content is not None and fc.content == prev_fc.content:
             continue
 
+        # Addon overrides template for the same destination.
+        if prev_label == "template" and label != "template":
+            seen[dest] = (label, fc)
+            continue
+
         # One has source, the other has content — resolve and compare actual text.
         fc_content = _resolve_content(fc)
         prev_content = _resolve_content(prev_fc)

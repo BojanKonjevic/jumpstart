@@ -211,11 +211,51 @@ def remove(
             _remove_lines(file, lines, rec_start, rec_end)
             return
 
-    # ── Stage C: fuzzy match in window ──────────────────────────────────────
+    # ── Stage C1: relocate via locator + normalised fingerprint ─────────────
+    relocated = relocate_block(file, block)
+    if relocated is not None:
+        new_start, new_end = relocated
+        rec_start = new_start - 1
+        rec_end = new_end - 1
+        print(
+            f"Warning: fuzzy removal matched '{block.point}' in {file} "
+            f"at relocated lines {new_start}-{new_end}. "
+            f"Block may have been reformatted.",
+            file=sys.stderr,
+        )
+        _remove_lines(file, lines, rec_start, rec_end)
+        return
+
+    # ── Stage C2: variable-length fingerprint match ─────────────────────────
     block_len = rec_end - rec_start + 1
     window_start = max(0, rec_start - FUZZY_WINDOW_LINES)
     window_end = min(len(lines) - 1, rec_end + FUZZY_WINDOW_LINES)
 
+    max_c2_len = min(max(block_len + 6, 6), len(lines))
+    c2_best_start = -1
+    c2_best_end = -1
+    for attempt_len in range(max_c2_len, 0, -1):
+        max_s = min(window_end, len(lines) - attempt_len)
+        for s in range(window_start, max_s + 1):
+            candidate = "".join(lines[s : s + attempt_len])
+            _, fp_norm = _fingerprint(candidate)
+            if fp_norm == block.fingerprint_normalised:
+                c2_best_start, c2_best_end = s, s + attempt_len - 1
+                break
+        if c2_best_start >= 0:
+            break
+
+    if c2_best_start >= 0:
+        print(
+            f"Warning: fuzzy removal matched '{block.point}' in {file} "
+            f"at lines {c2_best_start + 1}-{c2_best_end + 1} "
+            f"(normalised fingerprint). Block may have been reformatted.",
+            file=sys.stderr,
+        )
+        _remove_lines(file, lines, c2_best_start, c2_best_end)
+        return
+
+    # ── Stage C3: text-level fuzzy match (last resort) ─────────────────────
     ref_start = max(0, min(rec_start, len(lines) - 1))
     ref_end = max(0, min(rec_end, len(lines) - 1))
     ref_text = "".join(lines[ref_start : ref_end + 1])
@@ -244,6 +284,8 @@ def remove(
         )
         _remove_lines(file, lines, best_start, best_end)
         return
+
+    # ── Stage D: unrecoverable ───────────────────────────────────────────────
 
     # ── Stage D: unrecoverable ───────────────────────────────────────────────
     raise RemovalError(
@@ -329,7 +371,7 @@ def relocate_block(
     result = _try_range(locator_line, after_end - 1)
 
     if result is None:
-        before_start = max(0, locator_line - window)
+        before_start = max(0, locator_line - window - base_len)
         before_end = max(0, locator_line - 1)
         result = _try_range(before_start, before_end)
 
@@ -338,7 +380,7 @@ def relocate_block(
         return (start + 1, end)
 
     # Broader search centred on locator_line.
-    search_start = max(0, locator_line - window)
+    search_start = max(0, locator_line - window - base_len)
     search_end = min(len(lines) - 1, locator_line + window)
     result = _try_range(search_start, search_end)
     if result is not None:
@@ -358,7 +400,29 @@ def _remove_lines(
     new_lines = lines[:start] + lines[end + 1 :]
     cleaned = _collapse_blank_lines(new_lines)
 
-    atomic_write_text(file, "".join(cleaned))
+    new_source = "".join(cleaned)
+    _assert_valid_python(file, new_source)
+    atomic_write_text(file, new_source)
+
+
+def _assert_valid_python(file: Path, source: str) -> None:
+    """Raise ``RemovalError`` if *source* is not syntactically valid Python.
+
+    This is a safety net against removal leaving a corrupted file (e.g. when
+    fuzzy matching picks the wrong block boundaries).
+    """
+    try:
+        cst.parse_module(source)
+    except Exception as exc:
+        raise RemovalError(
+            f"Removal left '{file}' with invalid Python syntax and was aborted.\n"
+            f"  The injected block could not be located precisely enough.\n"
+            f"  Manual steps:\n"
+            f"    - Open {file}\n"
+            f"    - Find any remaining code from the addon and remove it\n"
+            f"    - Run: zenit doctor\n"
+            f"  Parser error: {exc}"
+        ) from exc
 
 
 def _collapse_blank_lines(lines: list[str]) -> list[str]:
