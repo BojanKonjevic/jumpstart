@@ -706,3 +706,64 @@ class TestAddInteractiveMulti:
             add_addon_interactive()
         lockfile = read_lockfile(project_dir)
         assert lockfile.addons == ["docker"]
+
+
+# ── Multi-addon atomicity ─────────────────────────────────────────────────────
+
+
+def test_multi_addon_rollback_when_second_fails(tmp_path, monkeypatch):
+    """When adding two addons and the second pipeline fails, the first
+    addon's changes are also rolled back via batch_snapshot."""
+    import zenit.addons.add as _add_mod
+
+    project_dir = _scaffold(tmp_path, "myapp", "blank", [])
+    monkeypatch.chdir(project_dir)
+
+    from typing import Any
+
+    call_count: list[int] = [0]
+    original_pipeline = _add_mod._run_add_pipeline
+
+    def _failing_pipeline(*args: Any, **kwargs: Any) -> Any:
+        call_count[0] += 1
+        if call_count[0] > 1:
+            msg = "simulated docker pipeline failure"
+            raise RuntimeError(msg)
+        return original_pipeline(*args, **kwargs)
+
+    monkeypatch.setattr(_add_mod, "_run_add_pipeline", _failing_pipeline)
+
+    from zenit.core.rollback import batch_snapshot
+
+    postgres_file = project_dir / "scripts" / "wait_db.py"
+    docker_file = project_dir / "Dockerfile"
+
+    with pytest.raises(SystemExit), batch_snapshot(project_dir, "test-batch"):
+        add_addon("postgres", yes=True)
+        add_addon("docker", yes=True)
+
+    assert not docker_file.exists(), "docker file should not exist"
+    assert not postgres_file.exists(), (
+        "postgres file should not exist after batch rollback"
+    )
+
+
+def test_multi_addon_all_succeed_when_no_failure(tmp_path, monkeypatch):
+    """When adding two addons and both succeed, both are installed."""
+    project_dir = _scaffold(tmp_path, "myapp", "blank", [])
+    monkeypatch.chdir(project_dir)
+
+    from zenit.core.rollback import batch_snapshot
+
+    postgres_file = project_dir / "scripts" / "wait_db.py"
+
+    with batch_snapshot(project_dir, "test-batch"):
+        add_addon("postgres", yes=True)
+        add_addon("docker", yes=True)
+
+    assert (project_dir / "Dockerfile").exists()
+    assert (project_dir / "compose.yml").exists()
+    assert postgres_file.exists()
+    lockfile = read_lockfile(project_dir)
+    assert "postgres" in lockfile.addons
+    assert "docker" in lockfile.addons

@@ -69,6 +69,20 @@ def _yaml_dumps(data: object) -> str:
     return buf.getvalue()
 
 
+def _remove_one(
+    addon_id: str,
+    dry_run: bool,
+    yes: bool,
+    project_dir: Path,
+) -> None:
+    """Thin wrapper: call *remove_addon*, convert ``ZenitError`` to exit."""
+    try:
+        remove_addon(addon_id, dry_run=dry_run, yes=yes, project_dir=project_dir)
+    except ZenitError as exc:
+        error(str(exc))
+        raise typer.Exit(1) from exc
+
+
 def _check_fuzzy_blocks(
     manifest: Manifest,
     addon_id: str,
@@ -989,9 +1003,13 @@ def remove_addon_interactive(
         raise typer.Exit(0)
 
     # Process dependents before their dependencies (leaves first).
-    for addon_id in graph.tsort_reverse(set(selected)):
-        try:
-            remove_addon(addon_id, dry_run=dry_run, yes=yes, project_dir=project_dir)
-        except ZenitError as exc:
-            error(str(exc))
-            raise typer.Exit(1) from exc
+    sorted_ids = list(graph.tsort_reverse(set(selected)))
+    if len(sorted_ids) > 1:
+        from zenit.core.rollback import batch_snapshot
+
+        with batch_snapshot(project_dir, f"addons: {', '.join(sorted_ids)}"):
+            for addon_id in sorted_ids:
+                _remove_one(addon_id, dry_run, yes, project_dir)
+    else:
+        for addon_id in sorted_ids:
+            _remove_one(addon_id, dry_run, yes, project_dir)

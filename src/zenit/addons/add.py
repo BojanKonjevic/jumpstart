@@ -573,5 +573,13 @@ def add_addon_interactive(
         print()
         return
 
-    for addon_id in graph.tsort(set(selected)):
-        add_addon(addon_id, dry_run=dry_run, yes=yes)
+    sorted_ids = list(graph.tsort(set(selected)))
+    if len(sorted_ids) > 1:
+        from zenit.core.rollback import batch_snapshot
+
+        with batch_snapshot(project_dir, f"addons: {', '.join(sorted_ids)}"):
+            for addon_id in sorted_ids:
+                add_addon(addon_id, dry_run=dry_run, yes=yes)
+    else:
+        for addon_id in sorted_ids:
+            add_addon(addon_id, dry_run=dry_run, yes=yes)

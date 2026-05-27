@@ -319,9 +319,19 @@ def cmd_add(
             add_addon(unknown[0], dry_run=dry_run, yes=yes, project_dir=project_dir)
             return
 
+        from zenit.core.rollback import batch_snapshot
+
         graph = DependencyGraph.build_from_meta(available_meta)
-        for addon_id in graph.tsort(set(parsed)):
-            add_addon(addon_id, dry_run=dry_run, yes=yes, project_dir=project_dir)
+        sorted_ids = list(graph.tsort(set(parsed)))
+        if len(sorted_ids) > 1:
+            with batch_snapshot(project_dir, f"addons: {', '.join(sorted_ids)}"):
+                for addon_id in sorted_ids:
+                    add_addon(
+                        addon_id, dry_run=dry_run, yes=yes, project_dir=project_dir
+                    )
+        else:
+            for addon_id in sorted_ids:
+                add_addon(addon_id, dry_run=dry_run, yes=yes, project_dir=project_dir)
 
 
 @app.command("remove")
@@ -371,17 +381,36 @@ def cmd_remove(
                 raise typer.Exit(1) from exc
             return
 
-        graph = DependencyGraph.build_from_meta(available_meta)
-        for addon_id in graph.tsort_reverse(set(parsed)):
-            try:
-                remove_addon(
-                    addon_id, dry_run=dry_run, yes=yes, project_dir=project_dir
-                )
-            except ZenitError as exc:
-                from zenit.cli.ui import error
+        from zenit.core.rollback import batch_snapshot
 
-                error(str(exc))
-                raise typer.Exit(1) from exc
+        graph = DependencyGraph.build_from_meta(available_meta)
+        sorted_ids = list(graph.tsort_reverse(set(parsed)))
+        if len(sorted_ids) > 1:
+            with batch_snapshot(project_dir, f"addons: {', '.join(sorted_ids)}"):
+                for addon_id in sorted_ids:
+                    _remove_one(addon_id, dry_run, yes, project_dir)
+        else:
+            for addon_id in sorted_ids:
+                _remove_one(addon_id, dry_run, yes, project_dir)
+
+
+def _remove_one(
+    addon_id: str,
+    dry_run: bool,
+    yes: bool,
+    project_dir: Path,
+) -> None:
+    """Thin wrapper: call *remove_addon*, convert ``ZenitError`` to exit."""
+    from zenit.addons.remove import remove_addon
+    from zenit.schema.exceptions import ZenitError
+
+    try:
+        remove_addon(addon_id, dry_run=dry_run, yes=yes, project_dir=project_dir)
+    except ZenitError as exc:
+        from zenit.cli.ui import error
+
+        error(str(exc))
+        raise typer.Exit(1) from exc
 
 
 @app.command("doctor")

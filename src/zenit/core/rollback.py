@@ -53,6 +53,27 @@ def _cleanup(project_dir: Path) -> None:
 
 
 @contextmanager
+def _snapshot_on_failure(
+    project_dir: Path,
+    label: str,
+) -> Generator[Path, None]:
+    """Core context: snapshot *project_dir*, restore on any failure.
+
+    Yields the snapshot path.  On success the snapshot is discarded; on
+    exception / ``KeyboardInterrupt`` / ``SystemExit`` the project
+    directory is restored from the snapshot.
+    """
+    with tempfile.TemporaryDirectory() as tmp:
+        snapshot = Path(tmp) / "snapshot"
+        shutil.copytree(project_dir, snapshot, ignore=_SNAPSHOT_IGNORE)
+        try:
+            yield snapshot
+        except BaseException:
+            _restore_snapshot(snapshot, project_dir)
+            raise
+
+
+@contextmanager
 def addon_or_rollback(project_dir: Path, addon_id: str) -> Generator[None]:
     """Roll back files written by an addon if it fails or is interrupted.
 
@@ -66,19 +87,37 @@ def addon_or_rollback(project_dir: Path, addon_id: str) -> Generator[None]:
     modifications) and any new files created by the addon are removed.
     Pre-existing ignored directories are left intact.
     """
-    with tempfile.TemporaryDirectory() as tmp:
-        snapshot = Path(tmp) / "snapshot"
-        shutil.copytree(project_dir, snapshot, ignore=_SNAPSHOT_IGNORE)
+    with _snapshot_on_failure(project_dir, f"addon '{addon_id}'"):
         try:
             yield
         except KeyboardInterrupt:
-            _restore_snapshot(snapshot, project_dir)
             warn(f"Interrupted — rolled back addon '{addon_id}'.")
             raise
         except (Exception, SystemExit) as exc:
-            _restore_snapshot(snapshot, project_dir)
             if not isinstance(exc, SystemExit):
                 error(f"Addon '{addon_id}' failed: {exc}")
+            warn("Rolled back — no changes were made.")
+            raise SystemExit(1) from exc
+
+
+@contextmanager
+def batch_snapshot(project_dir: Path, label: str = "operation") -> Generator[None]:
+    """Snapshot the project and roll back everything if the batch fails.
+
+    Wraps a batch of changes (e.g. multiple addon installs) so that if
+    *any* step fails, the entire project is restored to its pre-batch
+    state.  Uses the same snapshot/restore mechanism as
+    ``addon_or_rollback``.
+    """
+    with _snapshot_on_failure(project_dir, label):
+        try:
+            yield
+        except KeyboardInterrupt:
+            warn(f"Interrupted — rolled back batch '{label}'.")
+            raise
+        except (Exception, SystemExit) as exc:
+            if not isinstance(exc, SystemExit):
+                error(f"Batch '{label}' failed: {exc}")
             warn("Rolled back — no changes were made.")
             raise SystemExit(1) from exc
 

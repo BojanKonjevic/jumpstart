@@ -10,7 +10,7 @@ from pathlib import Path
 
 import pytest
 
-from zenit.core.rollback import addon_or_rollback, scaffold_or_rollback
+from zenit.core.rollback import addon_or_rollback, batch_snapshot, scaffold_or_rollback
 
 # ── scaffold_or_rollback — success ────────────────────────────────────────────
 
@@ -337,3 +337,81 @@ def test_addon_failure_restores_valid_cwd(tmp_path, monkeypatch):
         raise RuntimeError("boom")
 
     assert Path.cwd() == project_dir
+
+
+# ── batch_snapshot ────────────────────────────────────────────────────────────
+
+
+def test_batch_snapshot_success_leaves_changes(tmp_path):
+    project_dir = tmp_path / "myapp"
+    project_dir.mkdir()
+    (project_dir / "existing.py").write_text("# existing")
+    with batch_snapshot(project_dir, "batch"):
+        (project_dir / "new.py").write_text("# new")
+    assert (project_dir / "new.py").exists()
+    assert (project_dir / "existing.py").exists()
+
+
+def test_batch_snapshot_failure_restores_everything(tmp_path):
+    project_dir = tmp_path / "myapp"
+    project_dir.mkdir()
+    (project_dir / "existing.py").write_text("# existing")
+    with pytest.raises(SystemExit), batch_snapshot(project_dir, "batch"):
+        (project_dir / "new.py").write_text("# new")
+        raise RuntimeError("batch failed")
+    assert not (project_dir / "new.py").exists()
+    assert (project_dir / "existing.py").read_text() == "# existing"
+
+
+def test_batch_snapshot_restores_modified_files(tmp_path):
+    project_dir = tmp_path / "myapp"
+    project_dir.mkdir()
+    existing = project_dir / "config.toml"
+    existing.write_text("key = 'original'")
+    with pytest.raises(SystemExit), batch_snapshot(project_dir, "batch"):
+        existing.write_text("key = 'modified'")
+        raise RuntimeError("boom")
+    assert existing.read_text() == "key = 'original'"
+
+
+def test_batch_snapshot_restores_deleted_files(tmp_path):
+    project_dir = tmp_path / "myapp"
+    project_dir.mkdir()
+    existing = project_dir / "main.py"
+    existing.write_text("# content to restore")
+    with pytest.raises(SystemExit), batch_snapshot(project_dir, "batch"):
+        existing.unlink()
+        raise RuntimeError("boom")
+    assert existing.exists()
+    assert existing.read_text() == "# content to restore"
+
+
+def test_batch_snapshot_keyboard_interrupt_restores(tmp_path):
+    project_dir = tmp_path / "myapp"
+    project_dir.mkdir()
+    with pytest.raises(KeyboardInterrupt), batch_snapshot(project_dir, "batch"):
+        (project_dir / "new.py").write_text("# new")
+        raise KeyboardInterrupt
+    assert not (project_dir / "new.py").exists()
+
+
+def test_batch_snapshot_system_exit_restores(tmp_path):
+    project_dir = tmp_path / "myapp"
+    project_dir.mkdir()
+    with pytest.raises(SystemExit), batch_snapshot(project_dir, "batch"):
+        (project_dir / "new.py").write_text("# new")
+        raise SystemExit(1)
+    assert not (project_dir / "new.py").exists()
+
+
+def test_batch_snapshot_multiple_new_files_all_removed(tmp_path):
+    project_dir = tmp_path / "myapp"
+    project_dir.mkdir()
+    with pytest.raises(SystemExit), batch_snapshot(project_dir, "batch"):
+        (project_dir / "a.py").write_text("# a")
+        (project_dir / "b.py").write_text("# b")
+        (project_dir / "c.py").write_text("# c")
+        raise RuntimeError("boom")
+    assert not (project_dir / "a.py").exists()
+    assert not (project_dir / "b.py").exists()
+    assert not (project_dir / "c.py").exists()
