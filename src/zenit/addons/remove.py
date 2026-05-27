@@ -239,6 +239,12 @@ def remove_addon(
     # ── justfile recipes ──────────────────────────────────────────────────
     removed_recipes = _remove_just_recipes(project_dir, manifest, addon_id)
 
+    # ── ruff excludes ────────────────────────────────────────────────────
+    removed_ruff_excludes = _remove_ruff_excludes(project_dir, manifest, addon_id)
+
+    # ── tool overrides ───────────────────────────────────────────────────
+    removed_tool_overrides = _remove_tool_overrides(project_dir, manifest, addon_id)
+
     # ── manifest (written once, after all physical removals succeed) ────────
     remove_blocks_for_addon(manifest, addon_id)
     write_manifest(project_dir, manifest)
@@ -278,6 +284,22 @@ def remove_addon(
     if removed_recipes:
         bullet_list(
             "Just recipes removed:", removed_recipes, bullet="-", bullet_color=RED
+        )
+
+    if removed_ruff_excludes:
+        bullet_list(
+            "Ruff excludes removed from pyproject.toml:",
+            removed_ruff_excludes,
+            bullet="-",
+            bullet_color=RED,
+        )
+
+    if removed_tool_overrides:
+        bullet_list(
+            "Tool overrides removed from pyproject.toml:",
+            removed_tool_overrides,
+            bullet="-",
+            bullet_color=RED,
         )
 
     if removed_services:
@@ -746,6 +768,96 @@ def _remove_just_recipes(
 
     atomic_write_text(justfile_path, "".join(result_lines))
     return list(recipe_names)
+
+
+def _remove_ruff_excludes(
+    project_dir: Path, manifest: Manifest, addon_id: str
+) -> list[str]:
+    """Remove ruff exclude entries contributed by this addon from pyproject.toml."""
+
+    pyproject_path = project_dir / PYPROJECT_FILE
+    if not pyproject_path.exists():
+        return []
+
+    to_remove = {e.name for e in manifest.ruff_excludes if e.addon == addon_id}
+    if not to_remove:
+        return []
+
+    doc = tomlkit.parse(pyproject_path.read_text(encoding="utf-8"))
+    ruff = doc.get("tool", {}).get("ruff")
+    if ruff is None:
+        return []
+
+    exclude = ruff.get("exclude")
+    if not isinstance(exclude, Array):
+        return []
+
+    removed: list[str] = []
+    kept: list[str] = []
+    for item in exclude:
+        s = str(item)
+        if s in to_remove:
+            removed.append(s)
+        else:
+            kept.append(s)
+
+    if removed:
+        del exclude[:]
+        for d in kept:
+            exclude.append(d)
+        atomic_write_text(pyproject_path, tomlkit.dumps(doc))
+
+    return removed
+
+
+def _remove_tool_overrides(
+    project_dir: Path, manifest: Manifest, addon_id: str
+) -> list[str]:
+    """Remove tool override entries contributed by this addon from pyproject.toml."""
+
+    pyproject_path = project_dir / PYPROJECT_FILE
+    if not pyproject_path.exists():
+        return []
+
+    entries = [t for t in manifest.tool_overrides if t.addon == addon_id]
+    if not entries:
+        return []
+
+    doc = tomlkit.parse(pyproject_path.read_text(encoding="utf-8"))
+    removed: list[str] = []
+    modified = False
+
+    # Group entries by section
+    by_section: dict[str, set[str]] = {}
+    for entry in entries:
+        by_section.setdefault(entry.section, set()).add(entry.module)
+
+    for section, modules in by_section.items():
+        overrides = doc.get("tool", {}).get(section, {}).get("overrides")
+        if not isinstance(overrides, list):
+            continue
+
+        kept_overrides: list[Any] = []
+        for override in overrides:
+            if not isinstance(override, dict):
+                kept_overrides.append(override)
+                continue
+            mod_list = override.get("module")
+            if isinstance(mod_list, list) and any(str(m) in modules for m in mod_list):
+                removed.append(f"{section}:{mod_list}")
+                modified = True
+            else:
+                kept_overrides.append(override)
+
+        if modified:
+            del overrides[:]
+            for o in kept_overrides:
+                overrides.append(o)
+
+    if modified:
+        atomic_write_text(pyproject_path, tomlkit.dumps(doc))
+
+    return removed
 
 
 def _dry_remove(

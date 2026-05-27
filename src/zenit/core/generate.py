@@ -63,6 +63,7 @@ def generate_all(
         "template_just_recipes": rendered_template_recipes,
         "extra_just_recipes": rendered_addon_recipes,
         "tool_overrides": contributions.tool_overrides,
+        "ruff_excludes": contributions.ruff_excludes,
         "python_version": python_version,
     }
 

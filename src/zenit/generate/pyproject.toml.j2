@@ -30,7 +30,7 @@ pythonpath = ["src"]
 
 [tool.ruff]
 line-length = 88
-exclude = ["alembic/", ".venv/"]
+exclude = [".venv/"[% for exc in ruff_excludes %], "(( exc ))"[% endfor %]]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "ANN", "SIM"]

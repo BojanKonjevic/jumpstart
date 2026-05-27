@@ -82,6 +82,7 @@ config = AddonConfig(
             },
         ],
     },
+    ruff_excludes=["alembic/"],
     injections=[
         Injection(
             point="settings_fields",

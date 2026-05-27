@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import re
 
-_RECIPE_NAME_RE = re.compile(r"^([a-zA-Z0-9_-]+)\s*:", re.MULTILINE)
+_RECIPE_NAME_RE = re.compile(r"^([a-zA-Z0-9_-]+)\s*[^:]*:", re.MULTILINE)
 _RECIPE_LINE_RE = re.compile(r"^(@?[a-zA-Z0-9_-]+)(?:\s+[^:]+)?:")
 
 

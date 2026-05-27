@@ -101,6 +101,16 @@ class DependencyEntry:
 
 
 @dataclass
+class ToolOverrideEntry:
+    """Ownership record for a ``[[tool.<section>.overrides]]`` entry."""
+
+    section: str  # e.g. "mypy"
+    module: str  # e.g. "sqlalchemy.*"
+    addon: str
+    source: EntrySource
+
+
+@dataclass
 class Manifest:
     """Full manifest of all zenit-managed content in a project.
 
@@ -114,6 +124,8 @@ class Manifest:
     compose_volumes: list[OwnedEntry] = field(default_factory=list)
     dependencies: list[DependencyEntry] = field(default_factory=list)
     just_recipes: list[OwnedEntry] = field(default_factory=list)
+    ruff_excludes: list[OwnedEntry] = field(default_factory=list)
+    tool_overrides: list[ToolOverrideEntry] = field(default_factory=list)
 
 
 # ── Contribution types (addon/template → pipeline) ────────────────────────────
@@ -200,6 +212,7 @@ class AddonConfig:
     just_recipes: list[str] = field(default_factory=list)
     injections: list[Injection] = field(default_factory=list)
     tool_overrides: dict[str, list[dict[str, object]]] = field(default_factory=dict)
+    ruff_excludes: list[str] = field(default_factory=list)
     _module: AddonHooks | None = field(default=None, repr=False, compare=False)
 
 
@@ -257,4 +270,5 @@ class Contributions:
     recipes: RecipeCollection = field(default_factory=RecipeCollection)
     injections: list[Injection] = field(default_factory=list)
     tool_overrides: dict[str, list[dict[str, object]]] = field(default_factory=dict)
+    ruff_excludes: list[str] = field(default_factory=list)
     _addon_configs: list[AddonConfig] = field(default_factory=list)

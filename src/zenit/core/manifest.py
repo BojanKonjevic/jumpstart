@@ -47,6 +47,7 @@ from zenit.schema.models import (
     Manifest,
     ManifestBlock,
     OwnedEntry,
+    ToolOverrideEntry,
 )
 
 MANIFEST_SCHEMA_VERSION = 2
@@ -148,6 +149,10 @@ def remove_blocks_for_addon(manifest: Manifest, addon_id: str) -> None:
     ]
     manifest.dependencies = [d for d in manifest.dependencies if d.addon != addon_id]
     manifest.just_recipes = [r for r in manifest.just_recipes if r.addon != addon_id]
+    manifest.ruff_excludes = [e for e in manifest.ruff_excludes if e.addon != addon_id]
+    manifest.tool_overrides = [
+        t for t in manifest.tool_overrides if t.addon != addon_id
+    ]
 
 
 def add_env_entry(
@@ -221,6 +226,34 @@ def add_just_recipe(
     )
 
 
+def add_ruff_exclude(
+    manifest: Manifest, directory: str, source: EntrySource, addon: str
+) -> bool:
+    return _add_owned_entry(
+        manifest.ruff_excludes,
+        "name",
+        OwnedEntry(name=directory, source=source, addon=addon),
+        source=source,
+        addon=addon,
+    )
+
+
+def add_tool_override(
+    manifest: Manifest,
+    section: str,
+    module: str,
+    source: EntrySource,
+    addon: str,
+) -> bool:
+    existing = {t.module for t in manifest.tool_overrides if t.addon == addon}
+    if module in existing:
+        return False
+    manifest.tool_overrides.append(
+        ToolOverrideEntry(section=section, module=module, source=source, addon=addon)
+    )
+    return True
+
+
 def dep_package_name(dep: str) -> str:
     match = re.match(r"^([a-zA-Z0-9_.-]+)", dep)
     return match.group(1).lower().replace("-", "_") if match else dep.lower()
@@ -282,6 +315,21 @@ def record_addon_manifest_entries(
             manifest, m.group(1), source=EntrySource.ADDON, addon=addon_id
         ):
             adopted.append(f"just_recipe:{m.group(1)}")
+    for exc in addon_cfg.ruff_excludes:
+        if add_ruff_exclude(manifest, exc, source=EntrySource.ADDON, addon=addon_id):
+            adopted.append(f"ruff_exclude:{exc}")
+    for section, overrides in addon_cfg.tool_overrides.items():
+        for override in overrides:
+            module_list = override.get("module", [])
+            if not isinstance(module_list, list):
+                continue
+            for mod in module_list:
+                if not isinstance(mod, str):
+                    continue
+                if add_tool_override(
+                    manifest, section, mod, source=EntrySource.ADDON, addon=addon_id
+                ):
+                    adopted.append(f"tool_override:{section}:{mod}")
     return adopted
 
 
@@ -412,6 +460,23 @@ def _encode_manifest(m: Manifest) -> tomlkit.items.Table:
         "just_recipes",
         [("name", "name"), ("source", "source"), ("addon", "addon")],
     )
+    _encode_section(
+        tbl,
+        m.ruff_excludes,
+        "ruff_excludes",
+        [("name", "name"), ("source", "source"), ("addon", "addon")],
+    )
+    _encode_section(
+        tbl,
+        m.tool_overrides,
+        "tool_overrides",
+        [
+            ("section", "section"),
+            ("module", "module"),
+            ("source", "source"),
+            ("addon", "addon"),
+        ],
+    )
 
     return tbl
 
@@ -516,6 +581,27 @@ def _decode_manifest(raw: dict[str, Any]) -> Manifest:
         OwnedEntry,
         [
             ("name", "name", "", None),
+            ("source", "source", "", _parse_source),
+            ("addon", "addon", "", None),
+        ],
+    )
+    m.ruff_excludes = _decode_section(
+        raw,
+        "ruff_excludes",
+        OwnedEntry,
+        [
+            ("name", "name", "", None),
+            ("source", "source", "", _parse_source),
+            ("addon", "addon", "", None),
+        ],
+    )
+    m.tool_overrides = _decode_section(
+        raw,
+        "tool_overrides",
+        ToolOverrideEntry,
+        [
+            ("section", "section", "", None),
+            ("module", "module", "", None),
             ("source", "source", "", _parse_source),
             ("addon", "addon", "", None),
         ],

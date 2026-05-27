@@ -31,6 +31,7 @@ def _merge_addon_contributions(
         c.recipes.addon.extend(addon.just_recipes)
         for section, overrides in addon.tool_overrides.items():
             c.tool_overrides.setdefault(section, []).extend(overrides)
+        c.ruff_excludes.extend(addon.ruff_excludes)
         for inj in addon.injections:
             inj.addon_id = addon.id
             c.injections.append(inj)
