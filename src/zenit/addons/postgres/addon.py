@@ -57,8 +57,9 @@ config = AddonConfig(
     ],
     just_recipes=[
         '[% if "docker" in addons %]# wait until postgres is ready\nwait-db:\n    uv run python scripts/wait_db.py\n[% endif %]',
-        '[% if "docker" in addons %]# start db container, create databases, run migrations\ndb-create:\n    docker compose up -d db\n    just wait-db\n    docker compose exec db createdb -U postgres (( pkg_name ))\n    docker compose exec db createdb -U postgres (( pkg_name ))_test\n    just upgrade\n[% endif %]',
+        '[% if "docker" in addons %]# start db container and create both databases\ndb-create:\n    docker compose up -d db\n    just wait-db\n    docker compose exec db createdb -U postgres (( pkg_name ))\n    docker compose exec db createdb -U postgres (( pkg_name ))_test\n[% endif %]',
         '[% if "docker" in addons %]# drop and recreate both databases\ndb-reset:\n    docker compose exec db dropdb -U postgres --if-exists (( pkg_name ))\n    docker compose exec db dropdb -U postgres --if-exists (( pkg_name ))_test\n    just db-create\n[% endif %]',
+        '[% if "docker" in addons %]# drop both databases (keeps container running)\ndb-drop:\n    docker compose exec db dropdb -U postgres --if-exists (( pkg_name ))\n    docker compose exec db dropdb -U postgres --if-exists (( pkg_name ))_test\n[% endif %]',
     ],
     injections=[
         Injection(
@@ -83,7 +84,7 @@ def can_apply(project_dir: Path, lockfile: ZenitLockfile) -> str | None:
     return reject_existing_in_env(project_dir, "DATABASE_URL")
 
 
-_POSTGRES_RECIPES = frozenset({"wait-db", "db-create", "db-reset"})
+_POSTGRES_RECIPES = frozenset({"wait-db", "db-create", "db-reset", "db-drop"})
 
 
 def health_check(project_dir: Path, lockfile: object) -> list[HealthIssue]:

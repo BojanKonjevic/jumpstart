@@ -212,7 +212,9 @@ def apply_contributions(
 
     for file_name in ENV_FILES:
         if contributions.env_vars:
-            _merge_env_vars(ctx, fs, file_name, contributions.env_vars)
+            _merge_env_vars(
+                ctx, fs, file_name, contributions.env_vars, string_env, render_vars
+            )
 
     for addon_cfg in contributions._addon_configs:
         hooks = addon_cfg._module
@@ -303,9 +305,19 @@ def merge_compose(
 
 
 def _merge_env_vars(
-    ctx: Context, fs: FileSystem, file_name: str, env_vars: list[EnvVar]
+    ctx: Context,
+    fs: FileSystem,
+    file_name: str,
+    env_vars: list[EnvVar],
+    render_env: jinja2.Environment | None = None,
+    render_vars: dict[str, object] | None = None,
 ) -> None:
-    """Append missing env vars to *file_name* (creating it if needed)."""
+    """Append missing env vars to *file_name* (creating it if needed).
+
+    When *render_env* and *render_vars* are provided, env var default values
+    are rendered through Jinja2 before being written.  This resolves template
+    variables such as ``(( pkg_name ))`` in DATABASE_URL.
+    """
     env_path = ctx.project_dir / file_name
     text = env_path.read_text(encoding="utf-8") if env_path.exists() else ""
 
@@ -318,7 +330,10 @@ def _merge_env_vars(
     new_lines: list[str] = []
     for v in env_vars:
         if v.key not in existing_keys:
-            line = f"{v.key}={v.default}"
+            default = v.default
+            if render_env is not None and render_vars is not None:
+                default = render_env.from_string(default).render(**render_vars)
+            line = f"{v.key}={default}"
             if v.comment:
                 line += f"  # {v.comment}"
             new_lines.append(line)
