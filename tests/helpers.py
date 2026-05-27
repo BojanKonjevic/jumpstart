@@ -128,12 +128,12 @@ def scaffold_project_at(
         dev_deps=contributions.template_dev_deps + contributions.dev_deps,
     )
 
+    write_lockfile(project_dir, template, addons)
     apply_contributions(
         ctx, fs, contributions, template_config.injection_points, render_vars
     )
     generate_all(ctx, fs, contributions)
     write_test_manifest(project_dir, addons, render_vars)
     init(project_dir)
-    write_lockfile(project_dir, template, addons)
 
     return project_dir

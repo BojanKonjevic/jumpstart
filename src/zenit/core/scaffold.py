@@ -172,7 +172,6 @@ def scaffold_project(
             render_vars,
         )
         generate_all(ctx, fs, contributions, python_version=python_version)
-        init(project_dir)
 
         manifest = read_manifest(project_dir)
         string_env = make_env()
@@ -186,6 +185,8 @@ def scaffold_project(
         write_manifest(project_dir, manifest)
 
         _stamp_template_manifest(project_dir, template_config)
+
+        init(project_dir)
 
     print()
     addon_suffix = (" + " + ", ".join(adns)) if adns else ""

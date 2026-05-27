@@ -115,12 +115,13 @@ def _scaffold(tmp_path: Path, name: str, template: str, addons: list[str]) -> Pa
         addons=addons,
     )
 
+    write_lockfile(project_dir, template, addons)
+
     contributions = collect_all(template_config, selected_addon_configs)
     apply_contributions(
         ctx, fs, contributions, template_config.injection_points, render_vars
     )
     generate_all(ctx, fs, contributions)
-    init(project_dir)
 
     manifest = read_manifest(project_dir)
     string_env = make_env()
@@ -128,8 +129,9 @@ def _scaffold(tmp_path: Path, name: str, template: str, addons: list[str]) -> Pa
         record_addon_manifest_entries(manifest, addon_cfg, string_env, render_vars)
     write_manifest(project_dir, manifest)
 
-    write_lockfile(project_dir, template, addons)
     _stamp_template_manifest(project_dir, template_config)
+
+    init(project_dir)
 
     return project_dir
 

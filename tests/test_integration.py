@@ -84,6 +84,21 @@ class TestBlankTemplate:
         assert log.returncode == 0
         assert "Initial commit" in log.stdout
 
+    def test_git_working_tree_clean_after_scaffold(self, tmp_path, scaffold_project):
+        project_dir = scaffold_project("myapp", "blank", [])
+        import subprocess
+
+        status = subprocess.run(
+            ["git", "status", "--porcelain"],
+            cwd=project_dir,
+            capture_output=True,
+            text=True,
+        )
+        assert status.returncode == 0
+        assert status.stdout.strip() == "", (
+            f"Expected clean working tree, got:\n{status.stdout}"
+        )
+
     def test_no_duplicate_recipes_in_justfile(self, tmp_path, scaffold_project):
         project_dir = scaffold_project("myapp", "blank", [])
         justfile = (project_dir / "justfile").read_text()
