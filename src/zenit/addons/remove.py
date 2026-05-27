@@ -699,10 +699,16 @@ def _parse_justfile_blocks(lines: list[str]) -> list[_JustBlock]:
             i += 1
 
         elif stripped.startswith("set ") and ":" in stripped:
+            if pending_attrs:
+                blocks.append(_JustBlock("other", pending_attrs))
+                pending_attrs = []
             blocks.append(_JustBlock("setting", [line]))
             i += 1
 
         elif stripped.startswith("alias ") and ":=" in stripped:
+            if pending_attrs:
+                blocks.append(_JustBlock("other", pending_attrs))
+                pending_attrs = []
             blocks.append(_JustBlock("alias", [line]))
             i += 1
 
@@ -729,7 +735,7 @@ def _parse_justfile_blocks(lines: list[str]) -> list[_JustBlock]:
             blocks.append(_JustBlock("recipe", recipe_lines, recipe_name=name))
 
         elif stripped.startswith("#"):
-            blocks.append(_JustBlock("other", [line]))
+            pending_attrs.append(line)
             i += 1
 
         else:
@@ -738,6 +744,9 @@ def _parse_justfile_blocks(lines: list[str]) -> list[_JustBlock]:
                 pending_attrs = []
             blocks.append(_JustBlock("other", [line]))
             i += 1
+
+    if pending_attrs:
+        blocks.append(_JustBlock("other", pending_attrs))
 
     return blocks
 

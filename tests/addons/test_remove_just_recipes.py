@@ -138,13 +138,14 @@ class TestParseJustfileBlocks:
             "alias",
             "blank",
             "recipe",
-            "other",
             "recipe",
         ]
         # recipe blocks have correct names
         recipe_blocks = [b for b in blocks if b.kind == "recipe"]
         assert recipe_blocks[0].recipe_name == "build"
         assert recipe_blocks[1].recipe_name == "test"
+        # comment preceding test recipe is attached to the recipe block
+        assert recipe_blocks[1].lines[0] == "# A comment\n"
 
     def test_recipe_with_dash_in_name(self) -> None:
         lines = ["docker-up:\n", "    docker compose up\n"]
@@ -225,6 +226,42 @@ class TestRemoveJustRecipes:
         assert "[no-exit-message]" not in remaining
         assert "deploy" not in remaining
         assert "cargo test" in remaining
+
+    def test_comment_removed_with_recipe(self, tmp_path: Path) -> None:
+        """Comment immediately preceding a recipe is removed with it."""
+        justfile = tmp_path / "justfile"
+        text = "# build and start all services\ndocker-up:\n    docker compose up --build\n"
+        justfile.write_text(text)
+        manifest = self._make_manifest(["docker-up"])
+
+        result = _remove_just_recipes(tmp_path, manifest, "test")
+
+        assert result == ["docker-up"]
+        assert "# build" not in justfile.read_text()
+
+    def test_comment_preserved_for_kept_recipe(self, tmp_path: Path) -> None:
+        """Comment stays when the recipe is kept."""
+        justfile = tmp_path / "justfile"
+        text = "# keep me\ndocker-up:\n    docker compose up --build\n"
+        justfile.write_text(text)
+        manifest = self._make_manifest(["other-recipe"])
+
+        result = _remove_just_recipes(tmp_path, manifest, "test")
+
+        assert result == ["other-recipe"]
+        assert "# keep me" in justfile.read_text()
+
+    def test_comment_not_before_recipe_preserved(self, tmp_path: Path) -> None:
+        """Standalone comment (not immediately before a recipe) survives."""
+        justfile = tmp_path / "justfile"
+        text = "# standalone comment\n\nbuild:\n    cargo build\n"
+        justfile.write_text(text)
+        manifest = self._make_manifest(["build"])
+
+        result = _remove_just_recipes(tmp_path, manifest, "test")
+
+        assert result == ["build"]
+        assert "# standalone comment" in justfile.read_text()
 
     def test_alias_survives_removed_recipe(self, tmp_path: Path) -> None:
         justfile = tmp_path / "justfile"
