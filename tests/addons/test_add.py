@@ -341,6 +341,83 @@ def test_add_does_not_duplicate_recipes(tmp_path, monkeypatch):
     assert justfile.count("docker-down:") == 1
 
 
+# ── Recipe backfill (docker added after docker-gated addons) ──────────────────
+
+
+def test_add_docker_then_postgres_has_recipes(tmp_path, monkeypatch):
+    """Docker first, then postgres → postgres's docker-gated recipes present."""
+    project_dir = _scaffold(tmp_path, "myapp", "blank", [])
+    monkeypatch.chdir(project_dir)
+    with suppress_stdin():
+        add_addon("docker")
+    with suppress_stdin():
+        add_addon("postgres")
+    justfile = (project_dir / "justfile").read_text()
+    assert "wait-db:" in justfile
+    assert "db-create:" in justfile
+    assert "db-reset:" in justfile
+
+
+def test_add_postgres_then_docker_backfills_recipes(tmp_path, monkeypatch):
+    """Postgres first, then docker → recipes are backfilled."""
+    project_dir = _scaffold(tmp_path, "myapp", "blank", [])
+    monkeypatch.chdir(project_dir)
+    with suppress_stdin():
+        add_addon("postgres")
+    justfile_before = (project_dir / "justfile").read_text()
+    assert "wait-db:" not in justfile_before
+    assert "db-create:" not in justfile_before
+    assert "db-reset:" not in justfile_before
+    with suppress_stdin():
+        add_addon("docker")
+    justfile_after = (project_dir / "justfile").read_text()
+    assert "wait-db:" in justfile_after
+    assert "db-create:" in justfile_after
+    assert "db-reset:" in justfile_after
+
+
+def test_add_postgres_then_docker_records_recipes_in_manifest(tmp_path, monkeypatch):
+    """Backfilled recipes are recorded in the manifest as postgres-owned."""
+    from zenit.core.manifest import read_manifest
+    from zenit.schema.models import EntrySource
+
+    project_dir = _scaffold(tmp_path, "myapp", "blank", [])
+    monkeypatch.chdir(project_dir)
+    with suppress_stdin():
+        add_addon("postgres")
+    with suppress_stdin():
+        add_addon("docker")
+    manifest = read_manifest(project_dir)
+    recipe_names = {
+        e.name for e in manifest.just_recipes if e.source == EntrySource.ADDON
+    }
+    assert "wait-db" in recipe_names
+    assert "db-create" in recipe_names
+    assert "db-reset" in recipe_names
+    for entry in manifest.just_recipes:
+        if entry.name in ("wait-db", "db-create", "db-reset"):
+            assert entry.addon == "postgres", (
+                f"{entry.name} owned by {entry.addon}, expected postgres"
+            )
+
+
+def test_add_redis_then_docker_backfills_recipes(tmp_path, monkeypatch):
+    """Redis first, then docker → redis's docker-gated recipes are backfilled."""
+    project_dir = _scaffold(tmp_path, "myapp", "blank", [])
+    monkeypatch.chdir(project_dir)
+    with suppress_stdin():
+        add_addon("redis")
+    justfile_before = (project_dir / "justfile").read_text()
+    assert "redis-up:" not in justfile_before
+    assert "redis-down:" not in justfile_before
+    assert "redis-cli:" in justfile_before  # unconditional
+    with suppress_stdin():
+        add_addon("docker")
+    justfile_after = (project_dir / "justfile").read_text()
+    assert "redis-up:" in justfile_after
+    assert "redis-down:" in justfile_after
+
+
 # ── add_addon — env vars ──────────────────────────────────────────────────────
 
 

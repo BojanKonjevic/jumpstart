@@ -539,6 +539,44 @@ class TestCheckAddonHealth:
         assert result.has_errors
         assert any("Celery" in i.message for i in _errors(result))
 
+    def test_passes_on_fresh_postgres(self, tmp_path):
+        project_dir = _scaffold(
+            tmp_path, template="blank", addons=["docker", "postgres"]
+        )
+        result = _check_addon_health(project_dir, self._lockfile(project_dir))
+        assert not result.has_errors
+
+    def test_warn_when_database_url_missing_from_env(self, tmp_path):
+        project_dir = _scaffold(
+            tmp_path, template="fastapi", addons=["docker", "postgres"]
+        )
+        env_path = project_dir / ".env"
+        text = env_path.read_text()
+        env_path.write_text(
+            "\n".join(line for line in text.splitlines() if "DATABASE_URL" not in line)
+        )
+        result = _check_addon_health(project_dir, self._lockfile(project_dir))
+        assert result.has_warnings
+        assert any("DATABASE_URL" in i.message for i in _warnings(result))
+
+    def test_warn_when_postgres_recipes_missing_from_justfile(self, tmp_path):
+        project_dir = _scaffold(
+            tmp_path, template="blank", addons=["docker", "postgres"]
+        )
+        justfile_path = project_dir / "justfile"
+        text = justfile_path.read_text()
+        justfile_path.write_text(
+            "\n".join(line for line in text.splitlines() if "wait-db" not in line)
+        )
+        result = _check_addon_health(project_dir, self._lockfile(project_dir))
+        assert result.has_warnings
+        assert any("wait-db" in i.message for i in _warnings(result))
+
+    def test_no_postgres_health_check_when_no_docker(self, tmp_path):
+        project_dir = _scaffold(tmp_path, template="blank", addons=["postgres"])
+        result = _check_addon_health(project_dir, self._lockfile(project_dir))
+        assert not result.has_warnings
+
     def test_no_check_when_addon_has_no_health_check(self, tmp_path):
         project_dir = _scaffold(
             tmp_path, template="blank", addons=["docker", "github-actions"]

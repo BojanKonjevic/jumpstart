@@ -5,7 +5,10 @@ from zenit.addons._preflight import (
     reject_existing_in_env,
     require_src_layout,
 )
+from zenit.core._filenames import ENV_FILES, JUSTFILE_NAME
+from zenit.core.constants import extract_recipe_name
 from zenit.core.lockfile import ZenitLockfile
+from zenit.doctor.doctor import HealthIssue, Severity
 from zenit.schema.models import (
     AddonConfig,
     ComposeService,
@@ -78,3 +81,60 @@ def can_apply(project_dir: Path, lockfile: ZenitLockfile) -> str | None:
         return reason
 
     return reject_existing_in_env(project_dir, "DATABASE_URL")
+
+
+_POSTGRES_RECIPES = frozenset({"wait-db", "db-create", "db-reset"})
+
+
+def health_check(project_dir: Path, lockfile: object) -> list[HealthIssue]:
+    issues: list[HealthIssue] = []
+
+    for env_file in ENV_FILES:
+        path = project_dir / env_file
+        if path.exists():
+            if "DATABASE_URL=" in path.read_text(encoding="utf-8"):
+                issues.append(
+                    HealthIssue(
+                        Severity.OK, f"DATABASE_URL is defined in '{env_file}'."
+                    )
+                )
+            else:
+                issues.append(
+                    HealthIssue(
+                        Severity.WARN,
+                        f"DATABASE_URL is missing from '{env_file}'.",
+                        hint=f"Add 'DATABASE_URL=postgresql+asyncpg://postgres:postgres@localhost:5432/<dbname>' to '{env_file}'.",
+                    )
+                )
+
+    if (
+        isinstance(lockfile, ZenitLockfile)
+        and "docker" in lockfile.addons
+        and "postgres" in lockfile.addons
+    ):
+        justfile_path = project_dir / JUSTFILE_NAME
+        if justfile_path.exists():
+            text = justfile_path.read_text(encoding="utf-8")
+            existing = set()
+            for line in text.splitlines():
+                name = extract_recipe_name(line)
+                if name is not None:
+                    existing.add(name)
+            missing = _POSTGRES_RECIPES - existing
+            if missing:
+                issues.append(
+                    HealthIssue(
+                        Severity.WARN,
+                        f"Docker-dependent postgres recipes are missing from the justfile: {', '.join(sorted(missing))}.",
+                        hint="Run 'zenit add docker' again to backfill, or 'zenit doctor --fix'.",
+                    )
+                )
+            else:
+                issues.append(
+                    HealthIssue(
+                        Severity.OK,
+                        "All docker-dependent postgres recipes are present in the justfile.",
+                    )
+                )
+
+    return issues

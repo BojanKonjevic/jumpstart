@@ -38,6 +38,7 @@ from zenit.core.filesystem import FileSystem, RealFileSystem, RecordingFileSyste
 from zenit.core.justfile import inject_just_recipes
 from zenit.core.lockfile import ZenitLockfile, read_lockfile, write_lockfile
 from zenit.core.manifest import (
+    add_just_recipe,
     read_manifest,
     record_addon_manifest_entries,
     write_manifest,
@@ -291,6 +292,60 @@ def _refresh_compose(
         add_compose_volume(manifest, vol, EntrySource.ADDON, "docker")
 
 
+def _backfill_just_recipes(
+    ctx: Context,
+    project_dir: Path,
+    manifest: Manifest,
+    addon_id: str,
+) -> list[str]:
+    """Re-render and inject docker-dependent just-recipes for earlier addons.
+
+    When Docker is added to a project, addons whose recipes were gated on
+    ``[% if "docker" in addons %]`` need their recipes backfilled — they
+    rendered to empty strings during their own add pipeline because docker
+    was not present at the time.
+
+    Mirrors how ``_refresh_compose`` backfills compose entries for all
+    installed addons when Docker is (or becomes) available.
+
+    Returns the list of recipe names that were added to the justfile.
+    """
+    if addon_id != "docker":
+        return []
+
+    python_version = f"{sys.version_info.major}.{sys.version_info.minor}"
+    all_added: list[str] = []
+
+    for installed_id in ctx.addons:
+        if installed_id == "docker":
+            continue
+
+        installed_cfg = get_addon(installed_id)
+        if not installed_cfg.just_recipes:
+            continue
+
+        recipe_render_vars = build_recipe_render_vars(
+            name=ctx.name,
+            pkg_name=ctx.pkg_name,
+            template=ctx.template,
+            addons=ctx.addons,
+            deps=installed_cfg.deps,
+            dev_deps=installed_cfg.dev_deps,
+            python_version=python_version,
+        )
+        string_env = make_env()
+        rendered_recipes = [
+            string_env.from_string(r).render(**recipe_render_vars)
+            for r in installed_cfg.just_recipes
+        ]
+        added = inject_just_recipes(project_dir, rendered_recipes)
+        all_added.extend(added)
+        for name in added:
+            add_just_recipe(manifest, name, EntrySource.ADDON, installed_id)
+
+    return all_added
+
+
 def add_addon(
     addon_id: str,
     dry_run: bool = False,
@@ -420,10 +475,12 @@ def add_addon(
             template_file_paths=lockfile.template_file_paths,
         )
 
-    # ── Refresh compose (docker-owned reconciliation) ─────────────────────────
+    # ── Refresh compose + backfill recipes (docker-owned reconciliation) ──────
     if "docker" in ctx.addons:
         manifest = read_manifest(project_dir)
         _refresh_compose(ctx, project_dir, manifest)
+        backfilled = _backfill_just_recipes(ctx, project_dir, manifest, addon_id)
+        result.added_recipes.extend(backfilled)
         write_manifest(project_dir, manifest)
 
     # ── Output ────────────────────────────────────────────────────────────────
