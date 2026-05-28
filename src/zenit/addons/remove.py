@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
+import re
 import sys
-from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -36,12 +36,11 @@ from zenit.core.context import Context
 from zenit.core.dependency import DependencyGraph
 from zenit.core.filesystem import atomic_write_text
 from zenit.core.handlers import HandlerDispatcher
-from zenit.core.lockfile import ZenitLockfile, read_lockfile, write_lockfile
+from zenit.core.lockfile import ZenitLockfile, read_lockfile, write_zenit_toml
 from zenit.core.manifest import (
     dep_package_name,
     read_manifest,
     remove_blocks_for_addon,
-    write_manifest,
 )
 from zenit.core.manifest import (
     fingerprint as _fingerprint,
@@ -209,6 +208,7 @@ def remove_addon(
         if addon_id == "docker":
             # Docker removal: _remove_files deletes compose.yml entirely.
             removed_services = []
+            removed_volumes = []
         elif "docker" in lockfile.addons:
             # Reconcile compose.yml based on remaining addons.
             from zenit.addons.add import _refresh_compose
@@ -223,6 +223,7 @@ def remove_addon(
             )
             _refresh_compose(ctx_for_refresh, project_dir, manifest)
             removed_services = [s.name for s in addon_cfg.compose_services]
+            removed_volumes = list(addon_cfg.compose_volumes)
         else:
             # Legacy: no docker installed, remove per-addon as before.
             removed_services = _remove_compose_services(
@@ -231,7 +232,7 @@ def remove_addon(
                 addon_id,
                 addon_services=addon_cfg.compose_services,
             )
-            _remove_compose_volumes(
+            removed_volumes = _remove_compose_volumes(
                 project_dir,
                 manifest,
                 addon_id,
@@ -253,20 +254,18 @@ def remove_addon(
         # ── tool overrides ───────────────────────────────────────────────────
         removed_tool_overrides = _remove_tool_overrides(project_dir, manifest, addon_id)
 
-        # ── manifest (written once, after all physical removals succeed) ────────
+        # ── manifest + lockfile (single atomic write) ────────────────────────────
         remove_blocks_for_addon(manifest, addon_id)
-        write_manifest(project_dir, manifest)
-
-        # ── lockfile ──────────────────────────────────────────────────────────
         new_addons = [a for a in lockfile.addons if a != addon_id]
-        write_lockfile(
+        write_zenit_toml(
             project_dir,
-            template,
-            new_addons,
+            template=template,
+            addons=new_addons,
             template_source=lockfile.template_source,
             template_uri=lockfile.template_uri,
             template_has_tasks=lockfile.template_has_tasks,
             template_file_paths=lockfile.template_file_paths,
+            manifest=manifest,
         )
 
     # ── output ────────────────────────────────────────────────────────────
@@ -313,6 +312,11 @@ def remove_addon(
     if removed_services:
         bullet_list(
             "Compose services removed:", removed_services, bullet="-", bullet_color=RED
+        )
+
+    if removed_volumes:
+        bullet_list(
+            "Compose volumes removed:", removed_volumes, bullet="-", bullet_color=RED
         )
 
     if removed_env_vars:
@@ -390,6 +394,32 @@ def _remove_files(
     return removed
 
 
+_ADDONS_CONDITIONAL_RE = re.compile(r'\[\%\s+if\s+"(\w+)"\s+in\s+addons\s*\%\]')
+
+
+def _check_addons_drift(
+    raw_template: str,
+    remaining_addons: list[str],
+    dest: str,
+) -> bool:
+    """Return True if *raw_template* references addons not in *remaining_addons*.
+
+    Template content with ``[% if "<addon>" in addons %]`` rendered with a
+    different addon set would produce different output than at scaffold time.
+    Skip the restore to avoid silent content drift.
+    """
+    referenced = set(_ADDONS_CONDITIONAL_RE.findall(raw_template))
+    missing = referenced - set(remaining_addons)
+    if missing:
+        warn(
+            f"Template file '{dest}' references addon(s) "
+            f"{', '.join(sorted(missing))} via conditional Jinja2. "
+            f"Skipping restoration to avoid content drift."
+        )
+        return True
+    return False
+
+
 def _restore_overridden_template_files(
     project_dir: Path,
     template_id: str,
@@ -428,6 +458,9 @@ def _restore_overridden_template_files(
         if fc.source is not None:
             src = Path(fc.source)
             if fc.template:
+                raw = src.read_text(encoding="utf-8")
+                if _check_addons_drift(raw, remaining_addons, dest):
+                    continue
                 loader = make_env(src.parent)
                 content = loader.get_template(src.name).render(**render_vars)
             else:
@@ -436,6 +469,8 @@ def _restore_overridden_template_files(
             atomic_write_text(full_path, content)
         elif fc.content is not None:
             if fc.template:
+                if _check_addons_drift(fc.content, remaining_addons, dest):
+                    continue
                 content = env.from_string(fc.content).render(**render_vars)
             else:
                 content = fc.content
@@ -537,7 +572,10 @@ def _remove_compose_services(
             data.pop("services", None)
         if not data.get("volumes"):
             data.pop("volumes", None)
-        atomic_write_text(compose_path, compose_yaml_dumps(data))
+        if not data:
+            compose_path.unlink(missing_ok=True)
+        else:
+            atomic_write_text(compose_path, compose_yaml_dumps(data))
 
     return removed
 
@@ -547,15 +585,17 @@ def _remove_compose_volumes(
     manifest: Manifest,
     addon_id: str,
     addon_volumes: list[str] | None = None,
-) -> None:
+) -> list[str]:
     """Remove named volumes that belong to this addon from compose.yml.
 
     Removes volumes recorded in the manifest (normal path) AND volumes
     the addon defines but were never recorded in the manifest.
+
+    Returns list of removed volume names.
     """
     compose_path = project_dir / COMPOSE_FILE
     if not compose_path.exists():
-        return
+        return []
 
     data: dict[str, Any] = (
         compose_yaml_load(compose_path.read_text(encoding="utf-8")) or {}
@@ -581,7 +621,12 @@ def _remove_compose_volumes(
             data.pop("services", None)
         if not data.get("volumes"):
             data.pop("volumes", None)
-        atomic_write_text(compose_path, compose_yaml_dumps(data))
+        if not data:
+            compose_path.unlink(missing_ok=True)
+        else:
+            atomic_write_text(compose_path, compose_yaml_dumps(data))
+
+    return removed_names
 
 
 def _remove_env_vars(
@@ -671,11 +716,9 @@ def _remove_deps(
             [str(d) for d in dev_group], dev_deps_to_remove
         )
         if removed_dev:
-            dep_groups = doc.get("dependency-groups")
-            if isinstance(dep_groups, Mapping) and "dev" in dep_groups:
-                doc["dependency-groups"]["dev"] = kept_dev
-            else:
-                doc["project"]["optional-dependencies"]["dev"] = kept_dev
+            del dev_group[:]
+            for d in kept_dev:
+                dev_group.append(d)
     else:
         removed_dev = []
 

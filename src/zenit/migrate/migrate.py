@@ -32,7 +32,7 @@ from zenit.cli.ui import (
     warn,
 )
 from zenit.core._filenames import COMPOSE_FILE, ENV_FILES, PYPROJECT_FILE
-from zenit.core.lockfile import write_lockfile
+from zenit.core.lockfile import write_zenit_toml
 from zenit.core.manifest import (
     add_compose_service,
     add_compose_volume,
@@ -40,7 +40,6 @@ from zenit.core.manifest import (
     add_env_entry,
     dep_package_name,
     read_manifest,
-    write_manifest,
 )
 from zenit.core.rollback import scaffold_or_rollback
 from zenit.schema.exceptions import ZenitError
@@ -858,16 +857,15 @@ def run_migration(
             manifest, pkg, spec, source=EntrySource.TEMPLATE, addon="", dev=dev
         )
 
-    write_manifest(project_dir, manifest)
-
-    write_lockfile(
+    write_zenit_toml(
         project_dir,
-        template_source,
-        [],
+        template=template_source,
+        addons=[],
         template_source="copier",
         template_uri=template_source,
         template_has_tasks=bool(pending_tasks),
         template_file_paths=sorted(set(file_paths)),
+        manifest=manifest,
     )
 
     step("Processing tasks")

@@ -37,7 +37,6 @@ from jinja2 import Environment
 
 from zenit.core._filenames import LOCKFILE_NAME
 from zenit.core.constants import _RECIPE_NAME_RE
-from zenit.core.filesystem import atomic_write_text
 from zenit.schema.models import (
     AddonConfig,
     DependencyEntry,
@@ -86,18 +85,14 @@ def read_manifest(project_dir: Path) -> Manifest:
 def write_manifest(project_dir: Path, manifest: Manifest) -> None:
     """Write *manifest* into the ``[manifest]`` section of *project_dir*/.zenit.toml.
 
-    Preserves the existing ``[project]`` section and all comments.
-    Creates the file if it does not exist (though normally ``write_lockfile``
-    creates it first at scaffold time).
+    This is a thin wrapper around :func:`write_zenit_toml` for cases where
+    only the manifest section needs updating.  When both ``[project]`` and
+    ``[manifest]`` need updating, prefer ``write_zenit_toml`` directly for a
+    single atomic write.
     """
-    path = project_dir / LOCKFILE_NAME
-    if path.exists():
-        doc = tomlkit.parse(path.read_text(encoding="utf-8"))
-    else:
-        doc = tomlkit.document()
+    from zenit.core.lockfile import write_zenit_toml
 
-    doc["manifest"] = _encode_manifest(manifest)
-    atomic_write_text(path, tomlkit.dumps(doc))
+    write_zenit_toml(project_dir, manifest=manifest)
 
 
 # ── Manifest mutation helpers ─────────────────────────────────────────────────
@@ -459,7 +454,7 @@ def _encode_section(
     tbl.add(section_name, arr)
 
 
-def _encode_manifest(m: Manifest) -> tomlkit.items.Table:
+def encode_manifest(m: Manifest) -> tomlkit.items.Table:
     tbl = tomlkit.table()
 
     if m.python_blocks:

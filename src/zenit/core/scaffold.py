@@ -22,7 +22,7 @@ from zenit.core.dryrun import run_dry
 from zenit.core.filesystem import RealFileSystem
 from zenit.core.generate import generate_all
 from zenit.core.git import init
-from zenit.core.lockfile import write_lockfile
+from zenit.core.lockfile import write_lockfile, write_zenit_toml
 from zenit.core.manifest import (
     add_compose_service,
     add_compose_volume,
@@ -32,7 +32,6 @@ from zenit.core.manifest import (
     dep_package_name,
     read_manifest,
     record_addon_manifest_entries,
-    write_manifest,
 )
 from zenit.core.pkg_name import normalise_pkg_name
 from zenit.core.render import build_render_vars, make_env
@@ -182,7 +181,12 @@ def scaffold_project(
                 string_env,
                 render_vars,
             )
-        write_manifest(project_dir, manifest)
+        write_zenit_toml(
+            project_dir,
+            template=tpl,
+            addons=adns,
+            manifest=manifest,
+        )
 
         _stamp_template_manifest(project_dir, template_config)
 
@@ -255,4 +259,4 @@ def _stamp_template_manifest(
         if m:
             add_just_recipe(manifest, m.group(1), source=EntrySource.TEMPLATE, addon="")
 
-    write_manifest(project_dir, manifest)
+    write_zenit_toml(project_dir, manifest=manifest)

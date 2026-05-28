@@ -25,9 +25,9 @@ class EnvHandler(FileHandler):
         content_lines = _ensure_trailing_newline(content.splitlines(keepends=True))
 
         existing_keys = {
-            ln.split("=")[0].strip()
+            ln.split("=", 1)[0].strip()
             for ln in lines
-            if "=" in ln and not ln.startswith("#")
+            if "=" in ln and not ln.strip().startswith("#")
         }
         new_lines = [
             ln for ln in content_lines if ln.split("=")[0].strip() not in existing_keys

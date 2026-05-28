@@ -58,6 +58,9 @@ class FileHandler(ABC):
         new_lines = lines[:s] + lines[e + 1 :]
         atomic_write_text(file, "".join(new_lines))
 
+    def validate(self, file: Path) -> None:  # noqa: B027
+        """Verify the file can still be parsed after removal. No-op in base handler."""
+
     def _append_text(
         self,
         file: Path,
@@ -119,4 +122,6 @@ class HandlerDispatcher:
         return self._get(file).apply(file, content, locator_name, locator_args)
 
     def remove(self, file: Path, block: ManifestBlock) -> None:
-        self._get(file).remove(file, block)
+        handler = self._get(file)
+        handler.remove(file, block)
+        handler.validate(file)

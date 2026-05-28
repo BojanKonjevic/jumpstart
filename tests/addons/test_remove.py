@@ -661,8 +661,10 @@ class TestRemoveAddonIntegration:
         assert not (project_dir / "compose.yml").exists()
         assert not (project_dir / "Dockerfile").exists()
 
-    def test_remove_sqlalchemy_restores_template_conftest(self, tmp_path, monkeypatch):
-        """Removing sqlalchemy must restore the template's base conftest."""
+    def test_remove_sqlalchemy_skips_drifted_template_conftest(
+        self, tmp_path, monkeypatch
+    ):
+        """Removing sqlalchemy skips restoring template conftest that references addon via conditional Jinja2."""
         project_dir = _scaffold(tmp_path, "myapi", "fastapi", ["sqlalchemy"])
         monkeypatch.chdir(project_dir)
 
@@ -676,15 +678,11 @@ class TestRemoveAddonIntegration:
         with suppress_stdin():
             remove_addon("sqlalchemy", project_dir=project_dir)
 
-        assert conftest.exists(), "Template conftest must be restored after removal"
-        after = conftest.read_text()
-        # Template's base conftest has the simple client fixture (no session)
-        assert "async def client" in after
-        assert "async def session" not in after
-        # Must be valid Python
-        import libcst as cst
-
-        cst.parse_module(after)
+        # The template's conftest.py contains [% if "sqlalchemy" in addons %]
+        # — restoration is skipped to avoid content drift, so the file is gone.
+        assert not conftest.exists(), (
+            "Template conftest with addons-conditional Jinja2 must not be restored"
+        )
 
 
 # ── Migrated-project tests ──────────────────────────────────────────────────────

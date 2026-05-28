@@ -36,12 +36,11 @@ from zenit.core.dependency import DependencyGraph
 from zenit.core.deps import inject_deps
 from zenit.core.filesystem import FileSystem, RealFileSystem, RecordingFileSystem
 from zenit.core.justfile import inject_just_recipes
-from zenit.core.lockfile import ZenitLockfile, read_lockfile, write_lockfile
+from zenit.core.lockfile import ZenitLockfile, read_lockfile, write_zenit_toml
 from zenit.core.manifest import (
     add_just_recipe,
     read_manifest,
     record_addon_manifest_entries,
-    write_manifest,
 )
 from zenit.core.pkg_name import (
     normalise_pkg_name,
@@ -93,8 +92,12 @@ def _run_add_pipeline(
     installed_addons: list[str] | None = None,
     *,
     lockfile_override: ZenitLockfile | None = None,
-) -> _AddResult:
+) -> tuple[_AddResult, Manifest | None]:
     """Shared pipeline body for both real and dry-run add operations.
+
+    Returns ``(result, manifest)`` where *manifest* is ``None`` during
+    dry runs — the caller is responsible for writing the manifest and
+    lockfile via ``write_zenit_toml``.
 
     Parameters
     ----------
@@ -190,7 +193,6 @@ def _run_add_pipeline(
             string_env,
             render_vars,
         )
-        write_manifest(project_dir, manifest)
         for u in upgraded:
             info(
                 f"Transferred ownership of {u} from Copier template "
@@ -203,12 +205,15 @@ def _run_add_pipeline(
     # ── Recorded files (dry-run only) ─────────────────────────────────────────
     recorded_files = list(fs.recorded_files) if ctx.dry_run else []  # type: ignore[attr-defined]
 
-    return _AddResult(
-        added_deps=added_deps,
-        added_dev_deps=added_dev_deps,
-        added_env_vars=added_env_vars,
-        added_recipes=added_recipes,
-        recorded_files=recorded_files,
+    return (
+        _AddResult(
+            added_deps=added_deps,
+            added_dev_deps=added_dev_deps,
+            added_env_vars=added_env_vars,
+            added_recipes=added_recipes,
+            recorded_files=recorded_files,
+        ),
+        manifest if not ctx.dry_run else None,
     )
 
 
@@ -392,14 +397,11 @@ def _backfill_just_recipes(
 
     Returns the list of recipe names that were added to the justfile.
     """
-    if addon_id != "docker":
-        return []
-
     python_version = f"{sys.version_info.major}.{sys.version_info.minor}"
     all_added: list[str] = []
 
     for installed_id in ctx.addons:
-        if installed_id == "docker":
+        if installed_id == addon_id:
             continue
 
         installed_cfg = get_addon(installed_id)
@@ -448,6 +450,14 @@ def add_addon(
     template = lockfile.template
     pkg_name = normalise_pkg_name(project_dir.name)
     zenit_root = get_zenit_root()
+    addon_cfg = get_addon(addon_id)
+
+    # ── Warn about overrides of presence-tracked Copier template files ─────
+    overrides: list[str] = []
+    if lockfile.template_file_paths:
+        overrides = _template_file_overrides(
+            addon_cfg, lockfile.template_file_paths, pkg_name
+        )
 
     # ── Dry-run path ──────────────────────────────────────────────────────────
     fs: FileSystem
@@ -462,17 +472,14 @@ def add_addon(
             project_dir=project_dir,
             dry_run=True,
         )
-        addon_cfg = get_addon(addon_id)
-        if lockfile.template_file_paths:
-            overrides = _template_file_overrides(
-                addon_cfg, lockfile.template_file_paths, pkg_name
+        if overrides:
+            warn(
+                "Addon overrides presence-tracked Copier template files: "
+                + ", ".join(overrides)
             )
-            if overrides:
-                warn(
-                    "Addon overrides presence-tracked Copier template files: "
-                    + ", ".join(overrides)
-                )
-        result = _run_add_pipeline(ctx, fs, addon_cfg, installed_addons=lockfile.addons)
+        result, _ = _run_add_pipeline(
+            ctx, fs, addon_cfg, installed_addons=lockfile.addons
+        )
 
         dry_run_banner("add", addon_id)
 
@@ -500,18 +507,12 @@ def add_addon(
         print()
         return
 
-    addon_cfg = get_addon(addon_id)
-
-    # ── Warn about overrides of presence-tracked Copier template files ─────
-    if lockfile.template_file_paths:
-        overrides = _template_file_overrides(
-            addon_cfg, lockfile.template_file_paths, pkg_name
+    # ── Real path: warn about overrides ───────────────────────────────────────
+    if overrides:
+        warn(
+            "This addon will override files from the Copier template: "
+            + ", ".join(overrides)
         )
-        if overrides:
-            warn(
-                "This addon will override files from the Copier template: "
-                + ", ".join(overrides)
-            )
 
     # ── Real mode: prompt ─────────────────────────────────────────────────────
     addon_summary("add", addon_id, project_dir, template)
@@ -540,30 +541,31 @@ def add_addon(
             project_dir=project_dir,
         )
         fs = RealFileSystem(project_dir)
-        result = _run_add_pipeline(
+        result, manifest = _run_add_pipeline(
             ctx,
             fs,
             addon_cfg,
             installed_addons=lockfile.addons,
             lockfile_override=lockfile,
         )
-        write_lockfile(
+
+        # ── Refresh compose + backfill recipes (docker-owned reconciliation) ──
+        if "docker" in ctx.addons and manifest is not None:
+            _refresh_compose(ctx, project_dir, manifest)
+            backfilled = _backfill_just_recipes(ctx, project_dir, manifest, addon_id)
+            result.added_recipes.extend(backfilled)
+
+        # ── Single atomic write of both [project] and [manifest] sections ─────
+        write_zenit_toml(
             project_dir,
-            template,
-            ctx.addons,
+            template=template,
+            addons=ctx.addons,
             template_source=lockfile.template_source,
             template_uri=lockfile.template_uri,
             template_has_tasks=lockfile.template_has_tasks,
             template_file_paths=lockfile.template_file_paths,
+            manifest=manifest,
         )
-
-    # ── Refresh compose + backfill recipes (docker-owned reconciliation) ──────
-    if "docker" in ctx.addons:
-        manifest = read_manifest(project_dir)
-        _refresh_compose(ctx, project_dir, manifest)
-        backfilled = _backfill_just_recipes(ctx, project_dir, manifest, addon_id)
-        result.added_recipes.extend(backfilled)
-        write_manifest(project_dir, manifest)
 
     # ── Output ────────────────────────────────────────────────────────────────
     print()

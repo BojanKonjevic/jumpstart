@@ -22,11 +22,15 @@ import tomllib
 from dataclasses import dataclass, field
 from importlib.metadata import version as get_version
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import tomlkit
 
 from zenit.core._filenames import LOCKFILE_NAME
 from zenit.core.filesystem import atomic_write_text
+
+if TYPE_CHECKING:
+    from zenit.schema.models import Manifest
 
 SCHEMA_VERSION = 4
 
@@ -91,6 +95,69 @@ def write_lockfile(
 
     # Remove legacy [migrated] section if it exists
     doc.pop("migrated", None)
+
+    atomic_write_text(path, tomlkit.dumps(doc))
+
+
+def write_zenit_toml(
+    project_dir: Path,
+    *,
+    template: str | None = None,
+    addons: list[str] | None = None,
+    template_source: str = "native",
+    template_uri: str = "",
+    template_has_tasks: bool = False,
+    template_file_paths: list[str] | None = None,
+    manifest: Manifest | None = None,
+) -> None:
+    """Single atomic write of both ``[project]`` and ``[manifest]`` sections.
+
+    Reads ``.zenit.toml`` once (or creates an empty document), updates
+    whichever section(s) are provided, and writes back atomically.
+
+    When *template* is ``None`` the ``[project]`` section is left unchanged.
+    When *manifest* is ``None`` the ``[manifest]`` section is left unchanged.
+    When both are provided both sections are updated in a single write —
+    eliminating the inconsistency window of two sequential writes.
+    """
+    path = project_dir / LOCKFILE_NAME
+    doc = (
+        tomlkit.parse(path.read_text(encoding="utf-8"))
+        if path.exists()
+        else tomlkit.document()
+    )
+
+    if template is not None:
+        try:
+            zenit_version = get_version("zenit")
+        except Exception:
+            zenit_version = "dev"
+
+        project = tomlkit.table()
+        project.add("template", template)
+        project.add("addons", list(addons or []))
+        project.add("zenit_version", zenit_version)
+        project.add("schema_version", SCHEMA_VERSION)
+        if template_source != "native":
+            project.add("template_source", template_source)
+        if template_uri:
+            project.add("template_uri", template_uri)
+        if template_has_tasks:
+            project.add("template_has_tasks", template_has_tasks)
+        if template_file_paths:
+            file_paths = tomlkit.array()
+            file_paths.multiline(True)
+            for p in template_file_paths:
+                file_paths.append(p)
+            project.add("template_file_paths", file_paths)
+        doc["project"] = project
+
+        doc.pop("migrated", None)
+
+    if manifest is not None:
+        from zenit.core.manifest import encode_manifest
+
+        doc["manifest"] = encode_manifest(manifest)
 
     atomic_write_text(path, tomlkit.dumps(doc))
 

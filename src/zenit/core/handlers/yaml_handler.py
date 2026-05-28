@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 
 from zenit.core.handlers.base import FileHandler
+
+logger = logging.getLogger(__name__)
 
 
 class YamlHandler(FileHandler):
@@ -27,3 +30,13 @@ class YamlHandler(FileHandler):
             )
 
         return self._append_text(file, content, dedup_check=_dedup)
+
+    def validate(self, file: Path) -> None:
+        if not file.exists():
+            return
+        try:
+            import yaml as _yaml  # type: ignore[import-untyped]
+
+            _yaml.safe_load(file.read_text(encoding="utf-8"))
+        except Exception as exc:
+            logger.warning("YAML parse error after removal in '%s': %s", file, exc)

@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 
 import tomlkit
 
 from zenit.core.handlers.base import FileHandler
+
+logger = logging.getLogger(__name__)
 
 
 class TomlHandler(FileHandler):
@@ -29,3 +32,11 @@ class TomlHandler(FileHandler):
                 return False
 
         return self._append_text(file, content, dedup_check=_dedup)
+
+    def validate(self, file: Path) -> None:
+        if not file.exists():
+            return
+        try:
+            tomlkit.parse(file.read_text(encoding="utf-8"))
+        except Exception as exc:
+            logger.warning("TOML parse error after removal in '%s': %s", file, exc)
