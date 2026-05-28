@@ -1,6 +1,6 @@
-"""Export addon/template data for the configure page.
+"""Export addon/template data for the studio page.
 
-Generates ``configure-data.json`` — consumed by ``configure.html``.
+Generates ``studio-data.json`` — consumed by ``studio.html``.
 Runnable via: uv run python scripts/export-configure-data.py
 """
 
@@ -236,7 +236,7 @@ def build_json() -> str:
 
 
 def main() -> None:
-    output_path = _PROJECT_ROOT / "configure-data.json"
+    output_path = _PROJECT_ROOT / "studio-data.json"
     data = build_json()
     output_path.write_text(data, encoding="utf-8")
     print(f"Wrote {output_path} ({output_path.stat().st_size} bytes)")

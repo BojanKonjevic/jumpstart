@@ -48,7 +48,7 @@ jobs:
       - name: Test
         run: uv run pytest -v ${{ matrix.pytest-addopts }}
 
-  configure-data-check:
+  studio-data-check:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -65,7 +65,7 @@ jobs:
       - name: Install dependencies
         run: uv sync
 
-      - name: Verify configure-data.json is current
+      - name: Verify studio-data.json is current
         run: |
           uv run python scripts/export-configure-data.py
-          git diff --exit-code configure-data.json || (echo "configure-data.json is stale — run 'just export-configure-data'" && exit 1)
+          git diff --exit-code studio-data.json || (echo "studio-data.json is stale — regenerate and commit it" && exit 1)

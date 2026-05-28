@@ -13,8 +13,6 @@ test-full:
     uv run python -m pytest -n auto -v
 test-cov:
     uv run python -m pytest -n auto --cov=src --cov-report=term-missing -v
-export-configure-data:
-    uv run python scripts/export-configure-data.py
 re:
     uv tool install --reinstall .
 publish:

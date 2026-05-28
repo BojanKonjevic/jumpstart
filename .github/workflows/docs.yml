@@ -39,15 +39,15 @@ jobs:
 
       - run: pnpm run docs:build
 
-      - name: Generate configure page data
+      - name: Generate studio page data
         run: uv run python scripts/export-configure-data.py
 
       - name: Assemble site
         run: |
-          mkdir -p _site/docs _site/configure
+          mkdir -p _site/docs _site/studio
           cp index.html _site/index.html
-          cp configure.html _site/configure/index.html
-          cp configure-data.json _site/configure/configure-data.json
+          cp studio.html _site/studio/index.html
+          cp studio-data.json _site/studio/studio-data.json
           cp -r docs/.vitepress/dist/. _site/docs/
 
       - uses: actions/upload-pages-artifact@v5

@@ -11,7 +11,7 @@ export default defineConfig({
 
     nav: [
       { text: 'Home', link: 'https://bojankonjevic.github.io/zenit/' },
-      { text: 'Configure', link: 'https://bojankonjevic.github.io/zenit/configure/' },
+      { text: 'Studio', link: 'https://bojankonjevic.github.io/zenit/studio/' },
       { text: 'GitHub', link: 'https://github.com/BojanKonjevic/zenit' },
     ],
 

@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>zenit · configure</title>
+<title>zenit · studio</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:ital,wght@0,400;0,500;0,600;1,400&family=Instrument+Serif:ital@0;1&family=Geist+Mono:wght@300;400;500;600&display=swap" rel="stylesheet">
@@ -997,10 +997,10 @@ nav {
 <body>
 
 <nav>
-  <a class="nav-logo" href="/">zenit</a>
+  <a class="nav-logo" href="../">zenit</a>
   <div class="nav-right">
-    <a class="nav-link" href="#">docs</a>
-    <a class="nav-link" href="#">github</a>
+    <a class="nav-link" href="../docs/getting-started">docs</a>
+    <a class="nav-link" href="https://github.com/BojanKonjevic/zenit" target="_blank">github</a>
     <button class="nav-share-btn" onclick="shareUrl()">
       <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
       share
@@ -1190,7 +1190,7 @@ nav {
 </div>
 
 <script>
-// ── DATA (loaded from configure-data.json) ─────────────────────────────────────
+// ── DATA (loaded from studio-data.json) ────────────────────────────────────────
 
 let TEMPLATES, ADDONS, CAT_LABELS, CAT_COLORS, TEMPLATE_FILES, MAX_STEP, PIPELINE_STEPS;
 
@@ -1221,11 +1221,11 @@ let prevAutoDeps = new Set();
 async function init() {
   let data;
   try {
-    const resp = await fetch('configure-data.json');
+    const resp = await fetch('studio-data.json');
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
     data = await resp.json();
   } catch (e) {
-    console.error('Failed to load configure-data.json', e);
+    console.error('Failed to load studio-data.json', e);
     return;
   }
   TEMPLATES = data.templates;
