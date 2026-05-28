@@ -6,7 +6,6 @@ import sys
 from collections.abc import Callable
 
 from zenit.cli.ui import BOLD, CYAN, DIM, GREEN, MAGENTA, RESET, YELLOW, abort, warn
-from zenit.templates._load_config import list_templates
 
 from ._keys import read_key
 
@@ -52,14 +51,6 @@ CROSS = f"{DIM}—{RESET}"
 
 LABEL_WIDTH = 20
 DESC_INDENT = "  "
-
-
-def _get_templates() -> list[tuple[str, str]]:
-    """Return template id/description pairs from TOML metadata (cached)."""
-    try:
-        return [(t.id, t.description) for t in list_templates()]
-    except Exception:
-        return []
 
 
 # ── Search ─────────────────────────────────────────────────────────────────────

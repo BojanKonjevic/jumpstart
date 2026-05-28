@@ -14,6 +14,7 @@ if TYPE_CHECKING:
 
 import typer
 
+from zenit.addons.remove import _remove_one
 from zenit.cli.ui import BOLD, CYAN, DIM, GREEN, RED, RESET
 
 
@@ -392,25 +393,6 @@ def cmd_remove(
         else:
             for addon_id in sorted_ids:
                 _remove_one(addon_id, dry_run, yes, project_dir)
-
-
-def _remove_one(
-    addon_id: str,
-    dry_run: bool,
-    yes: bool,
-    project_dir: Path,
-) -> None:
-    """Thin wrapper: call *remove_addon*, convert ``ZenitError`` to exit."""
-    from zenit.addons.remove import remove_addon
-    from zenit.schema.exceptions import ZenitError
-
-    try:
-        remove_addon(addon_id, dry_run=dry_run, yes=yes, project_dir=project_dir)
-    except ZenitError as exc:
-        from zenit.cli.ui import error
-
-        error(str(exc))
-        raise typer.Exit(1) from exc
 
 
 @app.command("doctor")

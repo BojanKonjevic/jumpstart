@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from zenit.core.filesystem import atomic_write_text
 from zenit.core.handlers.base import FileHandler, _ensure_trailing_newline
 
 
@@ -43,5 +44,5 @@ class EnvHandler(FileHandler):
         end_line = start_line + len(new_lines) - 1
 
         new_source = "".join(lines + new_lines)
-        file.write_text(new_source, encoding="utf-8")
+        atomic_write_text(file, new_source)
         return new_source, start_line, end_line

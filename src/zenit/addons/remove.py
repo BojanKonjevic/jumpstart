@@ -5,13 +5,11 @@ from __future__ import annotations
 import sys
 from collections.abc import Mapping
 from dataclasses import dataclass
-from io import StringIO
 from pathlib import Path
 from typing import Any
 
 import tomlkit
 import typer
-from ruamel.yaml import YAML
 from tomlkit.items import Array
 
 from zenit.addons._registry import get_addon, list_addons
@@ -50,6 +48,7 @@ from zenit.core.manifest import (
 )
 from zenit.core.pkg_name import normalise_pkg_name, resolve_dest_placeholder
 from zenit.core.render import build_render_vars, make_env
+from zenit.core.yaml_utils import compose_yaml_dumps, compose_yaml_load
 from zenit.schema.exceptions import ZenitError
 from zenit.schema.models import (
     AddonConfig,
@@ -58,15 +57,6 @@ from zenit.schema.models import (
     ManifestBlock,
 )
 from zenit.templates._load_config import load_template_config
-
-_compose_yaml = YAML()
-_compose_yaml.default_flow_style = False
-
-
-def _yaml_dumps(data: object) -> str:
-    buf = StringIO()
-    _compose_yaml.dump(data, buf)
-    return buf.getvalue()
 
 
 def _remove_one(
@@ -494,7 +484,7 @@ def _remove_compose_services(
         return []
 
     data: dict[str, Any] = (
-        _compose_yaml.load(compose_path.read_text(encoding="utf-8")) or {}
+        compose_yaml_load(compose_path.read_text(encoding="utf-8")) or {}
     )
     services: dict[str, Any] = data.get("services", {})
 
@@ -520,7 +510,7 @@ def _remove_compose_services(
             data.pop("services", None)
         if not data.get("volumes"):
             data.pop("volumes", None)
-        atomic_write_text(compose_path, _yaml_dumps(data))
+        atomic_write_text(compose_path, compose_yaml_dumps(data))
 
     return removed
 
@@ -541,7 +531,7 @@ def _remove_compose_volumes(
         return
 
     data: dict[str, Any] = (
-        _compose_yaml.load(compose_path.read_text(encoding="utf-8")) or {}
+        compose_yaml_load(compose_path.read_text(encoding="utf-8")) or {}
     )
     vols: dict[str, Any] = data.get("volumes", {})
 
@@ -564,7 +554,7 @@ def _remove_compose_volumes(
             data.pop("services", None)
         if not data.get("volumes"):
             data.pop("volumes", None)
-        atomic_write_text(compose_path, _yaml_dumps(data))
+        atomic_write_text(compose_path, compose_yaml_dumps(data))
 
 
 def _remove_env_vars(

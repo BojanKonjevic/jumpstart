@@ -2,12 +2,10 @@
 
 from __future__ import annotations
 
-from io import StringIO
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 import jinja2
-from ruamel.yaml import YAML
 
 from zenit.cli.ui import warn as _warn
 from zenit.core._filenames import COMPOSE_FILE, ENV_FILES
@@ -26,6 +24,7 @@ from zenit.core.pkg_name import (
     resolve_dest_placeholder,
 )
 from zenit.core.render import make_env
+from zenit.core.yaml_utils import compose_yaml_dumps, compose_yaml_load
 from zenit.schema.exceptions import ZenitError
 from zenit.schema.models import LocatorSpec, Manifest, ManifestBlock
 
@@ -37,16 +36,6 @@ if TYPE_CHECKING:
         EnvVar,
         InjectionPoint,
     )
-
-
-_compose_yaml = YAML()
-_compose_yaml.default_flow_style = False
-
-
-def _yaml_dumps(data: object) -> str:
-    buf = StringIO()
-    _compose_yaml.dump(data, buf)
-    return buf.getvalue()
 
 
 def apply_contributions(
@@ -298,10 +287,10 @@ def merge_compose(
     """
     compose_path = ctx.project_dir / COMPOSE_FILE
     data: dict[str, Any] = (
-        _compose_yaml.load(compose_path.read_text(encoding="utf-8")) or {}
+        compose_yaml_load(compose_path.read_text(encoding="utf-8")) or {}
     )
     merge_compose_into_data(data, services, volumes, replace=replace)
-    fs.write_file(COMPOSE_FILE, _yaml_dumps(data))
+    fs.write_file(COMPOSE_FILE, compose_yaml_dumps(data))
 
 
 def _merge_env_vars(

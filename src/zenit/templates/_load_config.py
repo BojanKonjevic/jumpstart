@@ -59,4 +59,4 @@ def load_template_config(zenit_root: Path, template_id: str) -> TemplateConfig:
         raise AttributeError(
             f"template.py for '{template_id}' must export a 'config' object"
         )
-    return mod.config
+    return mod.config  # type: ignore[no-any-return]

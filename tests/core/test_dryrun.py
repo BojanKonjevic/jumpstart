@@ -93,12 +93,6 @@ def test_append_to_file_is_recorded(tmp_path):
     assert any(action == "append" for (action, _, __) in fs.recorded_files)
 
 
-def test_record_modification_is_recorded(tmp_path):
-    ctx, fs = _dry_ctx(tmp_path)
-    fs.record_modification("settings.py", "injected redis_url field")
-    assert any(action == "modify" for (action, _, __) in fs.recorded_files)
-
-
 # ── run_dry — no filesystem side-effects ─────────────────────────────────────
 
 

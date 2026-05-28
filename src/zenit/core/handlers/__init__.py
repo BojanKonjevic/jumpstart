@@ -6,7 +6,6 @@ from zenit.core.handlers.justfile_handler import JustfileHandler
 from zenit.core.handlers.python_handler import PythonHandler
 from zenit.core.handlers.toml_handler import TomlHandler
 from zenit.core.handlers.yaml_handler import YamlHandler
-from zenit.schema.models import ManifestBlock
 
 __all__ = [
     "FileHandler",
@@ -16,5 +15,4 @@ __all__ = [
     "JustfileHandler",
     "TomlHandler",
     "YamlHandler",
-    "ManifestBlock",
 ]

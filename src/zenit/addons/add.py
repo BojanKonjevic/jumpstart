@@ -225,22 +225,12 @@ def _refresh_compose(
     3. Merges current entries into compose.yml.
     4. Records all entries as docker-owned in the manifest.
     """
-    from io import StringIO
-
-    from ruamel.yaml import YAML
-
     from zenit.addons._registry import get_addon as _get_addon
     from zenit.core._filenames import COMPOSE_FILE
     from zenit.core.apply import merge_compose_into_data
     from zenit.core.manifest import add_compose_service, add_compose_volume
-
-    _compose_yaml = YAML()
-    _compose_yaml.default_flow_style = False
-
-    def _dump(data: object) -> str:
-        buf = StringIO()
-        _compose_yaml.dump(data, buf)
-        return buf.getvalue()
+    from zenit.core.yaml_utils import compose_yaml_dumps as _compose_yaml_dumps
+    from zenit.core.yaml_utils import compose_yaml_load as _compose_yaml_load
 
     compose_path = project_dir / COMPOSE_FILE
     if not compose_path.exists():
@@ -265,7 +255,7 @@ def _refresh_compose(
         e.name for e in manifest.compose_volumes if e.source == EntrySource.ADDON
     }
     data: dict[str, object] = (
-        _compose_yaml.load(compose_path.read_text(encoding="utf-8")) or {}
+        _compose_yaml_load(compose_path.read_text(encoding="utf-8")) or {}
     )
     svc_section: dict[str, object] = data.get("services", {})  # type: ignore[assignment]
     vol_section: dict[str, object] = data.get("volumes", {})  # type: ignore[assignment]
@@ -277,7 +267,7 @@ def _refresh_compose(
     merge_compose_into_data(data, services, volumes)
     from zenit.core.filesystem import atomic_write_text
 
-    atomic_write_text(compose_path, _dump(data))
+    atomic_write_text(compose_path, _compose_yaml_dumps(data))
 
     # 3. Update manifest — record all entries as docker-owned
     manifest.compose_services = [

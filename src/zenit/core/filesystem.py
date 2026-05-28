@@ -32,7 +32,6 @@ class FileSystem(Protocol):
     def create_dir(self, path: str) -> None: ...
     def copy_file(self, src: Path, dest_relative: str) -> None: ...
     def append_to_file(self, path: str, content: str) -> None: ...
-    def record_modification(self, path: str, description: str) -> None: ...
     def execute_command(self, cmd: list[str], check: bool = True) -> None: ...
 
 
@@ -59,9 +58,6 @@ class RealFileSystem:
         file_path = self._project_dir / path
         with open(file_path, "a") as f:
             f.write(content)
-
-    def record_modification(self, path: str, description: str) -> None:
-        pass
 
     def execute_command(self, cmd: list[str], check: bool = True) -> None:
         try:
@@ -94,9 +90,6 @@ class RecordingFileSystem:
     def append_to_file(self, path: str, content: str) -> None:
         preview = content.replace("\n", " ").strip()[:80]
         self.recorded_files.append(("append", path, preview))
-
-    def record_modification(self, path: str, description: str) -> None:
-        self.recorded_files.append(("modify", path, description))
 
     def execute_command(self, cmd: list[str], check: bool = True) -> None:
         return

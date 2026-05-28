@@ -200,15 +200,6 @@ def test_append_to_file_multiple_times(tmp_path):
     assert f.read_text() == "a\nb\nc\n"
 
 
-def test_record_modification_noop_on_real_fs(tmp_path):
-    ctx = _ctx(tmp_path)
-    ctx.project_dir.mkdir()
-    RealFileSystem(ctx.project_dir).record_modification(
-        "settings.py", "injected redis_url"
-    )
-    assert list(ctx.project_dir.iterdir()) == []
-
-
 def test_execute_command_runs_command(tmp_path):
     ctx = _ctx(tmp_path)
     ctx.project_dir.mkdir()
@@ -302,20 +293,6 @@ def test_dry_append_recorded_as_append(tmp_path):
     assert "append" in actions
 
 
-def test_dry_record_modification_recorded_as_modify(tmp_path):
-    _, fs = _dry(tmp_path)
-    fs.record_modification("settings.py", "injected redis_url field")
-    actions = [a for a, _, _ in fs.recorded_files]
-    assert "modify" in actions
-
-
-def test_dry_record_modification_records_description(tmp_path):
-    _, fs = _dry(tmp_path)
-    fs.record_modification("settings.py", "injected redis_url field")
-    descriptions = [d for _, _, d in fs.recorded_files]
-    assert "injected redis_url field" in descriptions
-
-
 def test_dry_multiple_operations_all_recorded(tmp_path):
     _, fs = _dry(tmp_path)
     src = tmp_path / "s.txt"
@@ -324,8 +301,7 @@ def test_dry_multiple_operations_all_recorded(tmp_path):
     fs.write_file("a.py", "")
     fs.copy_file(src, "b.txt")
     fs.append_to_file("c.txt", "line")
-    fs.record_modification("d.py", "changed")
-    assert len(fs.recorded_files) == 5
+    assert len(fs.recorded_files) == 4
 
 
 def test_dry_recorded_files_is_list_of_three_tuples(tmp_path):

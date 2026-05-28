@@ -10,7 +10,7 @@ from enum import Enum
 from importlib.metadata import version as get_version
 from pathlib import Path
 
-import yaml
+from ruamel.yaml import YAML
 
 from zenit.addons._registry import get_addon, list_addons
 from zenit.cli.ui import BOLD, DIM, GREEN, RED, RESET, YELLOW
@@ -276,7 +276,7 @@ def _check_manifest_compose(
         return result
 
     try:
-        data = yaml.safe_load(compose_path.read_text(encoding="utf-8")) or {}
+        data = YAML().load(compose_path.read_text(encoding="utf-8")) or {}
     except Exception as e:
         result.error(
             f"compose.yml could not be parsed: {e}",
@@ -942,7 +942,7 @@ def _check_compose(
         return result
 
     try:
-        data = yaml.safe_load(compose_path.read_text(encoding="utf-8")) or {}
+        data = YAML().load(compose_path.read_text(encoding="utf-8")) or {}
     except Exception as e:
         result.error(
             f"compose.yml could not be parsed: {e}",

@@ -19,7 +19,7 @@ from pathlib import Path
 from typing import Any
 
 import jinja2.meta
-import yaml
+from ruamel.yaml import YAML
 
 from zenit.cli.ui import (
     BOLD,
@@ -586,7 +586,7 @@ def _inventory_compose(project_dir: Path) -> tuple[list[str], list[str]]:
         return [], []
     try:
         data: dict[str, Any] = (
-            yaml.safe_load(compose_path.read_text(encoding="utf-8")) or {}
+            YAML().load(compose_path.read_text(encoding="utf-8")) or {}
         )
     except Exception:
         return [], []

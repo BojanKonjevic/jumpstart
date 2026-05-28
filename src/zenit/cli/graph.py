@@ -4,13 +4,10 @@ import json
 import re
 from collections.abc import Generator, Sequence
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Protocol
+from typing import Protocol
 
 from zenit.cli.ui import BOLD, CYAN, DIM, GREEN, RESET
 from zenit.core.dependency import DependencyGraph
-
-if TYPE_CHECKING:
-    pass
 
 
 class _HasIdAndRequires(Protocol):

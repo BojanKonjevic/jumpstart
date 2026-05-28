@@ -1,2 +1,5 @@
+# Template, addon, and generate directories are packaged via
+# [tool.setuptools.package-data] in pyproject.toml — this file
+# only needs to cover files at the package root.
 include LICENSE
 include README.md

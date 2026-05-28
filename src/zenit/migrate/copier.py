@@ -7,12 +7,13 @@ import fnmatch
 import json
 from dataclasses import dataclass, field
 from enum import Enum
+from io import StringIO
 from pathlib import Path
 from typing import Any
 
 import jinja2
 import jinja2.meta
-import yaml
+from ruamel.yaml import YAML
 
 # ── Question types ─────────────────────────────────────────────────────────────
 
@@ -67,10 +68,12 @@ class CopierConfig:
 
 def _to_nice_yaml(value: object, indent: int = 2) -> str:
     """Serialize a Python object to YAML (``to_nice_yaml`` filter)."""
-    result = yaml.dump(
-        value, default_flow_style=False, indent=indent, allow_unicode=True
-    )
-    return result.rstrip("\n")
+    y = YAML()
+    y.default_flow_style = False
+    y.indent(mapping=indent, sequence=indent, offset=indent)
+    buf = StringIO()
+    y.dump(value, buf)
+    return buf.getvalue().rstrip("\n")
 
 
 def _to_nice_json(value: object, indent: int = 2) -> str:
@@ -121,7 +124,7 @@ def parse_copier_yml(path: Path) -> CopierConfig:
     if not raw.strip():
         return CopierConfig()
 
-    data: dict[str, Any] = yaml.safe_load(raw) or {}
+    data: dict[str, Any] = YAML().load(raw) or {}
 
     config = CopierConfig()
 

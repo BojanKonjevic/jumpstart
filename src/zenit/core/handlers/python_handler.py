@@ -286,8 +286,6 @@ def remove(
         return
 
     # ── Stage D: unrecoverable ───────────────────────────────────────────────
-
-    # ── Stage D: unrecoverable ───────────────────────────────────────────────
     raise RemovalError(
         f"Could not remove '{block.point}' injection for addon '{block.addon}'.\n"
         f"  File: {file}\n"
