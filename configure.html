@@ -27,6 +27,7 @@
   --amber-h:  #d8a848;
   --amber-m:  rgba(200,146,46,0.12);
   --amber-s:  rgba(200,146,46,0.06);
+  --amber-glow: 0 0 12px rgba(200,146,46,0.15);
   --blue:     #78a8c2;
   --green:    #7aaa72;
   --red:      #b87878;
@@ -37,7 +38,7 @@
   --serif:    'Instrument Serif', serif;
 }
 
-html { color-scheme: dark; scroll-behavior: smooth; font-size: 18px; }
+html { color-scheme: dark; scroll-behavior: smooth; font-size: 23px; }
 body {
   font-family: var(--sans);
   background: var(--bg);
@@ -46,7 +47,7 @@ body {
   overflow: hidden;
   -webkit-font-smoothing: antialiased;
   font-weight: 500;
-  font-size: 14px;
+  font-size: .78rem;
 }
 
 body::after {
@@ -70,139 +71,108 @@ body::before {
 /* Nav */
 nav {
   position: fixed; top: 0; left: 0; right: 0; z-index: 300;
-  height: 44px;
+  height: 52px;
   background: rgba(14,13,11,0.96);
-  backdrop-filter: blur(20px);
+  backdrop-filter: blur(20px) saturate(1.3);
+  -webkit-backdrop-filter: blur(20px) saturate(1.3);
   border-bottom: 1px solid var(--bdl);
-  display: flex; align-items: center;
-  padding: 0 1.1rem;
-  gap: 0;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 1.5rem;
+  transition: background .2s, border-color .2s;
 }
 .nav-logo {
-  font-family: var(--mono); font-size: .82rem; font-weight: 600;
-  letter-spacing: -.03em; color: var(--t1); text-decoration: none;
+  font-family: var(--mono); font-size: .95rem; font-weight: 600;
+  letter-spacing: -.025em; color: var(--t1); text-decoration: none;
+  transition: opacity .15s;
 }
-.nav-logo .acc { color: var(--amber); }
-.nav-sep { width: 1px; height: 14px; background: var(--bdl); margin: 0 .85rem; }
-.nav-crumb { font-size: .66rem; color: var(--t4); display: flex; align-items: center; gap: .3rem; }
-.nav-crumb .cur { color: var(--t3); }
-.nav-right { margin-left: auto; display: flex; align-items: center; gap: .35rem; }
-.nav-link { font-size: .66rem; color: var(--t4); text-decoration: none; padding: .25rem .5rem; border-radius: 4px; transition: color .15s, background .15s; }
-.nav-link:hover { color: var(--t2); background: var(--bg-s); }
+.nav-logo:hover { opacity: .55; }
+.nav-right { display: flex; align-items: center; gap: 1.25rem; }
+.nav-link {
+  text-decoration: none; color: var(--t4);
+  font-size: .78rem; font-weight: 500;
+  transition: color .15s; position: relative;
+}
+.nav-link:hover { color: var(--t1); }
+.nav-link::after {
+  content: ''; position: absolute; bottom: -3px; left: 0;
+  width: 0; height: 1px;
+  background: var(--amber);
+  transition: width .2s var(--ease);
+}
+.nav-link:hover::after { width: 100%; }
 .nav-share-btn {
-  font-family: var(--sans); font-size: .66rem; font-weight: 500;
-  padding: .25rem .65rem; border-radius: 4px;
-  border: 1px solid rgba(200,146,46,.3); background: rgba(200,146,46,.08);
+  font-family: var(--sans); font-size: .7rem; font-weight: 500;
+  padding: .3rem .6rem; border-radius: 4px;
+  border: 1px solid rgba(200,146,46,.25); background: rgba(200,146,46,.07);
   color: var(--amber); cursor: pointer;
-  transition: all .15s var(--ease);
-  display: flex; align-items: center; gap: .3rem;
+  transition: all .15s; display: flex; align-items: center; gap: .3rem;
 }
-.nav-share-btn:hover { background: rgba(200,146,46,.14); border-color: rgba(200,146,46,.5); color: var(--amber-h); }
-.nav-sep2 { width: 1px; height: 14px; background: var(--bdl); margin: 0 .4rem; }
-
-/* Keyboard shortcuts button */
+.nav-share-btn:hover { background: rgba(200,146,46,.13); border-color: rgba(200,146,46,.45); }
 .nav-kbd-btn {
-  width: 22px; height: 22px; border-radius: 3px;
-  border: 1px solid var(--bdl); background: none;
-  color: var(--t5); font-family: var(--mono); font-size: .58rem;
+  width: 24px; height: 24px; border-radius: 4px;
+  border: 1px solid var(--bd); background: none;
+  color: var(--t4); font-family: var(--mono); font-size: .6rem;
   cursor: pointer; transition: all .15s;
   display: flex; align-items: center; justify-content: center;
 }
-.nav-kbd-btn:hover { color: var(--t2); border-color: var(--t4); }
+.nav-kbd-btn:hover { color: var(--t2); border-color: var(--t4); background: var(--bg-s); }
 
 /* LAYOUT */
 .shell {
   display: grid;
-  grid-template-columns: 210px 1fr 310px;
+  grid-template-columns: 1fr 440px;
   height: 100vh;
-  padding-top: 44px;
+  padding-top: 52px;
   position: relative; z-index: 1;
 }
 
-/* ── LEFT SIDEBAR ── */
-.sidebar {
-  background: var(--bg-c);
-  border-right: 1px solid var(--bdl);
-  display: flex; flex-direction: column;
-  overflow: hidden;
-}
-
-.sidebar-section {
-  padding: .8rem .9rem .7rem;
+/* ── TEMPLATE BAR ── */
+.tpl-bar {
+  display: flex; align-items: center; gap: 0;
+  padding: 0 1rem;
   border-bottom: 1px solid var(--bdl);
+  background: var(--bg-c);
+  flex-shrink: 0;
+  height: 36px;
+}
+.tpl-bar-label {
+  font-family: var(--mono); font-size: .5rem;
+  color: var(--t5); text-transform: uppercase; letter-spacing: .13em;
+  margin-right: .75rem; flex-shrink: 0;
+}
+.tpl-bar-items {
+  display: flex; align-items: center; gap: .18rem;
   flex-shrink: 0;
 }
-.sidebar-label {
-  font-family: var(--mono); font-size: .52rem; font-weight: 500;
-  color: var(--t5); text-transform: uppercase; letter-spacing: .13em;
-  margin-bottom: .55rem;
+.tpl-bar-item {
+  display: flex; align-items: center; gap: .35rem;
+  font-family: var(--mono); font-size: .66rem;
+  padding: .2rem .55rem; border-radius: 3px;
+  cursor: pointer; border: 1px solid transparent;
+  color: var(--t5); transition: all .15s var(--ease);
+  user-select: none;
 }
-
-.tpl-list {
-  flex: 1; overflow-y: auto; padding: .1rem 0;
+.tpl-bar-item:hover:not(.active) { color: var(--t3); background: var(--bg-s); }
+.tpl-bar-item.active {
+  color: var(--amber); background: var(--amber-s);
+  border-color: rgba(200,146,46,.2);
 }
-.tpl-list::-webkit-scrollbar { width: 3px; }
-.tpl-list::-webkit-scrollbar-thumb { background: var(--bdl); }
-
-/* Template description banner */
-.tpl-desc-banner {
-  margin: .5rem 0 .1rem;
-  padding: .35rem .5rem;
-  background: var(--amber-s);
-  border: 1px solid rgba(200,146,46,.12);
-  border-radius: 3px;
-  font-family: var(--mono); font-size: .61rem;
-  color: rgba(200,146,46,.7);
-  line-height: 1.45;
-  transition: opacity .2s;
-}
-
-.tpl-item {
-  display: flex; align-items: center; gap: .45rem;
-  padding: .32rem .9rem;
-  cursor: pointer; transition: background .12s;
-  border-left: 2px solid transparent;
-}
-.tpl-item:hover { background: var(--bg-s); }
-.tpl-item.active {
-  background: var(--amber-s);
-  border-left-color: var(--amber);
-}
-.tpl-radio {
-  width: 9px; height: 9px; border-radius: 50%;
-  border: 1.5px solid var(--t5); flex-shrink: 0;
+.tpl-bar-radio {
+  width: 8px; height: 8px; border-radius: 50%;
+  border: 1.5px solid currentColor; flex-shrink: 0;
   display: flex; align-items: center; justify-content: center;
-  transition: border-color .15s;
+  opacity: .6;
 }
-.tpl-item.active .tpl-radio { border-color: var(--amber); }
-.tpl-dot { width: 3px; height: 3px; border-radius: 50%; background: var(--amber); opacity: 0; transition: opacity .15s; }
-.tpl-item.active .tpl-dot { opacity: 1; }
-.tpl-name { font-family: var(--mono); font-size: .69rem; color: var(--t4); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.tpl-item.active .tpl-name { color: var(--amber); }
-
-/* Category nav */
-.cat-section {
-  flex: 0 0 auto;
-  padding: .7rem .9rem .75rem;
-  border-bottom: 1px solid var(--bdl);
+.tpl-bar-item.active .tpl-bar-radio { opacity: 1; }
+.tpl-bar-dot { width: 3px; height: 3px; border-radius: 50%; background: currentColor; opacity: 0; transition: opacity .15s; }
+.tpl-bar-item.active .tpl-bar-dot { opacity: 1; }
+.tpl-bar-sep { width: 1px; height: 16px; background: var(--bdl); margin: 0 .75rem; flex-shrink: 0; }
+.tpl-bar-desc {
+  font-family: var(--mono); font-size: .6rem;
+  color: var(--t5); flex: 1; min-width: 0;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  font-style: italic;
 }
-
-.cat-nav-btn {
-  display: flex; align-items: center; gap: .4rem;
-  width: 100%; padding: .27rem .42rem; border-radius: 3px;
-  background: none; border: none; cursor: pointer;
-  font-family: var(--mono); font-size: .66rem; color: var(--t5);
-  transition: color .12s, background .12s; text-align: left;
-  margin-bottom: 1px;
-}
-.cat-nav-btn:hover { color: var(--t2); background: rgba(255,255,255,.03); }
-.cat-nav-btn.active { color: var(--t2); background: rgba(255,255,255,.04); }
-.cat-dot { width: 5px; height: 5px; border-radius: 50%; flex-shrink: 0; }
-.cat-count {
-  margin-left: auto; font-size: .56rem; color: var(--t5);
-  background: rgba(255,255,255,.04); padding: .02rem .25rem; border-radius: 2px;
-}
-.cat-nav-btn.active .cat-count { color: rgba(200,146,46,.7); background: var(--amber-m); }
 
 /* ── CENTER ── */
 .center {
@@ -308,6 +278,15 @@ nav {
   display: flex; align-items: center; gap: .45rem;
 }
 .cat-title::after { content: ''; flex: 1; height: 1px; background: var(--bdl); }
+.cat-count {
+  font-family: var(--mono); font-size: .5rem;
+  padding: .04rem .22rem; border-radius: 2px;
+  background: rgba(255,255,255,.04);
+  color: var(--t5);
+  border: 1px solid var(--bdl);
+  letter-spacing: 0;
+  flex-shrink: 0;
+}
 
 .addons-grid {
   display: grid;
@@ -330,7 +309,7 @@ nav {
 .addon-card.selected {
   border-color: rgba(200,146,46,.5);
   background: rgba(200,146,46,.05);
-  box-shadow: 0 0 0 1px rgba(200,146,46,.12) inset;
+  box-shadow: var(--amber-glow), 0 0 0 1px rgba(200,146,46,.12) inset;
 }
 .addon-card.auto-dep { border-color: rgba(200,146,46,.22); background: rgba(200,146,46,.025); }
 
@@ -498,6 +477,7 @@ nav {
   padding: .12rem .3rem; border-radius: 2px;
   border: 1px solid var(--bdl); background: var(--bg-c); color: var(--t3);
   display: flex; align-items: center; gap: .22rem;
+  font-variant-ligatures: none;
 }
 .drawer-chip.file { color: var(--blue); border-color: rgba(120,168,194,.2); background: rgba(120,168,194,.04); }
 .drawer-chip.env  { color: var(--green); border-color: rgba(122,170,114,.2); background: rgba(122,170,114,.04); }
@@ -728,6 +708,7 @@ nav {
   font-family: var(--mono); font-size: .7rem; color: var(--t3);
   padding: .18rem .36rem; border-radius: 3px;
   border: 1px solid var(--bdl); background: var(--bg-e);
+  font-variant-ligatures: none;
 }
 .file-icon { width: 10px; height: 12px; flex-shrink: 0; }
 
@@ -760,6 +741,7 @@ nav {
   border: 1px solid var(--bdl); background: var(--bg-e);
   color: var(--t3);
   display: flex; align-items: center; gap: .25rem;
+  font-variant-ligatures: none;
 }
 .artifact-chip.env   { color: var(--green); border-color: rgba(122,170,114,.25); background: rgba(122,170,114,.06); }
 .artifact-chip.dep   { color: var(--blue);  border-color: rgba(120,168,194,.25); background: rgba(120,168,194,.06); }
@@ -817,14 +799,11 @@ nav {
   background: #080807; border: 1px solid var(--bdl);
   border-radius: 4px; padding: .6rem .75rem;
   margin-bottom: .5rem; position: relative;
-}
-.cmd-display::after {
-  content: '▋'; font-family: var(--mono); font-size: .68rem;
-  color: var(--amber); opacity: .55;
-  animation: blink 1.2s step-end infinite;
+  text-align: left;
 }
 @keyframes blink { 0%,100% { opacity: .55; } 50% { opacity: 0; } }
-.cmd-text { font-family: var(--mono); font-size: .67rem; color: var(--t2); line-height: 1.6; white-space: pre-wrap; word-break: break-all; }
+.cmd-text { font-family: var(--mono); font-size: .67rem; color: var(--t2); line-height: 1.6; word-break: keep-all; overflow-wrap: break-word; text-align: left; }
+.cmd-cursor { color: var(--amber); opacity: .55; animation: blink 1.2s step-end infinite; font-size: .68rem; }
 .cmd-prompt { color: var(--amber); }
 .cmd-kw { color: var(--t3); }
 .cmd-tpl { color: var(--blue); }
@@ -843,24 +822,13 @@ nav {
 .btn.copied { color: var(--green); border-color: rgba(122,170,114,.3); }
 
 /* Stack section */
-.stack-block {
-  padding: .75rem 1rem;
+.stack-summary {
+  padding: .45rem 1rem .5rem;
   border-bottom: 1px solid var(--bdl);
   flex-shrink: 0;
   min-height: 0;
-}
-.stack-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: .45rem; }
-.stack-badge {
-  font-family: var(--mono); font-size: .56rem;
-  color: var(--amber); background: var(--amber-m);
-  border: 1px solid rgba(200,146,46,.2);
-  padding: .07rem .34rem; border-radius: 2px;
-}
-.stack-badge.zero { color: var(--t5); background: transparent; border-color: var(--bdl); }
-.stack-empty {
-  font-family: var(--mono); font-size: .63rem; color: var(--t5);
-  display: block; padding: .3rem 0 .1rem;
-  line-height: 1.6;
+  overflow-y: auto;
+  max-height: 80px;
 }
 .stack-pills { display: flex; flex-wrap: wrap; gap: .25rem; }
 .stack-pill {
@@ -879,8 +847,12 @@ nav {
 .pill-rm:hover { color: var(--red); }
 .clear-btn { background: none; border: none; color: var(--t5); font-family: var(--mono); font-size: .58rem; cursor: pointer; transition: color .15s; }
 .clear-btn:hover { color: var(--red); }
+.stack-empty-note {
+  font-family: var(--mono); font-size: .62rem; color: var(--t5);
+  font-style: italic;
+}
 
-/* Graph - now takes the dominant space */
+/* Graph - takes all remaining space */
 .graph-block {
   flex: 1; display: flex; flex-direction: column; min-height: 0;
   padding: .75rem 1rem .9rem;
@@ -894,11 +866,13 @@ nav {
 }
 .gc-btn:hover { color: var(--t2); border-color: var(--t4); }
 .graph-ctrls { display: flex; gap: .2rem; }
+.graph-canvas {
+  flex: 1; min-height: 0; position: relative;
+}
 #cy {
-  flex: 1; min-height: 0;
+  position: absolute; inset: 0;
   background: #080807; border: 1px solid var(--bdl);
   border-radius: 4px;
-  position: relative;
 }
 .graph-empty-state {
   position: absolute; inset: 0;
@@ -979,25 +953,57 @@ nav {
   cursor: pointer; transition: all .15s;
 }
 .kbd-close-btn:hover { color: var(--t1); border-color: var(--t3); }
+
+/* ── EDITABLE PROJECT NAME ── */
+.cmd-project {
+  border-bottom: 1px dashed var(--t4);
+  outline: none; cursor: text;
+  transition: border-color .15s;
+}
+.cmd-project:focus { border-bottom-color: var(--amber); }
+
+/* ── FILTER CHIPS ── */
+.filter-chips {
+  display: flex; gap: .25rem; padding: .35rem 1rem;
+  border-bottom: 1px solid var(--bdl);
+  background: var(--bg);
+  flex-shrink: 0;
+  flex-wrap: wrap;
+}
+.filter-chip {
+  font-family: var(--mono); font-size: .58rem;
+  padding: .12rem .4rem; border-radius: 3px;
+  background: none; border: 1px solid var(--bdl);
+  color: var(--t5); cursor: pointer; transition: all .12s;
+}
+.filter-chip:hover { color: var(--t3); border-color: var(--t4); }
+.filter-chip.active { color: var(--amber); border-color: rgba(200,146,46,.4); background: var(--amber-m); }
+
+/* ── INTRO BANNER DISMISS ── */
+.intro-dismiss {
+  background: none; border: none;
+  color: var(--t5); cursor: pointer;
+  font-size: .8rem; line-height: 1; padding: .05rem .15rem;
+  transition: color .12s;
+  margin-left: auto;
+}
+.intro-dismiss:hover { color: var(--t2); }
+.intro-banner.collapsed {
+  height: 0; padding: 0 1rem; overflow: hidden;
+  border-bottom-color: transparent;
+}
 </style>
 </head>
 <body>
 
 <nav>
-  <a class="nav-logo" href="/">zen<span class="acc">it</span></a>
-  <div class="nav-sep"></div>
-  <div class="nav-crumb">
-    <span>project</span>
-    <span style="color:var(--t5)">›</span>
-    <span class="cur">configure</span>
-  </div>
+  <a class="nav-logo" href="/">zenit</a>
   <div class="nav-right">
     <a class="nav-link" href="#">docs</a>
     <a class="nav-link" href="#">github</a>
-    <div class="nav-sep2"></div>
     <button class="nav-share-btn" onclick="shareUrl()">
       <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
-      share config
+      share
     </button>
     <button class="nav-kbd-btn" onclick="toggleKbdModal()" title="Keyboard shortcuts (?)">?</button>
   </div>
@@ -1005,25 +1011,19 @@ nav {
 
 <div class="shell">
 
-  <!-- LEFT SIDEBAR -->
-  <div class="sidebar">
-    <div class="sidebar-section">
-      <div class="sidebar-label">base template</div>
-      <div class="tpl-list" id="tplList"></div>
-      <div class="tpl-desc-banner" id="tplDescBanner"></div>
-    </div>
-
-    <div class="cat-section">
-      <div class="sidebar-label">browse by</div>
-      <div id="catNav"></div>
-    </div>
-  </div>
-
   <!-- CENTER -->
   <div class="center" id="centerPane">
 
+    <!-- TEMPLATE BAR -->
+    <div class="tpl-bar">
+      <span class="tpl-bar-label">template</span>
+      <div class="tpl-bar-items" id="tplList"></div>
+      <div class="tpl-bar-sep"></div>
+      <span class="tpl-bar-desc" id="tplDescBanner"></span>
+    </div>
+
     <!-- INTRO BANNER -->
-    <div class="intro-banner">
+    <div class="intro-banner" id="introBanner">
       <div class="intro-flow">
         <div class="intro-step">
           <div class="intro-step-num">1</div>
@@ -1041,6 +1041,7 @@ nav {
         </div>
       </div>
       <a class="intro-docs-link" href="#" style="display:none">full docs ↗</a>
+      <button class="intro-dismiss" onclick="dismissIntro()" title="Dismiss">×</button>
     </div>
 
     <!-- ADDON PANE -->
@@ -1053,10 +1054,10 @@ nav {
           <input class="search-input" type="text" id="searchInput" placeholder="search addons… (press / to focus)" oninput="renderAddons()">
         </div>
         <div class="view-toggle">
-          <button class="vt-btn active" id="viewGrid" onclick="setView('grid')" title="Grid">
+          <button class="vt-btn" id="viewGrid" onclick="setView('grid')" title="Grid">
             <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
           </button>
-          <button class="vt-btn" id="viewList" onclick="setView('list')" title="List">
+          <button class="vt-btn active" id="viewList" onclick="setView('list')" title="List">
             <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
           </button>
         </div>
@@ -1064,6 +1065,7 @@ nav {
         <!-- Auto-dep toast -->
         <div class="autodep-toast" id="autodepToast"></div>
       </div>
+      <div class="filter-chips" id="filterChips"></div>
       <div class="addon-canvas" id="addonList"></div>
 
       <!-- Addon detail drawer (inside addon-pane for correct positioning) -->
@@ -1091,10 +1093,10 @@ nav {
           <span class="asm-counter" id="asmCounter">—</span>
           <button class="asm-btn" id="asmNextBtn" onclick="nextStep()">next →</button>
           <div class="asm-scrubber-wrap">
-            <input class="asm-scrubber" type="range" id="asmScrubber" min="1" max="8" value="1" oninput="scrubStep(this.value)" disabled>
+            <input class="asm-scrubber" type="range" id="asmScrubber" min="1" max="9" value="1" oninput="scrubStep(this.value)" disabled>
           </div>
           <div class="asm-divider"></div>
-          <button class="asm-btn" onclick="resetAssembly()">reset</button>
+          <button class="asm-btn" onclick="resetAssembly()" style="color:var(--red);border-color:rgba(184,120,120,.2)" onmouseover="this.style.borderColor='rgba(184,120,120,.4)'" onmouseout="this.style.borderColor='rgba(184,120,120,.2)'">reset</button>
         </div>
       </div>
       <div class="assembly-body" id="assemblyBody">
@@ -1126,7 +1128,9 @@ nav {
       <div class="block-label">command</div>
       <div class="cmd-display">
         <div class="cmd-text" id="cmdText">
-          <span class="cmd-prompt">$&nbsp;</span><span class="cmd-kw">zenit create</span> my-project <span class="cmd-flag">--template</span> <span class="cmd-tpl">fastapi</span>
+          <span class="cmd-prompt">$&nbsp;</span><span class="cmd-kw">zenit create</span> <span class="cmd-project" id="cmdProjectName" contenteditable="true" oninput="updateProjectName(this.textContent)" onkeydown="return projectNameKeydown(event)">my-project</span>
+          <span class="cmd-flag">--template</span>
+          <span class="cmd-tpl" id="cmdTplName">blank</span><span class="cmd-flag cmd-addons" id="cmdAddonsStr" style="white-space:pre-wrap"></span><span class="cmd-cursor">▋</span>
         </div>
       </div>
       <div class="cmd-actions">
@@ -1134,20 +1138,16 @@ nav {
           <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
           copy
         </button>
+        <button class="clear-btn" id="clearBtn" onclick="clearAll()" style="display:none;margin-left:auto">clear all</button>
       </div>
     </div>
 
-    <div class="stack-block">
-      <div class="stack-head">
-        <div class="block-label" style="margin-bottom:0">stack</div>
-        <div style="display:flex;align-items:center;gap:.35rem">
-          <button class="clear-btn" id="clearBtn" onclick="clearAll()" style="display:none">clear all</button>
-          <span class="stack-badge zero" id="stackBadge">0 addons</span>
-        </div>
-      </div>
-      <div id="stackItems"><span class="stack-empty">Nothing selected yet.</span></div>
+    <!-- Compact addon pills summary -->
+    <div class="stack-summary" id="stackSummary">
+      <div id="stackItems"><span class="stack-empty-note">no addons selected</span></div>
     </div>
 
+    <!-- Graph takes all remaining space -->
     <div class="graph-block">
       <div class="graph-head">
         <div class="block-label" style="margin-bottom:0">dependency graph</div>
@@ -1157,7 +1157,8 @@ nav {
           <button class="gc-btn" onclick="cy&&cy.zoom(cy.zoom()*.77)">−</button>
         </div>
       </div>
-      <div id="cy">
+      <div class="graph-canvas">
+        <div id="cy"></div>
         <div class="graph-empty-state" id="graphEmptyState">
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#4a4440" stroke-width="1.2"><circle cx="6" cy="12" r="3"/><circle cx="18" cy="6" r="3"/><circle cx="18" cy="18" r="3"/><line x1="9" y1="11" x2="15" y2="7"/><line x1="9" y1="13" x2="15" y2="17"/></svg>
           <p>select addons to see<br>their dependencies</p>
@@ -1189,65 +1190,19 @@ nav {
 </div>
 
 <script>
-// ── DATA ──────────────────────────────────────────────────────────────────────
+// ── DATA (loaded from configure-data.json) ─────────────────────────────────────
 
-const TEMPLATES = [
-  { id: 'blank',   name: 'blank',   desc: 'Minimal Python project — pytest, ruff, mypy, justfile. Dev tools only, no web framework.' },
-  { id: 'fastapi', name: 'fastapi', desc: 'FastAPI web framework skeleton — router, lifespan, settings, app factory, health endpoint.' },
-];
-
-const ADDONS = [
-  { id: 'postgres', name: 'postgres', desc: 'PostgreSQL driver + DATABASE_URL + compose service', tags: ['database'], requires: [], conflicts: [], templates: ['fastapi','blank'], col: '#78a8c2',
-    files: ['scripts/wait_db.py'], envVars: ['DATABASE_URL'], deps: ['asyncpg','python-dotenv'], composeServices: ['db'], recipes: ['wait-db','db-create','db-reset','db-drop'],
-    injections: ['settings_fields → database_url'] },
-  { id: 'redis', name: 'redis', desc: 'Redis service + connection helper + compose service', tags: ['database','infra'], requires: [], conflicts: [], templates: ['fastapi','blank'], col: '#78a8c2',
-    files: ['src/((pkg_name))/integrations/__init__.py','src/((pkg_name))/integrations/redis.py'], envVars: ['REDIS_URL'], deps: ['redis>=5','hiredis','python-dotenv'], devDeps: ['fakeredis'], composeServices: ['redis'], recipes: ['redis-up','redis-down','redis-cli'],
-    injections: ['lifespan_imports → close_redis','lifespan_shutdown → close_redis()','settings_fields → redis_url'] },
-  { id: 'sqlalchemy', name: 'sqlalchemy', desc: 'SQLAlchemy ORM + Alembic migrations', tags: ['database'], requires: [], conflicts: [], templates: ['fastapi','blank'], col: '#78a8c2',
-    files: ['src/((pkg_name))/db/__init__.py','src/((pkg_name))/db/base.py','src/((pkg_name))/db/session.py','src/((pkg_name))/models/mixins.py','alembic.ini','alembic/env.py','alembic/script.py.mako','tests/conftest.py'], envVars: ['DATABASE_URL'], deps: ['sqlalchemy[asyncio]','alembic'], devDeps: ['aiosqlite'], recipes: ['migrate','upgrade','downgrade'],
-    injections: ['lifespan_imports → engine','lifespan_shutdown → engine.dispose()','settings_fields → database_url'] },
-  { id: 'sqlmodel', name: 'sqlmodel', desc: 'SQLModel ORM (Pydantic + SQLAlchemy)', tags: ['database'], requires: ['sqlalchemy'], conflicts: [], templates: ['fastapi'], col: '#78a8c2',
-    files: ['src/((pkg_name))/models/base.py'], envVars: [], deps: ['sqlmodel'] },
-  { id: 'docker', name: 'docker', desc: 'Dockerfile + compose.yml + .dockerignore', tags: ['infra'], requires: [], conflicts: [], templates: ['fastapi','blank'], col: '#9c9080',
-    files: ['Dockerfile','compose.yml','.dockerignore'], envVars: [], deps: [], recipes: ['docker-up','docker-down'] },
-  { id: 'celery', name: 'celery', desc: 'Celery worker + beat scheduler, backed by Redis', tags: ['infra'], requires: ['redis'], conflicts: [], templates: ['fastapi','blank'], col: '#9c9080',
-    files: ['src/((pkg_name))/tasks/__init__.py','src/((pkg_name))/tasks/celery_app.py','src/((pkg_name))/tasks/example_tasks.py'], envVars: [], deps: ['celery[redis]>=5'], devDeps: ['pytest-celery','flower'], composeServices: ['celery-worker','celery-beat'], recipes: ['celery-up','celery-down','celery-flower','celery-logs'] },
-  { id: 'auth-manual', name: 'auth-manual', desc: 'JWT auth: register, login, refresh, logout, current user', tags: ['auth'], requires: ['sqlalchemy'], conflicts: [], templates: ['fastapi'], col: '#c8922e',
-    files: ['src/((pkg_name))/core/security.py','src/((pkg_name))/core/dependencies.py','src/((pkg_name))/models/user.py','src/((pkg_name))/models/refresh_token.py','src/((pkg_name))/schemas/auth.py','src/((pkg_name))/api/routes/auth.py','tests/integration/test_auth.py'], envVars: ['SECRET_KEY','ACCESS_TOKEN_EXPIRE_MINUTES','REFRESH_TOKEN_EXPIRE_DAYS'], deps: ['bcrypt','pyjwt','email-validator','python-multipart','python-dotenv'], recipes: ['gen-secret'],
-    injections: ['settings_fields → secret_key/algorithm/expire','router_imports → auth_router','router_includes → include_router(auth)','test_imports → User/hash_password','test_fixtures → test_user/auth_client','model_imports → User/RefreshToken','exceptions → UnauthorizedError/ForbiddenError'] },
-  { id: 'sentry', name: 'sentry', desc: 'Sentry error tracking + performance monitoring', tags: ['ops'], requires: [], conflicts: [], templates: ['fastapi','blank'], col: '#7aaa72',
-    files: ['src/((pkg_name))/integrations/__init__.py','src/((pkg_name))/integrations/sentry.py'], envVars: ['SENTRY_DSN','SENTRY_ENVIRONMENT'], deps: ['sentry-sdk[fastapi]','python-dotenv'], recipes: ['sentry-check','sentry-test'],
-    injections: ['lifespan_startup → init_sentry (fastapi)','main_startup → init_sentry (blank)','settings_fields → sentry_dsn/environment'] },
-  { id: 'github-actions', name: 'github-actions', desc: 'CI workflow (lint, type-check, test on push/PR)', tags: ['ops'], requires: [], conflicts: [], templates: ['fastapi','blank'], col: '#7aaa72',
-    files: ['.github/workflows/ci.yml'], envVars: [], deps: [] },
-];
-
-const CAT_LABELS = { database: 'Database', infra: 'Infrastructure', auth: 'Auth', ops: 'Operations' };
-const CAT_COLORS = { database: '#78a8c2', infra: '#9c9080', auth: '#c8922e', ops: '#7aaa72' };
-
-const TEMPLATE_FILES = {
-  blank:   ['src/((pkg_name))/__init__.py', 'src/((pkg_name))/main.py', 'src/((pkg_name))/__main__.py', 'tests/test_main.py', '.env'],
-  fastapi: ['src/((pkg_name))/__init__.py', 'src/((pkg_name))/api/__init__.py', 'src/((pkg_name))/api/routes/__init__.py', 'src/((pkg_name))/core/__init__.py', 'src/((pkg_name))/schemas/__init__.py', 'src/((pkg_name))/models/__init__.py', 'src/((pkg_name))/main.py', 'src/((pkg_name))/lifecycle.py', 'src/((pkg_name))/exceptions.py', 'src/((pkg_name))/api/router.py', 'src/((pkg_name))/api/routes/health.py', 'src/((pkg_name))/schemas/common.py', 'src/((pkg_name))/settings.py', '.env', '.env.example', 'tests/conftest.py', 'tests/integration/test_health.py'],
-};
-
-const PIPELINE_STEPS = [
-  { id: 'template',    label: 'template files' },
-  { id: 'addon-files', label: 'addon files'    },
-  { id: 'injections',  label: 'injections'     },
-  { id: 'deps',        label: 'dependencies'   },
-  { id: 'env',         label: 'env vars'       },
-  { id: 'recipes',     label: 'just recipes'   },
-  { id: 'compose',     label: 'compose merge'  },
-  { id: 'manifest',    label: 'manifest'       },
-];
+let TEMPLATES, ADDONS, CAT_LABELS, CAT_COLORS, TEMPLATE_FILES, MAX_STEP, PIPELINE_STEPS;
 
 // ── STATE ─────────────────────────────────────────────────────────────────────
 
 let selected = new Set();
 let autoDeps = new Set();
-let currentTpl = 'fastapi';
+let currentTpl = 'blank';
 let currentFilter = 'all';
-let currentView = 'grid';
+let currentView = 'list';
+let projectName = 'my-project';
+let pkgName = 'my_project';
 let cy = null;
 
 let asmStep = 0;
@@ -1263,7 +1218,27 @@ let prevAutoDeps = new Set();
 
 // ── INIT ──────────────────────────────────────────────────────────────────────
 
-function init() {
+async function init() {
+  let data;
+  try {
+    const resp = await fetch('configure-data.json');
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    data = await resp.json();
+  } catch (e) {
+    console.error('Failed to load configure-data.json', e);
+    return;
+  }
+  TEMPLATES = data.templates;
+  ADDONS = data.addons;
+  CAT_LABELS = data.catLabels;
+  CAT_COLORS = data.catColors;
+  TEMPLATE_FILES = data.templateFiles;
+  MAX_STEP = data.maxStep;
+  PIPELINE_STEPS = data.pipelineSteps;
+  updatePkgName();
+  if (localStorage.getItem('zenit-intro-hidden')) {
+    document.getElementById('introBanner').classList.add('collapsed');
+  }
   renderTemplates();
   renderCatNav();
   parseURL();
@@ -1299,9 +1274,9 @@ function shareUrl() {
 function renderTemplates() {
   const list = document.getElementById('tplList');
   list.innerHTML = TEMPLATES.map(t=>`
-    <div class="tpl-item${t.id===currentTpl?' active':''}" onclick="setTemplate('${t.id}')">
-      <div class="tpl-radio"><div class="tpl-dot"></div></div>
-      <span class="tpl-name">${t.id}</span>
+    <div class="tpl-bar-item${t.id===currentTpl?' active':''}" onclick="setTemplate('${t.id}')">
+      <div class="tpl-bar-radio"><div class="tpl-bar-dot"></div></div>
+      <span>${t.id}</span>
     </div>
   `).join('');
 }
@@ -1309,7 +1284,7 @@ function renderTemplates() {
 function updateTplDescBanner() {
   const tpl = TEMPLATES.find(t=>t.id===currentTpl);
   const banner = document.getElementById('tplDescBanner');
-  if (tpl) banner.textContent = tpl.desc;
+  if (tpl && banner) banner.textContent = tpl.desc;
 }
 
 function setTemplate(id) {
@@ -1329,17 +1304,12 @@ function setTemplate(id) {
 
 function renderCatNav() {
   const cats = ['all', ...Object.keys(CAT_LABELS)];
-  document.getElementById('catNav').innerHTML = cats.map(c=>{
-    const label = c === 'all' ? 'all addons' : CAT_LABELS[c];
+  document.getElementById('filterChips').innerHTML = cats.map(c=>{
+    const label = c === 'all' ? 'all' : CAT_LABELS[c];
     const count = c === 'all'
       ? ADDONS.filter(a=>a.templates.includes(currentTpl)).length
       : ADDONS.filter(a=>a.tags.includes(c)&&a.templates.includes(currentTpl)).length;
-    const color = c === 'all' ? 'var(--t4)' : CAT_COLORS[c];
-    return `<button class="cat-nav-btn${currentFilter===c?' active':''}" onclick="setFilter('${c}')">
-      <div class="cat-dot" style="background:${color};opacity:${c==='all'?0.4:0.65}"></div>
-      ${label}
-      <span class="cat-count">${count}</span>
-    </button>`;
+    return `<button class="filter-chip${currentFilter===c?' active':''}" onclick="setFilter('${c}')">${label} (${count})</button>`;
   }).join('');
 }
 
@@ -1456,6 +1426,7 @@ function renderAddons() {
     html += `<div class="cat-section-grid">
       <div class="cat-title" style="color:${CAT_COLORS[tag]||'var(--t4)'}">
         ${CAT_LABELS[tag]||tag}
+        <span class="cat-count">${addons.length}</span>
       </div>`;
 
     if (currentView === 'grid') {
@@ -1632,20 +1603,48 @@ function drawerToggleAddon() {
 
 // ── RIGHT PANEL ───────────────────────────────────────────────────────────────
 
+function updateProjectName(name) {
+  projectName = name || 'my-project';
+  updatePkgName();
+  updatePanel();
+  initAssembly();
+  renderGraph();
+}
+
+function projectNameKeydown(e) {
+  if (e.key === 'Enter') { e.preventDefault(); e.target.blur(); }
+}
+
+function normalisePkgName(name) {
+  return name.toLowerCase().replace(/[^a-z0-9_]/g, '_').replace(/^_+|_+$/g, '') || name;
+}
+
+function updatePkgName() {
+  pkgName = normalisePkgName(projectName);
+}
+
+function dismissIntro() {
+  document.getElementById('introBanner').classList.add('collapsed');
+  localStorage.setItem('zenit-intro-hidden', '1');
+}
+
+function pkg(path) {
+  return path.replace(/\(\(pkg_name\)\)/g, pkgName);
+}
+
 function updatePanel() {
   const all = [...selected].map(id=>({id,auto:false})).concat([...autoDeps].map(id=>({id,auto:true})));
   const addonsStr = all.length ? ` \\\n  --addons ${all.map(x=>x.id).join(',')}` : '';
-  document.getElementById('cmdText').innerHTML =
-    `<span class="cmd-prompt">$&nbsp;</span><span class="cmd-kw">zenit create</span> my-project <span class="cmd-flag">--template</span> <span class="cmd-tpl">${currentTpl}</span><span style="color:var(--t4);white-space:pre-wrap">${addonsStr}</span>`;
+  document.getElementById('cmdTplName').textContent = currentTpl;
+  document.getElementById('cmdAddonsStr').textContent = addonsStr;
 
-  const n = all.length;
-  const badge = document.getElementById('stackBadge');
-  badge.textContent = `${n} addon${n!==1?'s':''}`;
-  badge.classList.toggle('zero', n===0);
   document.getElementById('clearBtn').style.display = selected.size>0 ? '' : 'none';
 
   const stackEl = document.getElementById('stackItems');
-  if (!all.length) { stackEl.innerHTML = `<span class="stack-empty">No addons — template only.<br>Toggle addons above to add them.</span>`; return; }
+  if (!all.length) {
+    stackEl.innerHTML = `<span class="stack-empty-note">no addons selected</span>`;
+    return;
+  }
   stackEl.innerHTML = `<div class="stack-pills">${all.map(({id,auto})=>{
     const a = ADDONS.find(x=>x.id===id);
     return `<div class="stack-pill${auto?' is-auto':''}">
@@ -1668,11 +1667,11 @@ function copyCmd() {
 // ── GRAPH ─────────────────────────────────────────────────────────────────────
 
 function renderGraph() {
+  const hasSelection = selected.size > 0 || autoDeps.size > 0;
+  document.getElementById('graphEmptyState').style.display = hasSelection ? 'none' : 'flex';
+
   if (!window.cytoscape) return;
   const compat = ADDONS.filter(a=>a.templates.includes(currentTpl));
-  const hasSelection = selected.size > 0 || autoDeps.size > 0;
-
-  // Show/hide empty state
   document.getElementById('graphEmptyState').style.display = hasSelection ? 'none' : 'flex';
 
   const nodes = compat.map(a=>{
@@ -1744,7 +1743,7 @@ function getStepCounts() {
   const recipes    = addons.flatMap(a => a.recipes||[]);
   const services   = addons.flatMap(a => a.composeServices||[]);
   return [tplFiles.length, addonFiles.length, injections.length, deps.length,
-          envVars.length, recipes.length, services.length, null];
+          envVars.length, recipes.length, services.length, null, null];
 }
 
 function initAssembly() {
@@ -1786,6 +1785,7 @@ function buildAssemblyDOM() {
     mkSection(6, 'just recipes',   recipes.length,    mkChipsBody(recipes.map(x=>`just ${x.r}`), 'recipe')),
     mkSection(7, 'compose merge',  services.length,   mkChipsBody(services.map(x=>x.s), 'service')),
     mkSection(8, 'manifest',       null,              mkManifestBody(tplFiles, addonFiles, addons)),
+    mkSection(9, 'git init',       null,              mkGitBody()),
   ];
 
   scroll.innerHTML = sections.join('');
@@ -1809,7 +1809,7 @@ function mkSection(n, label, count, bodyHtml) {
 
 function mkFilesBody(files) {
   return `<div class="files-wrap">${files.map(f=>
-    `<div class="stage-item section-file">${fileIcon(f)}<span>${f}</span></div>`
+    `<div class="stage-item section-file">${fileIcon(f)}<span>${pkg(f)}</span></div>`
   ).join('')}</div>`;
 }
 
@@ -1823,7 +1823,7 @@ function mkAddonFilesBody(addonFiles) {
     <div class="section-group">
       <div class="section-group-label" style="color:${col}">${id}</div>
       <div class="files-wrap">${files.map(f=>
-        `<div class="stage-item section-file" style="border-color:${col}28;color:${col}">${fileIcon(f)}<span>${f}</span></div>`
+        `<div class="stage-item section-file" style="border-color:${col}28;color:${col}">${fileIcon(f)}<span>${pkg(f)}</span></div>`
       ).join('')}</div>
     </div>`
   ).join('');
@@ -1842,6 +1842,14 @@ function mkChipsBody(items, cls) {
   return `<div class="chips-wrap">${items.map(text=>
     `<div class="stage-item artifact-chip ${cls}">${text}</div>`
   ).join('')}</div>`;
+}
+
+function mkGitBody() {
+  return `<div class="chips-wrap">
+    <div class="stage-item artifact-chip" style="color:var(--green);border-color:rgba(122,170,114,.25);background:rgba(122,170,114,.06)">git init</div>
+    <div class="stage-item artifact-chip" style="color:var(--green);border-color:rgba(122,170,114,.25);background:rgba(122,170,114,.06)">git add .</div>
+    <div class="stage-item artifact-chip" style="color:var(--green);border-color:rgba(122,170,114,.25);background:rgba(122,170,114,.06)">git commit -m "Initial commit"</div>
+  </div>`;
 }
 
 function mkManifestBody(tplFiles, addonFiles, addons) {
@@ -1876,9 +1884,9 @@ function togglePlay() {
 }
 
 function startPlay() {
-  if (!asmBuilt || asmStep >= 8) {
+  if (!asmBuilt || asmStep >= MAX_STEP) {
     // Reset and play from start
-    if (asmStep >= 8) { goToStep(1); }
+    if (asmStep >= MAX_STEP) { goToStep(1); }
   }
   asmPlaying = true;
   updatePlayBtn();
@@ -1895,7 +1903,7 @@ function scheduleNextStep() {
   if (!asmPlaying) return;
   asmPlayTimer = setTimeout(()=>{
     if (!asmPlaying) return;
-    if (asmStep < 8) {
+    if (asmStep < MAX_STEP) {
       goToStep(asmStep + 1);
       scheduleNextStep();
     } else {
@@ -1921,7 +1929,7 @@ function goToStep(n) {
   if (!asmBuilt) return;
   asmStep = n;
 
-  for (let i = 1; i <= 8; i++) {
+  for (let i = 1; i <= MAX_STEP; i++) {
     const section = document.querySelector(`.stage-section[data-step="${i}"]`);
     if (!section) continue;
 
@@ -1977,7 +1985,7 @@ function showSectionInstant(section) {
 function nextStep() {
   if (!asmBuilt) return;
   stopPlay();
-  if (asmStep < 8) goToStep(asmStep + 1);
+  if (asmStep < MAX_STEP) goToStep(asmStep + 1);
 }
 
 function prevStep() {
@@ -2009,14 +2017,14 @@ function updateNavBtns() {
   const counter = document.getElementById('asmCounter');
   const play    = document.getElementById('asmPlayBtn');
   if (prev)    prev.disabled    = !asmBuilt || asmStep <= 1;
-  if (next)    next.disabled    = !asmBuilt || asmStep >= 8;
-  if (counter) counter.textContent = asmBuilt ? `${asmStep} / 8` : '—';
+  if (next)    next.disabled    = !asmBuilt || asmStep >= MAX_STEP;
+  if (counter) counter.textContent = asmBuilt ? `${asmStep} / ${MAX_STEP}` : '—';
   if (play)    play.disabled    = !asmBuilt;
   updatePlayBtn();
 
   // Update progress bar
   const fill = document.getElementById('stepProgressFill');
-  if (fill) fill.style.width = asmBuilt ? `${(asmStep/8)*100}%` : '0%';
+  if (fill) fill.style.width = asmBuilt ? `${(asmStep/MAX_STEP)*100}%` : '0%';
 }
 
 function updateScrubber() {
@@ -2031,7 +2039,7 @@ function updateScrubber() {
 function renderStepList() {
   const list   = document.getElementById('stepList');
   const counts = getStepCounts();
-  const progressBar = `<div class="step-progress-bar"><div class="step-progress-fill" id="stepProgressFill" style="width:${asmBuilt?(asmStep/8)*100:0}%"></div></div>`;
+  const progressBar = `<div class="step-progress-bar"><div class="step-progress-fill" id="stepProgressFill" style="width:${asmBuilt?(asmStep/MAX_STEP)*100:0}%"></div></div>`;
 
   list.innerHTML = progressBar +
     PIPELINE_STEPS.map((s, i) => {
@@ -2084,7 +2092,7 @@ function initKeyboard() {
 
     if (e.key === 'ArrowRight') {
       e.preventDefault();
-      if (asmBuilt && asmStep < 8) { stopPlay(); goToStep(asmStep + 1); }
+      if (asmBuilt && asmStep < MAX_STEP) { stopPlay(); goToStep(asmStep + 1); }
       return;
     }
 

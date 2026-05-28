@@ -47,3 +47,25 @@ jobs:
 
       - name: Test
         run: uv run pytest -v ${{ matrix.pytest-addopts }}
+
+  configure-data-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
+
+      - name: Set up Python 3.12
+        run: uv python install 3.12
+
+      - name: Install dependencies
+        run: uv sync
+
+      - name: Verify configure-data.json is current
+        run: |
+          uv run python scripts/export-configure-data.py
+          git diff --exit-code configure-data.json || (echo "configure-data.json is stale — run 'just export-configure-data'" && exit 1)

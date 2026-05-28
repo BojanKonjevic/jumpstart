@@ -1,0 +1,443 @@
+{
+  "version": "1.0.9",
+  "templates": [
+    {
+      "id": "blank",
+      "name": "blank",
+      "desc": "blank: dev tools only (pytest, ruff, mypy)"
+    },
+    {
+      "id": "fastapi",
+      "name": "fastapi",
+      "desc": "fastapi: FastAPI web framework skeleton"
+    }
+  ],
+  "addons": [
+    {
+      "id": "auth-manual",
+      "name": "auth-manual",
+      "desc": "JWT auth: register, login, refresh, logout, current user",
+      "tags": [
+        "auth"
+      ],
+      "requires": [
+        "sqlalchemy"
+      ],
+      "conflicts": [],
+      "templates": [
+        "fastapi"
+      ],
+      "col": "#c8922e",
+      "files": [
+        "src/((pkg_name))/core/security.py",
+        "src/((pkg_name))/core/dependencies.py",
+        "src/((pkg_name))/models/user.py",
+        "src/((pkg_name))/models/refresh_token.py",
+        "src/((pkg_name))/schemas/auth.py",
+        "src/((pkg_name))/api/routes/auth.py",
+        "tests/integration/test_auth.py"
+      ],
+      "envVars": [
+        "SECRET_KEY",
+        "ACCESS_TOKEN_EXPIRE_MINUTES",
+        "REFRESH_TOKEN_EXPIRE_DAYS"
+      ],
+      "deps": [
+        "bcrypt",
+        "pyjwt",
+        "email-validator",
+        "python-multipart",
+        "python-dotenv"
+      ],
+      "devDeps": [],
+      "composeServices": [],
+      "recipes": [
+        "gen-secret"
+      ],
+      "injections": [
+        "settings_fields → secret_key",
+        "router_imports → router as auth_router",
+        "router_includes → api_router.include_router",
+        "test_imports → User",
+        "test_fixtures → pytest.fixture",
+        "model_imports → User",
+        "exceptions → class"
+      ]
+    },
+    {
+      "id": "celery",
+      "name": "celery",
+      "desc": "Celery worker + beat scheduler, backed by Redis",
+      "tags": [
+        "infra"
+      ],
+      "requires": [
+        "redis"
+      ],
+      "conflicts": [],
+      "templates": [
+        "fastapi",
+        "blank"
+      ],
+      "col": "#9c9080",
+      "files": [
+        "src/((pkg_name))/tasks/__init__.py",
+        "src/((pkg_name))/tasks/celery_app.py",
+        "src/((pkg_name))/tasks/example_tasks.py"
+      ],
+      "envVars": [],
+      "deps": [
+        "celery[redis]>=5"
+      ],
+      "devDeps": [
+        "pytest-celery",
+        "flower"
+      ],
+      "composeServices": [
+        "celery-worker",
+        "celery-beat"
+      ],
+      "recipes": [
+        "celery-up",
+        "celery-down",
+        "celery-flower",
+        "celery-logs"
+      ],
+      "injections": []
+    },
+    {
+      "id": "docker",
+      "name": "docker",
+      "desc": "Dockerfile + compose.yml + .dockerignore",
+      "tags": [
+        "infra"
+      ],
+      "requires": [],
+      "conflicts": [],
+      "templates": [
+        "fastapi",
+        "blank"
+      ],
+      "col": "#9c9080",
+      "files": [
+        "Dockerfile",
+        "compose.yml",
+        ".dockerignore"
+      ],
+      "envVars": [],
+      "deps": [],
+      "devDeps": [],
+      "composeServices": [],
+      "recipes": [
+        "docker-up",
+        "docker-down"
+      ],
+      "injections": []
+    },
+    {
+      "id": "github-actions",
+      "name": "github-actions",
+      "desc": "CI workflow (lint, type-check, test on push/PR)",
+      "tags": [
+        "ci"
+      ],
+      "requires": [],
+      "conflicts": [],
+      "templates": [
+        "fastapi",
+        "blank"
+      ],
+      "col": "#7aaa72",
+      "files": [
+        ".github/workflows/ci.yml"
+      ],
+      "envVars": [],
+      "deps": [],
+      "devDeps": [],
+      "composeServices": [],
+      "recipes": [],
+      "injections": []
+    },
+    {
+      "id": "postgres",
+      "name": "postgres",
+      "desc": "PostgreSQL driver + DATABASE_URL + compose service",
+      "tags": [
+        "database"
+      ],
+      "requires": [],
+      "conflicts": [],
+      "templates": [
+        "fastapi",
+        "blank"
+      ],
+      "col": "#78a8c2",
+      "files": [
+        "scripts/wait_db.py"
+      ],
+      "envVars": [
+        "DATABASE_URL"
+      ],
+      "deps": [
+        "asyncpg",
+        "python-dotenv"
+      ],
+      "devDeps": [],
+      "composeServices": [
+        "db"
+      ],
+      "recipes": [
+        "wait-db",
+        "db-create",
+        "db-reset",
+        "db-drop"
+      ],
+      "injections": [
+        "settings_fields → database_url"
+      ]
+    },
+    {
+      "id": "redis",
+      "name": "redis",
+      "desc": "Redis service + connection helper + compose service",
+      "tags": [
+        "database"
+      ],
+      "requires": [],
+      "conflicts": [],
+      "templates": [
+        "fastapi",
+        "blank"
+      ],
+      "col": "#78a8c2",
+      "files": [
+        "src/((pkg_name))/integrations/__init__.py",
+        "src/((pkg_name))/integrations/redis.py"
+      ],
+      "envVars": [
+        "REDIS_URL"
+      ],
+      "deps": [
+        "redis>=5",
+        "hiredis",
+        "python-dotenv"
+      ],
+      "devDeps": [
+        "fakeredis"
+      ],
+      "composeServices": [
+        "redis"
+      ],
+      "recipes": [
+        "redis-up",
+        "redis-down",
+        "redis-cli"
+      ],
+      "injections": [
+        "settings_fields → redis_url",
+        "lifespan_imports → close_redis",
+        "lifespan_shutdown → close_redis()"
+      ]
+    },
+    {
+      "id": "sentry",
+      "name": "sentry",
+      "desc": "Sentry error tracking + performance monitoring",
+      "tags": [
+        "ops"
+      ],
+      "requires": [],
+      "conflicts": [],
+      "templates": [
+        "fastapi",
+        "blank"
+      ],
+      "col": "#b87878",
+      "files": [
+        "src/((pkg_name))/integrations/__init__.py",
+        "src/((pkg_name))/integrations/sentry.py"
+      ],
+      "envVars": [
+        "SENTRY_DSN",
+        "SENTRY_ENVIRONMENT"
+      ],
+      "deps": [
+        "sentry-sdk[fastapi]",
+        "python-dotenv"
+      ],
+      "devDeps": [],
+      "composeServices": [],
+      "recipes": [
+        "sentry-check",
+        "sentry-test"
+      ],
+      "injections": [
+        "lifespan_startup → init_sentry",
+        "main_startup → init_sentry",
+        "settings_fields → sentry_dsn"
+      ]
+    },
+    {
+      "id": "sqlalchemy",
+      "name": "sqlalchemy",
+      "desc": "SQLAlchemy ORM + Alembic migrations",
+      "tags": [
+        "database"
+      ],
+      "requires": [],
+      "conflicts": [],
+      "templates": [
+        "fastapi",
+        "blank"
+      ],
+      "col": "#78a8c2",
+      "files": [
+        "src/((pkg_name))/db/__init__.py",
+        "src/((pkg_name))/db/base.py",
+        "src/((pkg_name))/db/session.py",
+        "src/((pkg_name))/models/mixins.py",
+        "alembic.ini",
+        "alembic/env.py",
+        "alembic/script.py.mako",
+        "tests/conftest.py"
+      ],
+      "envVars": [
+        "DATABASE_URL"
+      ],
+      "deps": [
+        "sqlalchemy[asyncio]",
+        "alembic"
+      ],
+      "devDeps": [
+        "aiosqlite"
+      ],
+      "composeServices": [],
+      "recipes": [
+        "migrate",
+        "upgrade",
+        "downgrade"
+      ],
+      "injections": [
+        "settings_fields → database_url",
+        "lifespan_imports → engine",
+        "lifespan_shutdown → engine.dispose()"
+      ]
+    },
+    {
+      "id": "sqlmodel",
+      "name": "sqlmodel",
+      "desc": "SQLModel ORM (Pydantic + SQLAlchemy)",
+      "tags": [
+        "database"
+      ],
+      "requires": [
+        "sqlalchemy"
+      ],
+      "conflicts": [],
+      "templates": [
+        "fastapi"
+      ],
+      "col": "#78a8c2",
+      "files": [
+        "src/((pkg_name))/models/base.py"
+      ],
+      "envVars": [],
+      "deps": [
+        "sqlmodel"
+      ],
+      "devDeps": [],
+      "composeServices": [],
+      "recipes": [],
+      "injections": []
+    }
+  ],
+  "catLabels": {
+    "database": "Database",
+    "infra": "Infrastructure",
+    "auth": "Auth",
+    "ops": "Operations",
+    "ci": "CI/CD"
+  },
+  "catColors": {
+    "database": "#78a8c2",
+    "infra": "#9c9080",
+    "auth": "#c8922e",
+    "ops": "#b87878",
+    "ci": "#7aaa72"
+  },
+  "templateFiles": {
+    "blank": [
+      ".gitignore",
+      ".gitattributes",
+      ".pre-commit-config.yaml",
+      ".envrc",
+      "src/((pkg_name))/__init__.py",
+      "src/((pkg_name))/main.py",
+      "src/((pkg_name))/__main__.py",
+      "tests/test_main.py",
+      ".env"
+    ],
+    "fastapi": [
+      ".gitignore",
+      ".gitattributes",
+      ".pre-commit-config.yaml",
+      ".envrc",
+      "src/((pkg_name))/__init__.py",
+      "src/((pkg_name))/api/__init__.py",
+      "src/((pkg_name))/api/routes/__init__.py",
+      "src/((pkg_name))/core/__init__.py",
+      "src/((pkg_name))/schemas/__init__.py",
+      "src/((pkg_name))/models/__init__.py",
+      "src/((pkg_name))/main.py",
+      "src/((pkg_name))/lifecycle.py",
+      "src/((pkg_name))/exceptions.py",
+      "src/((pkg_name))/api/router.py",
+      "src/((pkg_name))/api/routes/health.py",
+      "src/((pkg_name))/schemas/common.py",
+      "src/((pkg_name))/settings.py",
+      ".env",
+      ".env.example",
+      "tests/conftest.py",
+      "tests/integration/test_health.py"
+    ]
+  },
+  "pipelineSteps": [
+    {
+      "id": "template",
+      "label": "template files"
+    },
+    {
+      "id": "addon-files",
+      "label": "addon files"
+    },
+    {
+      "id": "injections",
+      "label": "injections"
+    },
+    {
+      "id": "deps",
+      "label": "dependencies"
+    },
+    {
+      "id": "env",
+      "label": "env vars"
+    },
+    {
+      "id": "recipes",
+      "label": "just recipes"
+    },
+    {
+      "id": "compose",
+      "label": "compose merge"
+    },
+    {
+      "id": "manifest",
+      "label": "manifest"
+    },
+    {
+      "id": "git",
+      "label": "git init"
+    }
+  ],
+  "maxStep": 9
+}
