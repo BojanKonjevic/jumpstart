@@ -26,7 +26,7 @@ if TYPE_CHECKING:
 
 
 def _locate_line(
-    module: cst.Module,
+    source: str,
     locator_name: str,
     locator_args: dict[str, object],
     insert_index: int,
@@ -42,6 +42,11 @@ def _locate_line(
     """
     from libcst.metadata import MetadataWrapper, PositionProvider
 
+    # Isolate metadata resolution to its own parse — MetadataWrapper uses
+    # unsafe_skip_copy=True so that PositionProvider keys match the tree
+    # nodes we iterate over below.  Each call re-parses to avoid any risk
+    # of cross-contamination from a long-lived wrapper.
+    module = cst.parse_module(source)
     wrapper = MetadataWrapper(module, unsafe_skip_copy=True)
     positions = wrapper.resolve(PositionProvider)
 
@@ -63,7 +68,7 @@ def _locate_line(
             return positions[body[-1]].end.line
         return 0
 
-    locator_fn = _REGISTRY[locator_name]  # locate() already validates existence
+    locator_fn = _REGISTRY[locator_name]
     scope: LocatorScope = locator_fn.__locator_scope__  # type: ignore[attr-defined]
     if scope == LocatorScope.MODULE_BODY:
         return _split_for(module.body, insert_index)
@@ -158,7 +163,7 @@ def apply(
         ) from exc
 
     # Convert CST body-index → source-file line index.
-    line_number = _locate_line(module, locator_name, locator_args, insert_index)
+    line_number = _locate_line(source, locator_name, locator_args, insert_index)
 
     lines = source.splitlines(keepends=True)
     content_lines = _ensure_trailing_newline(content.splitlines(keepends=True))
@@ -263,19 +268,25 @@ def remove(
 
     best_ratio = 0.0
     best_start = -1
+    best_len = 0
 
-    for s in range(window_start, window_end + 1):
-        e = s + block_len - 1
-        if e > len(lines) - 1:
-            break
-        candidate = _normalise_for_fuzzy(_extract(s, e))
-        ratio = SequenceMatcher(None, norm_ref, candidate).ratio()
-        if ratio > best_ratio:
-            best_ratio = ratio
-            best_start = s
+    # Try multiple candidate lengths around the recorded block length in
+    # case the user added or removed lines within the block.
+    for block_delta in range(-2, 3):
+        candidate_len = block_len + block_delta
+        if candidate_len < 1:
+            continue
+        max_s = min(window_end, len(lines) - candidate_len)
+        for s in range(window_start, max_s + 1):
+            candidate = _normalise_for_fuzzy(_extract(s, s + candidate_len - 1))
+            ratio = SequenceMatcher(None, norm_ref, candidate).ratio()
+            if ratio > best_ratio:
+                best_ratio = ratio
+                best_start = s
+                best_len = candidate_len
 
     if best_ratio >= FUZZY_REMOVAL_THRESHOLD and best_start >= 0:
-        best_end = best_start + block_len - 1
+        best_end = best_start + best_len - 1
         print(
             f"Warning: fuzzy removal matched '{block.point}' in {file} "
             f"at lines {best_start + 1}-{best_end + 1} "
@@ -327,7 +338,7 @@ def relocate_block(
 
     try:
         locator_line = _locate_line(
-            module, block.locator.name, block.locator.args, insert_index
+            source, block.locator.name, block.locator.args, insert_index
         )
     except InjectionError:
         return None
@@ -394,9 +405,9 @@ def _remove_lines(
     start: int,
     end: int,
 ) -> None:
-    """Delete lines[start:end+1] from *file*, cleaning up surrounding blank lines."""
+    """Delete lines[start:end+1] from *file*, cleaning up blank lines at the boundary."""
     new_lines = lines[:start] + lines[end + 1 :]
-    cleaned = _collapse_blank_lines(new_lines)
+    cleaned = _collapse_boundary_blank_lines(new_lines, start, end)
 
     new_source = "".join(cleaned)
     _assert_valid_python(file, new_source)
@@ -423,22 +434,25 @@ def _assert_valid_python(file: Path, source: str) -> None:
         ) from exc
 
 
-def _collapse_blank_lines(lines: list[str]) -> list[str]:
-    """Collapse runs of 3+ consecutive blank lines to exactly 2.
+def _collapse_boundary_blank_lines(
+    new_lines: list[str], start: int, end: int
+) -> list[str]:
+    """Collapse runs of 3+ consecutive blank lines at the removal boundary only.
 
-    Matches the normalisation contract in manifest._normalise():
-      'Collapse runs of 3+ consecutive newlines to exactly two newlines.'
+    The boundary is the join point between ``lines[:start]`` and
+    ``lines[end+1:]``.  Blank lines elsewhere in the file are left
+    untouched so that the user's intentional formatting is preserved.
     """
+    boundary = start  # index into new_lines where the two halves meet
     cleaned: list[str] = []
     blank_run = 0
 
-    for ln in lines:
+    for i, ln in enumerate(new_lines):
         is_blank = ln.strip() == ""
         if is_blank:
             blank_run += 1
-            if blank_run <= 2:
+            if blank_run <= 2 or i < boundary - 3 or i > boundary + 3:
                 cleaned.append(ln)
-            # else: drop the line (3rd+ consecutive blank)
         else:
             blank_run = 0
             cleaned.append(ln)

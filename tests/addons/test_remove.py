@@ -516,6 +516,59 @@ class TestRemoveAddonIntegration:
         env = (project_dir / ".env").read_text()
         assert "REDIS_URL" not in env
 
+    def test_remove_redis_cleans_compose_app_env(self, tmp_path, monkeypatch):
+        """Removing redis strips REDIS_URL and depends_on from app service."""
+        project_dir = _scaffold(tmp_path, "myapp", "blank", ["docker", "redis"])
+        monkeypatch.chdir(project_dir)
+
+        compose_path = project_dir / "compose.yml"
+        data = yaml.safe_load(compose_path.read_text())
+        app = data.setdefault("services", {}).setdefault("app", {})
+        app["environment"] = {"REDIS_URL": "redis://redis:6379/0", "OTHER": "keep"}
+        app["depends_on"] = {"redis": {"condition": "service_healthy"}}
+        compose_path.write_text(yaml.dump(data))
+
+        with suppress_stdin():
+            remove_addon("redis", project_dir=project_dir)
+
+        compose = yaml.safe_load(compose_path.read_text())
+        app_env = compose.get("services", {}).get("app", {}).get("environment", {})
+        app_dep = compose.get("services", {}).get("app", {}).get("depends_on", {})
+
+        assert "REDIS_URL" not in app_env, (
+            "REDIS_URL should be removed from app service"
+        )
+        assert "OTHER" in app_env, "OTHER env var should be preserved"
+        assert "redis" not in app_dep, "redis depends_on should be removed"
+
+    def test_remove_postgres_cleans_compose_app_env(self, tmp_path, monkeypatch):
+        """Removing postgres strips DATABASE_URL and depends_on from app service."""
+        project_dir = _scaffold(tmp_path, "myapp", "blank", ["docker", "postgres"])
+        monkeypatch.chdir(project_dir)
+
+        compose_path = project_dir / "compose.yml"
+        data = yaml.safe_load(compose_path.read_text())
+        app = data.setdefault("services", {}).setdefault("app", {})
+        app["environment"] = {
+            "DATABASE_URL": "postgresql+asyncpg://postgres:postgres@db:5432/myapp",
+            "OTHER": "keep",
+        }
+        app["depends_on"] = {"db": {"condition": "service_healthy"}}
+        compose_path.write_text(yaml.dump(data))
+
+        with suppress_stdin():
+            remove_addon("postgres", project_dir=project_dir)
+
+        compose = yaml.safe_load(compose_path.read_text())
+        app_env = compose.get("services", {}).get("app", {}).get("environment", {})
+        app_dep = compose.get("services", {}).get("app", {}).get("depends_on", {})
+
+        assert "DATABASE_URL" not in app_env, (
+            "DATABASE_URL should be removed from app service"
+        )
+        assert "OTHER" in app_env, "OTHER env var should be preserved"
+        assert "db" not in app_dep, "db depends_on should be removed"
+
     def test_remove_invalid_addon_doesnt_modify_project(self, tmp_path, monkeypatch):
         project_dir = _scaffold(tmp_path, "myapp", "blank", ["sentry"])
         monkeypatch.chdir(project_dir)

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -33,8 +34,8 @@ def _merge_addon_contributions(
             c.tool_overrides.setdefault(section, []).extend(overrides)
         c.ruff_excludes.extend(addon.ruff_excludes)
         for inj in addon.injections:
-            inj.addon_id = addon.id
-            c.injections.append(inj)
+            cloned = replace(inj, addon_id=addon.id)
+            c.injections.append(cloned)
     c._addon_configs = addon_configs
 
 
@@ -73,8 +74,8 @@ def collect_all(
     c.recipes.template.extend(template_config.just_recipes)
 
     for inj in template_config.injections:
-        inj.addon_id = "template"
-        c.injections.append(inj)
+        cloned = replace(inj, addon_id="template")
+        c.injections.append(cloned)
 
     _merge_addon_contributions(c, addon_configs)
 

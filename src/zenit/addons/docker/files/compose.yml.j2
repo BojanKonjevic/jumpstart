@@ -8,24 +8,6 @@ services:
       - .env
     command: uvicorn (( pkg_name )).main:app --host 0.0.0.0 --port 8000 --reload
 [% endif %]
-[% if "postgres" in addon_ids or "redis" in addon_ids or "celery" in addon_ids %]
-    depends_on:
-[% endif %]
-[% if "postgres" in addon_ids %]
-      db:
-        condition: service_healthy
-[% endif %]
-[% if "redis" in addon_ids or "celery" in addon_ids %]
-      redis:
-        condition: service_healthy
-[% endif %]
-    environment:
-[% if "postgres" in addon_ids %]
-      DATABASE_URL: postgresql+asyncpg://postgres:postgres@db:5432/(( pkg_name ))
-[% endif %]
-[% if "redis" in addon_ids or "celery" in addon_ids %]
-      REDIS_URL: redis://redis:6379/0
-[% endif %]
     develop:
       watch:
         - action: sync

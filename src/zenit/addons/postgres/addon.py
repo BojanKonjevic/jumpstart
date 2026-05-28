@@ -45,6 +45,10 @@ config = AddonConfig(
         ),
     ],
     compose_volumes=["pgdata"],
+    compose_app_env={
+        "DATABASE_URL": "postgresql+asyncpg://postgres:postgres@db:5432/(( pkg_name ))"
+    },
+    compose_app_depends_on={"db": {"condition": "service_healthy"}},
     env_vars=[
         EnvVar(
             key="DATABASE_URL",

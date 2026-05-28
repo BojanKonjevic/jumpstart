@@ -265,11 +265,15 @@ def _refresh_compose(
         vol_section.pop(name, None)
 
     merge_compose_into_data(data, services, volumes)
+
+    # 3. Reconcile app service environment and depends_on (before write)
+    _reconcile_app_service_env(data, ctx, manifest)
+
     from zenit.core.filesystem import atomic_write_text
 
     atomic_write_text(compose_path, _compose_yaml_dumps(data))
 
-    # 3. Update manifest — record all entries as docker-owned
+    # 4. Update manifest — record all entries as docker-owned
     manifest.compose_services = [
         e for e in manifest.compose_services if e.source != EntrySource.ADDON
     ]
@@ -280,6 +284,94 @@ def _refresh_compose(
         add_compose_service(manifest, svc.name, EntrySource.ADDON, "docker")
     for vol in volumes:
         add_compose_volume(manifest, vol, EntrySource.ADDON, "docker")
+
+
+def _reconcile_app_service_env(
+    data: dict[str, object],
+    ctx: Context,
+    manifest: Manifest,
+) -> None:
+    """Reconcile the ``app`` service's ``environment`` and ``depends_on``.
+
+    Adds env vars and depends_on entries contributed by currently installed
+    addons, and removes stale entries from addons that are no longer present.
+    """
+    from zenit.addons._registry import get_addon as _get_addon
+    from zenit.core.manifest import (
+        add_compose_app_depends_on as _add_dep,
+    )
+    from zenit.core.manifest import (
+        add_compose_app_env as _add_env,
+    )
+
+    services_data: dict[str, object] = data.get("services", {})  # type: ignore[assignment]
+    if "app" not in services_data:
+        services_data["app"] = {}
+    app_svc: dict[str, object] = services_data["app"]  # type: ignore[assignment]
+
+    # 4a. Collect active compose_app_env from installed addons
+    active_env: dict[str, str] = {}
+    for addon_id in ctx.addons:
+        cfg = _get_addon(addon_id)
+        active_env.update(cfg.compose_app_env)
+
+    # Resolve placeholders
+    active_env = {
+        k: v.replace("(( pkg_name ))", ctx.pkg_name) for k, v in active_env.items()
+    }
+
+    # 4b. Reconcile environment block
+    stale_env_keys = {
+        e.key for e in manifest.compose_app_env if e.key not in active_env
+    }
+    current_env: dict[str, object] | None = app_svc.get("environment")  # type: ignore[assignment]
+    if current_env is not None and isinstance(current_env, dict):
+        for key in stale_env_keys:
+            current_env.pop(key, None)
+        current_env.update(active_env)
+        if not current_env:
+            del app_svc["environment"]
+    elif active_env:
+        app_svc["environment"] = dict(active_env)
+    elif current_env is not None and not isinstance(current_env, dict):
+        pass
+
+    # 4c. Update manifest entries for compose_app_env
+    manifest.compose_app_env = [
+        e for e in manifest.compose_app_env if e.key not in stale_env_keys
+    ]
+    active_keys = set(active_env)
+    for key in active_keys:
+        _add_env(manifest, key, EntrySource.ADDON, "docker")
+
+    # 4d. Collect active compose_app_depends_on
+    active_dep: dict[str, dict[str, str]] = {}
+    for addon_id in ctx.addons:
+        cfg = _get_addon(addon_id)
+        active_dep.update(cfg.compose_app_depends_on)
+
+    # 4e. Reconcile depends_on block
+    stale_dep_names = {
+        e.name for e in manifest.compose_app_depends_on if e.name not in active_dep
+    }
+    current_dep: dict[str, object] | None = app_svc.get("depends_on")  # type: ignore[assignment]
+    if current_dep is not None and isinstance(current_dep, dict):
+        for name in stale_dep_names:
+            current_dep.pop(name, None)
+        current_dep.update(active_dep)
+        if not current_dep:
+            del app_svc["depends_on"]
+    elif active_dep:
+        app_svc["depends_on"] = dict(active_dep)
+    elif current_dep is not None and not isinstance(current_dep, dict):
+        pass
+
+    # 4f. Update manifest entries for compose_app_depends_on
+    manifest.compose_app_depends_on = [
+        e for e in manifest.compose_app_depends_on if e.name not in stale_dep_names
+    ]
+    for name in active_dep:
+        _add_dep(manifest, name, EntrySource.ADDON, "docker")
 
 
 def _backfill_just_recipes(

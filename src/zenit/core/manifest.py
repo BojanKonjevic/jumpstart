@@ -147,6 +147,12 @@ def remove_blocks_for_addon(manifest: Manifest, addon_id: str) -> None:
     manifest.compose_volumes = [
         v for v in manifest.compose_volumes if v.addon != addon_id
     ]
+    manifest.compose_app_env = [
+        e for e in manifest.compose_app_env if e.addon != addon_id
+    ]
+    manifest.compose_app_depends_on = [
+        d for d in manifest.compose_app_depends_on if d.addon != addon_id
+    ]
     manifest.dependencies = [d for d in manifest.dependencies if d.addon != addon_id]
     manifest.just_recipes = [r for r in manifest.just_recipes if r.addon != addon_id]
     manifest.ruff_excludes = [e for e in manifest.ruff_excludes if e.addon != addon_id]
@@ -188,6 +194,30 @@ def add_compose_volume(
 ) -> bool:
     return _add_owned_entry(
         manifest.compose_volumes,
+        "name",
+        OwnedEntry(name=name, source=source, addon=addon),
+        source=source,
+        addon=addon,
+    )
+
+
+def add_compose_app_env(
+    manifest: Manifest, key: str, source: EntrySource, addon: str
+) -> bool:
+    return _add_owned_entry(
+        manifest.compose_app_env,
+        "key",
+        EnvEntry(key=key, source=source, addon=addon),
+        source=source,
+        addon=addon,
+    )
+
+
+def add_compose_app_depends_on(
+    manifest: Manifest, name: str, source: EntrySource, addon: str
+) -> bool:
+    return _add_owned_entry(
+        manifest.compose_app_depends_on,
         "name",
         OwnedEntry(name=name, source=source, addon=addon),
         source=source,
@@ -286,6 +316,14 @@ def record_addon_manifest_entries(
     for vol in addon_cfg.compose_volumes:
         if add_compose_volume(manifest, vol, source=EntrySource.ADDON, addon=addon_id):
             adopted.append(f"compose_volume:{vol}")
+    for key in addon_cfg.compose_app_env:
+        if add_compose_app_env(manifest, key, source=EntrySource.ADDON, addon=addon_id):
+            adopted.append(f"compose_app_env:{key}")
+    for name in addon_cfg.compose_app_depends_on:
+        if add_compose_app_depends_on(
+            manifest, name, source=EntrySource.ADDON, addon=addon_id
+        ):
+            adopted.append(f"compose_app_depends_on:{name}")
     for dep in addon_cfg.deps:
         pkg = dep_package_name(dep)
         if add_dependency(
@@ -336,6 +374,31 @@ def record_addon_manifest_entries(
 # ── Fingerprinting ────────────────────────────────────────────────────────────
 
 
+def _try_canonicalise_fragment(code: str) -> str | None:
+    """Attempt to produce canonical libcst output for a code fragment.
+
+    Tries three approaches in order:
+    1. Parse ``code`` directly as a full module.
+    2. Wrap as a class body (``class _Stub:\n    <code>``).
+    3. Wrap as a function body (``def _stub():\n    <code>``).
+
+    Returns canonical code on success, ``None`` if all attempts fail.
+    """
+    import libcst
+
+    for wrapped in (
+        code,
+        f"class _Stub:\n    {code}",
+        f"def _stub():\n    {code}",
+    ):
+        try:
+            module = libcst.parse_module(wrapped)
+            return module.code
+        except Exception:
+            continue
+    return None
+
+
 def fingerprint(code: str) -> tuple[str, str]:
     """Return ``(fingerprint, fingerprint_normalised)`` for *code*.
 
@@ -345,23 +408,13 @@ def fingerprint(code: str) -> tuple[str, str]:
     Do NOT change ``_normalise`` without bumping ``MANIFEST_SCHEMA_VERSION``.
 
     If *code* is not a valid Python module (e.g. a class-body fragment such as
-    a single annotated attribute), libcst round-tripping is skipped and the
-    raw text is hashed directly.  This means the hash is computed without a
-    canonical libcst round-trip: Stage A and B removal will not match, and
-    removal will fall through to Stage C (fuzzy match).
-
-    This is an explicit trade-off: fingerprinting must not crash on fragments,
-    but removal precision degrades for syntactically invalid blocks.
+    a single annotated attribute), the function tries to wrap the fragment in a
+    valid Python construct before falling back to raw-text hashing.  The
+    fallback means Stage A and B removal may not match, and removal falls
+    through to Stage C (fuzzy match).
     """
-    try:
-        import libcst
-
-        module = libcst.parse_module(code)
-        canonical = module.code
-    except Exception:
-        # Class-body fragments (e.g. single annotated attributes) are not
-        # valid modules. Fall back to raw text so fingerprinting doesn't
-        # crash, but note that Stage A/B removal may fall through to fuzzy.
+    canonical = _try_canonicalise_fragment(code)
+    if canonical is None:
         canonical = code
     raw_hash = hashlib.sha256(canonical.encode()).hexdigest()
     norm_hash = hashlib.sha256(_normalise(canonical).encode()).hexdigest()
@@ -440,6 +493,18 @@ def _encode_manifest(m: Manifest) -> tomlkit.items.Table:
         tbl,
         m.compose_volumes,
         "compose_volumes",
+        [("name", "name"), ("source", "source"), ("addon", "addon")],
+    )
+    _encode_section(
+        tbl,
+        m.compose_app_env,
+        "compose_app_env",
+        [("key", "key"), ("source", "source"), ("addon", "addon")],
+    )
+    _encode_section(
+        tbl,
+        m.compose_app_depends_on,
+        "compose_app_depends_on",
         [("name", "name"), ("source", "source"), ("addon", "addon")],
     )
     _encode_section(
@@ -556,6 +621,26 @@ def _decode_manifest(raw: dict[str, Any]) -> Manifest:
     m.compose_volumes = _decode_section(
         raw,
         "compose_volumes",
+        OwnedEntry,
+        [
+            ("name", "name", "", None),
+            ("source", "source", "", _parse_source),
+            ("addon", "addon", "", None),
+        ],
+    )
+    m.compose_app_env = _decode_section(
+        raw,
+        "compose_app_env",
+        EnvEntry,
+        [
+            ("key", "key", "", None),
+            ("source", "source", "", _parse_source),
+            ("addon", "addon", "", None),
+        ],
+    )
+    m.compose_app_depends_on = _decode_section(
+        raw,
+        "compose_app_depends_on",
         OwnedEntry,
         [
             ("name", "name", "", None),

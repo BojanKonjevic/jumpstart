@@ -51,6 +51,8 @@ config = AddonConfig(
         )
     ],
     compose_volumes=["redis-data"],
+    compose_app_env={"REDIS_URL": "redis://redis:6379/0"},
+    compose_app_depends_on={"redis": {"condition": "service_healthy"}},
     env_vars=[
         EnvVar(key="REDIS_URL", default="redis://localhost:6379/0"),
     ],

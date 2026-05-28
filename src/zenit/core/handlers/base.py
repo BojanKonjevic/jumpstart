@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from abc import ABC, abstractmethod
 from collections.abc import Callable
 from pathlib import Path
@@ -7,10 +8,14 @@ from pathlib import Path
 from zenit.core.filesystem import atomic_write_text
 from zenit.schema.models import ManifestBlock
 
+logger = logging.getLogger(__name__)
+
 
 def _ensure_trailing_newline(content_lines: list[str]) -> list[str]:
     """Ensure the last line ends with a newline."""
-    if content_lines and not content_lines[-1].endswith("\n"):
+    if not content_lines or (len(content_lines) == 1 and content_lines[0] == ""):
+        return content_lines
+    if not content_lines[-1].endswith("\n"):
         content_lines[-1] += "\n"
     return content_lines
 
@@ -40,6 +45,16 @@ class FileHandler(ABC):
         e = int(end_str) - 1
         if e >= len(lines):
             return
+        # Verify the recorded block still matches before deleting
+        if block.fingerprint:
+            import hashlib
+
+            actual = hashlib.sha256("".join(lines[s : e + 1]).encode()).hexdigest()
+            if f"sha256:{actual}" != block.fingerprint:
+                logger.warning(
+                    "Block content has changed since injection — skipping removal"
+                )
+                return
         new_lines = lines[:s] + lines[e + 1 :]
         atomic_write_text(file, "".join(new_lines))
 

@@ -26,7 +26,7 @@ from zenit.core.handlers.locators import (
 from zenit.core.handlers.python_handler import (
     InjectionError,
     RemovalError,
-    _collapse_blank_lines,
+    _collapse_boundary_blank_lines,
     apply,
     remove,
 )
@@ -448,22 +448,22 @@ def test_remove_empty_block_is_noop(tmp_path: Path) -> None:
     assert f.exists()
 
 
-# ── _collapse_blank_lines() ───────────────────────────────────────────────────
+# ── _collapse_boundary_blank_lines() ──────────────────────────────────────────
 
 
-def test_collapse_blank_lines_collapses_three_to_two() -> None:
+def test_collapse_boundary_blank_lines_collapses_three_to_two_at_boundary() -> None:
     lines = ["a\n", "\n", "\n", "\n", "b\n"]
-    result = _collapse_blank_lines(lines)
+    result = _collapse_boundary_blank_lines(lines, 1, 4)
     assert result == ["a\n", "\n", "\n", "b\n"]
 
 
-def test_collapse_blank_lines_leaves_two_unchanged() -> None:
+def test_collapse_boundary_blank_lines_leaves_two_unchanged() -> None:
     lines = ["a\n", "\n", "\n", "b\n"]
-    result = _collapse_blank_lines(lines)
+    result = _collapse_boundary_blank_lines(lines, 1, 4)
     assert result == ["a\n", "\n", "\n", "b\n"]
 
 
-def test_collapse_blank_lines_preserves_non_blank() -> None:
+def test_collapse_boundary_blank_lines_preserves_non_blank() -> None:
     lines = ["import os\n", "import sys\n", "class Foo:\n", "    pass\n"]
-    result = _collapse_blank_lines(lines)
+    result = _collapse_boundary_blank_lines(lines, 0, 4)
     assert result == lines

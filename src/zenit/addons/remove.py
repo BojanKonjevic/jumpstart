@@ -48,11 +48,13 @@ from zenit.core.manifest import (
 )
 from zenit.core.pkg_name import normalise_pkg_name, resolve_dest_placeholder
 from zenit.core.render import build_render_vars, make_env
+from zenit.core.rollback import addon_or_rollback
 from zenit.core.yaml_utils import compose_yaml_dumps, compose_yaml_load
 from zenit.schema.exceptions import ZenitError
 from zenit.schema.models import (
     AddonConfig,
     ComposeService,
+    FileContribution,
     Manifest,
     ManifestBlock,
 )
@@ -182,88 +184,90 @@ def remove_addon(
         else:
             warn("Non-interactive mode — proceeding automatically.")
 
-    # ── files ──────────────────────────────────────────────────────────────
-    removed_files = _remove_files(project_dir, addon_cfg, pkg_name)
+    # ── destructive operations (wrapped in rollback context) ─────────────────
+    with addon_or_rollback(project_dir, addon_id):
+        # ── files ──────────────────────────────────────────────────────────────
+        removed_files = _remove_files(project_dir, addon_cfg, pkg_name)
 
-    # ── restore template files that this addon had overridden ──────────────
-    remaining_addons = [a for a in lockfile.addons if a != addon_id]
-    _restore_overridden_template_files(
-        project_dir,
-        template,
-        pkg_name,
-        project_dir.name,
-        removed_files,
-        remaining_addons,
-    )
-
-    # ── injections (physical removal only — manifest written at the end) ────
-    _undo_injections_physical(project_dir, manifest, addon_id)
-
-    # ── compose services ────────────────────────────────────────────────────
-    # Docker owns all compose entries in the manifest, but _refresh_compose
-    # keeps compose.yml in sync with the current set of installed addons.
-    if addon_id == "docker":
-        # Docker removal: _remove_files deletes compose.yml entirely.
-        removed_services = []
-    elif "docker" in lockfile.addons:
-        # Reconcile compose.yml based on remaining addons.
-        from zenit.addons.add import _refresh_compose
-
-        ctx_for_refresh = Context(
-            name=project_dir.name,
-            pkg_name=pkg_name,
-            template=lockfile.template,
-            addons=[a for a in lockfile.addons if a != addon_id],
-            zenit_root=get_zenit_root(),
-            project_dir=project_dir,
-        )
-        _refresh_compose(ctx_for_refresh, project_dir, manifest)
-        removed_services = [s.name for s in addon_cfg.compose_services]
-    else:
-        # Legacy: no docker installed, remove per-addon as before.
-        removed_services = _remove_compose_services(
+        # ── restore template files that this addon had overridden ──────────────
+        remaining_addons = [a for a in lockfile.addons if a != addon_id]
+        _restore_overridden_template_files(
             project_dir,
-            manifest,
-            addon_id,
-            addon_services=addon_cfg.compose_services,
+            template,
+            pkg_name,
+            project_dir.name,
+            removed_files,
+            remaining_addons,
         )
-        _remove_compose_volumes(
+
+        # ── injections (physical removal only — manifest written at the end) ────
+        _undo_injections_physical(project_dir, manifest, addon_id)
+
+        # ── compose services ────────────────────────────────────────────────────
+        # Docker owns all compose entries in the manifest, but _refresh_compose
+        # keeps compose.yml in sync with the current set of installed addons.
+        if addon_id == "docker":
+            # Docker removal: _remove_files deletes compose.yml entirely.
+            removed_services = []
+        elif "docker" in lockfile.addons:
+            # Reconcile compose.yml based on remaining addons.
+            from zenit.addons.add import _refresh_compose
+
+            ctx_for_refresh = Context(
+                name=project_dir.name,
+                pkg_name=pkg_name,
+                template=lockfile.template,
+                addons=[a for a in lockfile.addons if a != addon_id],
+                zenit_root=get_zenit_root(),
+                project_dir=project_dir,
+            )
+            _refresh_compose(ctx_for_refresh, project_dir, manifest)
+            removed_services = [s.name for s in addon_cfg.compose_services]
+        else:
+            # Legacy: no docker installed, remove per-addon as before.
+            removed_services = _remove_compose_services(
+                project_dir,
+                manifest,
+                addon_id,
+                addon_services=addon_cfg.compose_services,
+            )
+            _remove_compose_volumes(
+                project_dir,
+                manifest,
+                addon_id,
+                addon_volumes=addon_cfg.compose_volumes,
+            )
+
+        # ── env vars ─────────────────────────────────────────────────────────────
+        removed_env_vars = _remove_env_vars(project_dir, manifest, addon_id)
+
+        # ── deps ──────────────────────────────────────────────────────────────
+        removed_deps, removed_dev_deps = _remove_deps(project_dir, manifest, addon_id)
+
+        # ── justfile recipes ──────────────────────────────────────────────────
+        removed_recipes = _remove_just_recipes(project_dir, manifest, addon_id)
+
+        # ── ruff excludes ────────────────────────────────────────────────────
+        removed_ruff_excludes = _remove_ruff_excludes(project_dir, manifest, addon_id)
+
+        # ── tool overrides ───────────────────────────────────────────────────
+        removed_tool_overrides = _remove_tool_overrides(project_dir, manifest, addon_id)
+
+        # ── manifest (written once, after all physical removals succeed) ────────
+        remove_blocks_for_addon(manifest, addon_id)
+        write_manifest(project_dir, manifest)
+
+        # ── lockfile ──────────────────────────────────────────────────────────
+        new_addons = [a for a in lockfile.addons if a != addon_id]
+        write_lockfile(
             project_dir,
-            manifest,
-            addon_id,
-            addon_volumes=addon_cfg.compose_volumes,
+            template,
+            new_addons,
+            template_source=lockfile.template_source,
+            template_uri=lockfile.template_uri,
+            template_has_tasks=lockfile.template_has_tasks,
+            template_file_paths=lockfile.template_file_paths,
         )
-
-    # ── env vars ─────────────────────────────────────────────────────────────
-    removed_env_vars = _remove_env_vars(project_dir, manifest, addon_id)
-
-    # ── deps ──────────────────────────────────────────────────────────────
-    removed_deps, removed_dev_deps = _remove_deps(project_dir, manifest, addon_id)
-
-    # ── justfile recipes ──────────────────────────────────────────────────
-    removed_recipes = _remove_just_recipes(project_dir, manifest, addon_id)
-
-    # ── ruff excludes ────────────────────────────────────────────────────
-    removed_ruff_excludes = _remove_ruff_excludes(project_dir, manifest, addon_id)
-
-    # ── tool overrides ───────────────────────────────────────────────────
-    removed_tool_overrides = _remove_tool_overrides(project_dir, manifest, addon_id)
-
-    # ── manifest (written once, after all physical removals succeed) ────────
-    remove_blocks_for_addon(manifest, addon_id)
-    write_manifest(project_dir, manifest)
-
-    # ── lockfile ──────────────────────────────────────────────────────────
-    new_addons = [a for a in lockfile.addons if a != addon_id]
-    write_lockfile(
-        project_dir,
-        template,
-        new_addons,
-        template_source=lockfile.template_source,
-        template_uri=lockfile.template_uri,
-        template_has_tasks=lockfile.template_has_tasks,
-        template_file_paths=lockfile.template_file_paths,
-    )
 
     # ── output ────────────────────────────────────────────────────────────
     print()
@@ -328,6 +332,25 @@ def remove_addon(
 # This separation keeps each removal path simple and explicit.
 
 
+def _file_content_matches_contribution(full: Path, fc: FileContribution) -> bool:
+    """Check if *full*'s current content matches what the addon contributed.
+
+    Only checks non-template inline content and source-file content (template
+    content requires render vars that aren't available at remove time).
+    """
+    if fc.template:
+        return True
+    if fc.content is not None:
+        return full.read_text(encoding="utf-8") == fc.content
+    if fc.source is not None:
+        try:
+            src = Path(fc.source).read_text(encoding="utf-8")
+            return full.read_text(encoding="utf-8") == src
+        except OSError:
+            return True
+    return True
+
+
 def _remove_files(
     project_dir: Path, addon_cfg: AddonConfig, pkg_name: str
 ) -> list[str]:
@@ -342,6 +365,10 @@ def _remove_files(
             continue
         full = project_dir / dest
         if full.exists():
+            if not _file_content_matches_contribution(full, fc):
+                warn(
+                    f"'{dest}' was modified since addon installation — deleting anyway"
+                )
             full.unlink()
             removed.append(dest)
             _prune_empty_parents(full.parent, project_dir)
@@ -635,10 +662,10 @@ def _remove_deps(
         removed = []
 
     _dev_doc = doc.get("dependency-groups", {})
-    _dev_group = _dev_doc.get("dev")
-    dev_group = _dev_group or doc.get("project", {}).get(
-        "optional-dependencies", {}
-    ).get("dev")
+    if "dev" in _dev_doc:
+        dev_group = _dev_doc["dev"]
+    else:
+        dev_group = doc.get("project", {}).get("optional-dependencies", {}).get("dev")
     if isinstance(dev_group, (list, Array)):
         removed_dev, kept_dev = _partition_deps(
             [str(d) for d in dev_group], dev_deps_to_remove

@@ -27,8 +27,8 @@ def _block(lines: str, file: Path) -> ManifestBlock:
         point="toml_section",
         file=str(file),
         lines=lines,
-        fingerprint="sha256:abc",
-        fingerprint_normalised="sha256:def",
+        fingerprint="",
+        fingerprint_normalised="",
         locator=LocatorSpec(name=LOCATOR_AT_FILE_END, args={}),
     )
 
