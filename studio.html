@@ -1783,6 +1783,10 @@ function getAllAddons() {
   return [...selected, ...autoDeps].map(id => ADDONS.find(a=>a.id===id)).filter(Boolean);
 }
 
+function hasDocker() {
+  return getAllAddons().some(a => a.id === 'docker');
+}
+
 function getStepCounts() {
   const addons = getAllAddons();
   const tplFiles   = TEMPLATE_FILES[currentTpl] || [];
@@ -1791,7 +1795,7 @@ function getStepCounts() {
   const deps       = addons.flatMap(a => a.deps||[]);
   const envVars    = addons.flatMap(a => a.envVars||[]);
   const recipes    = addons.flatMap(a => a.recipes||[]);
-  const services   = addons.flatMap(a => a.composeServices||[]);
+  const services   = addons.flatMap(a => a.id === 'docker' || !hasDocker() ? [] : a.composeServices||[]);
   return [tplFiles.length, addonFiles.length, injections.length, deps.length,
           envVars.length, recipes.length, services.length, null, null];
 }
@@ -1824,7 +1828,7 @@ function buildAssemblyDOM() {
   const deps       = addons.flatMap(a => (a.deps||[]).map(d=>({dep:d, addon:a.id, col:a.col})));
   const envVars    = addons.flatMap(a => (a.envVars||[]).map(v=>({v, addon:a.id, col:a.col})));
   const recipes    = addons.flatMap(a => (a.recipes||[]).map(r=>({r, addon:a.id, col:a.col})));
-  const services   = addons.flatMap(a => (a.composeServices||[]).map(s=>({s, addon:a.id, col:a.col})));
+  const services   = addons.flatMap(a => a.id === 'docker' || !hasDocker() ? [] : (a.composeServices||[]).map(s=>({s, addon:a.id, col:a.col})));
 
   const sections = [
     mkSection(1, 'template files', tplFiles.length, mkFilesBody(tplFiles)),
