@@ -3,8 +3,6 @@ recording context that captures every file operation without touching disk."""
 
 from __future__ import annotations
 
-import sys
-
 from zenit.addons._registry import get_addon, list_addons
 from zenit.cli.ui import (
     BOLD,
@@ -58,7 +56,6 @@ def run_dry(ctx: Context) -> None:
     ]
 
     contributions = collect_all(template_config, selected_addon_configs)
-    python_version = f"{sys.version_info.major}.{sys.version_info.minor}"
 
     render_vars = build_render_vars(
         name=ctx.name,
@@ -66,8 +63,7 @@ def run_dry(ctx: Context) -> None:
         template=ctx.template,
         addons=dry_ctx.addons,
         deps=contributions.deps,
-        dev_deps=contributions.dev_deps,
-        python_version=python_version,
+        dev_deps=contributions.template_dev_deps + contributions.dev_deps,
     )
 
     apply_contributions(

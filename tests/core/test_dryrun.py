@@ -237,6 +237,9 @@ def test_recorded_files_is_list_of_tuples(tmp_path):
         assert isinstance(details, str)
 
 
-def test_run_dry_blank_recorded_files_are_non_empty(tmp_path):
+def test_run_dry_blank_recorded_files_are_non_empty(tmp_path, capsys):
     ctx = _real_ctx(tmp_path, template="blank")
     run_dry(ctx)
+    captured = capsys.readouterr()
+    assert "Files that would be created" in captured.out
+    assert "main.py" in captured.out

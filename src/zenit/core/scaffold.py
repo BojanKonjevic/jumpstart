@@ -16,7 +16,7 @@ from zenit.core._apply_loader import load_apply
 from zenit.core._paths import get_zenit_root
 from zenit.core.apply import apply_contributions
 from zenit.core.collect import collect_all
-from zenit.core.constants import _RECIPE_NAME_RE
+from zenit.core.constants import RECIPE_NAME_RE
 from zenit.core.context import Context
 from zenit.core.dryrun import run_dry
 from zenit.core.filesystem import RealFileSystem
@@ -150,7 +150,6 @@ def scaffold_project(
 
         contributions = collect_all(template_config, selected_addon_configs)
 
-        python_version = f"{sys.version_info.major}.{sys.version_info.minor}"
         render_vars = build_render_vars(
             name=name,
             pkg_name=pkg_name,
@@ -158,7 +157,6 @@ def scaffold_project(
             addons=adns,
             deps=contributions.deps,
             dev_deps=contributions.template_dev_deps + contributions.dev_deps,
-            python_version=python_version,
         )
 
         write_lockfile(project_dir, tpl, adns)
@@ -170,7 +168,7 @@ def scaffold_project(
             template_config.injection_points,
             render_vars,
         )
-        generate_all(ctx, fs, contributions, python_version=python_version)
+        generate_all(ctx, fs, contributions)
 
         manifest = read_manifest(project_dir)
         string_env = make_env()
@@ -255,7 +253,7 @@ def _stamp_template_manifest(
         )
 
     for recipe_raw in template_config.just_recipes:
-        m = _RECIPE_NAME_RE.search(recipe_raw)
+        m = RECIPE_NAME_RE.search(recipe_raw)
         if m:
             add_just_recipe(manifest, m.group(1), source=EntrySource.TEMPLATE, addon="")
 

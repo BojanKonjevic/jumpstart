@@ -32,6 +32,35 @@ def _add_deps_if_missing(
     return added
 
 
+def _resolve_dev_target(
+    doc: tomlkit.TOMLDocument,
+) -> tuple[list[str], set[str]] | None:
+    """Find the dev-dependency list in either ``[dependency-groups]`` or
+    ``[project.optional-dependencies]``. Returns ``(list, existing_names)``
+    or ``None`` if neither section exists."""
+    if "dependency-groups" in doc:
+        group = cast(Container, doc["dependency-groups"])
+        existing_dev = group.get("dev")
+        if existing_dev is None:
+            existing_dev = tomlkit.array()
+            group["dev"] = existing_dev
+        existing_dev = cast(list[str], existing_dev)
+        existing_names = {dep_package_name(str(d)) for d in existing_dev}
+        return existing_dev, existing_names
+
+    if "project" in doc and "optional-dependencies" in cast(Container, doc["project"]):
+        opt = cast(Container, cast(Container, doc["project"])["optional-dependencies"])
+        existing_dev = opt.get("dev")
+        if existing_dev is None:
+            existing_dev = tomlkit.array()
+            opt["dev"] = existing_dev
+        existing_dev = cast(list[str], existing_dev)
+        existing_names = {dep_package_name(str(d)) for d in existing_dev}
+        return existing_dev, existing_names
+
+    return None
+
+
 def inject_deps(
     project_dir: Path,
     deps: list[str],
@@ -71,32 +100,12 @@ def inject_deps(
     # ── dev deps ──────────────────────────────────────────────────────────────
     # Support both [dependency-groups] dev (PEP 735 / uv style) and
     # [project.optional-dependencies] dev.
-    if "dependency-groups" in doc:
-        group = cast(Container, doc["dependency-groups"])
-        existing_dev = group.get("dev")
-        if existing_dev is None:
-            existing_dev = tomlkit.array()
-            group["dev"] = existing_dev
-        existing_dev = cast(list[str], existing_dev)
-        existing_dev_names = {dep_package_name(str(d)) for d in existing_dev}
+    dev_target = _resolve_dev_target(doc)
+    if dev_target is not None:
+        existing_dev, existing_dev_names = dev_target
         added_dev_deps = _add_deps_if_missing(
             existing_dev, existing_dev_names, dev_deps
         )
-
-    elif "project" in doc and "optional-dependencies" in cast(
-        Container, doc["project"]
-    ):
-        opt = cast(Container, cast(Container, doc["project"])["optional-dependencies"])
-        existing_dev = opt.get("dev")
-        if existing_dev is None:
-            existing_dev = tomlkit.array()
-            opt["dev"] = existing_dev
-        existing_dev = cast(list[str], existing_dev)
-        existing_dev_names = {dep_package_name(str(d)) for d in existing_dev}
-        added_dev_deps = _add_deps_if_missing(
-            existing_dev, existing_dev_names, dev_deps
-        )
-
     else:
         added_dev_deps = []
 

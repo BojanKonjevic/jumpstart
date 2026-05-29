@@ -23,7 +23,7 @@ from zenit.core._filenames import (
 )
 from zenit.core._paths import get_zenit_root
 from zenit.core.collect import collect_all
-from zenit.core.constants import _RECIPE_NAME_RE
+from zenit.core.constants import RECIPE_NAME_RE
 from zenit.core.lockfile import SCHEMA_VERSION, ZenitLockfile, read_lockfile
 from zenit.core.manifest import dep_package_name, read_manifest, write_manifest
 from zenit.core.pkg_name import normalise_pkg_name, resolve_dest_placeholder
@@ -392,7 +392,7 @@ def _check_manifest_recipes(
         return result
 
     text = justfile_path.read_text(encoding="utf-8")
-    existing_names = set(_RECIPE_NAME_RE.findall(text))
+    existing_names = set(RECIPE_NAME_RE.findall(text))
 
     missing: list[OwnedEntry] = []
     for entry in manifest.just_recipes:

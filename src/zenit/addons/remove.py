@@ -31,7 +31,7 @@ from zenit.cli.ui import (
 )
 from zenit.core._filenames import COMPOSE_FILE, ENV_FILES, JUSTFILE_NAME, PYPROJECT_FILE
 from zenit.core._paths import get_zenit_root
-from zenit.core.constants import _RECIPE_NAME_RE
+from zenit.core.constants import RECIPE_NAME_RE
 from zenit.core.context import Context
 from zenit.core.dependency import DependencyGraph
 from zenit.core.filesystem import atomic_write_text
@@ -177,11 +177,8 @@ def remove_addon(
         if raw not in ("", "y", "yes"):
             warn("Aborted.")
             raise typer.Exit(0)
-    else:
-        if yes:
-            pass
-        else:
-            warn("Non-interactive mode — proceeding automatically.")
+    elif not yes:
+        warn("Non-interactive mode — proceeding automatically.")
 
     # ── destructive operations (wrapped in rollback context) ─────────────────
     with addon_or_rollback(project_dir, addon_id):
@@ -395,7 +392,7 @@ def _remove_files(
     return removed
 
 
-_ADDONS_CONDITIONAL_RE = re.compile(r'\[\%\s+if\s+"(\w+)"\s+in\s+addons')
+_ADDONS_CONDITIONAL_RE = re.compile(r'\[\%\s+if\s+"([a-zA-Z0-9_-]+)"\s+in\s+addons')
 
 
 def _check_addons_drift(
@@ -823,7 +820,7 @@ def _parse_justfile_blocks(lines: list[str]) -> list[_JustBlock]:
 
         elif not line[0].isspace() and not stripped.startswith("#") and ":" in stripped:
             # Recipe header
-            m = _RECIPE_NAME_RE.match(stripped)
+            m = RECIPE_NAME_RE.match(stripped)
             name = m.group(1) if m else ""
             recipe_lines = pending_attrs + [line]
             pending_attrs = []

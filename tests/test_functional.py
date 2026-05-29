@@ -52,7 +52,12 @@ class TestBlankFunctional:
         return project_dir
 
     def test_uv_sync_succeeds(self, blank_project: Path) -> None:
-        pass
+        result = _uv("sync", "--frozen", cwd=blank_project)
+        assert result.returncode == 0, (
+            f"uv sync --frozen failed in scaffolded blank project:\n"
+            f"stdout:\n{result.stdout}\n"
+            f"stderr:\n{result.stderr}"
+        )
 
     def test_pytest_passes(self, blank_project: Path) -> None:
         result = _uv("run", "pytest", "-v", cwd=blank_project)
@@ -111,7 +116,12 @@ class TestBlankDockerFunctional:
         return project_dir
 
     def test_uv_sync_succeeds(self, blank_docker_project: Path) -> None:
-        pass
+        result = _uv("sync", "--frozen", cwd=blank_docker_project)
+        assert result.returncode == 0, (
+            f"uv sync --frozen failed in blank+docker project:\n"
+            f"stdout:\n{result.stdout}\n"
+            f"stderr:\n{result.stderr}"
+        )
 
     def test_pytest_passes(self, blank_docker_project: Path) -> None:
         result = _uv("run", "pytest", "-v", cwd=blank_docker_project)

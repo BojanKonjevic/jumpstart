@@ -338,9 +338,6 @@ def _reconcile_app_service_env(
             del app_svc["environment"]
     elif active_env:
         app_svc["environment"] = dict(active_env)
-    elif current_env is not None and not isinstance(current_env, dict):
-        pass
-
     # 4c. Update manifest entries for compose_app_env
     manifest.compose_app_env = [
         e for e in manifest.compose_app_env if e.key not in stale_env_keys
@@ -368,9 +365,6 @@ def _reconcile_app_service_env(
             del app_svc["depends_on"]
     elif active_dep:
         app_svc["depends_on"] = dict(active_dep)
-    elif current_dep is not None and not isinstance(current_dep, dict):
-        pass
-
     # 4f. Update manifest entries for compose_app_depends_on
     manifest.compose_app_depends_on = [
         e for e in manifest.compose_app_depends_on if e.name not in stale_dep_names
@@ -525,11 +519,8 @@ def add_addon(
         if raw not in ("", "y", "yes"):
             warn("Aborted.")
             raise typer.Exit(0)
-    else:
-        if yes:
-            pass
-        else:
-            warn("Non‑interactive mode — proceeding automatically.")
+    elif not yes:
+        warn("Non‑interactive mode — proceeding automatically.")
 
     with addon_or_rollback(project_dir, addon_id):
         ctx = Context(

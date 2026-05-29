@@ -5,11 +5,9 @@ from __future__ import annotations
 import dataclasses
 import functools
 import importlib.util
-import sys
 import tomllib
 from pathlib import Path
 
-from zenit.core.dependency import DependencyGraph
 from zenit.schema.exceptions import ZenitError
 from zenit.schema.models import AddonConfig, AddonHooks, AddonMeta
 
@@ -68,13 +66,3 @@ def get_addon(addon_id: str) -> AddonConfig:
         can_remove=getattr(mod, "can_remove", None),
     )
     return dataclasses.replace(cfg, _module=hooks)
-
-
-def _validate_addons(addons: list[AddonConfig]) -> None:
-    """Check all registered addons for cycles / missing deps; warn on failure."""
-    graph = DependencyGraph.build(addons)
-    errors = graph.validate()
-    if errors:
-        for err in errors:
-            msg = f"[addon registry] {err.message}"
-            print(msg, file=sys.stderr)

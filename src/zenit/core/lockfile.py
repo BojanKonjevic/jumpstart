@@ -25,6 +25,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 import tomlkit
+import tomlkit.items
 
 from zenit.core._filenames import LOCKFILE_NAME
 from zenit.core.filesystem import atomic_write_text
@@ -33,6 +34,7 @@ if TYPE_CHECKING:
     from zenit.schema.models import Manifest
 
 SCHEMA_VERSION = 4
+VALID_TEMPLATE_SOURCES: frozenset[str] = frozenset({"native", "copier"})
 
 
 @dataclass
@@ -45,6 +47,40 @@ class ZenitLockfile:
     template_uri: str = ""
     template_has_tasks: bool = False
     template_file_paths: list[str] = field(default_factory=list)
+
+
+def _build_project_table(
+    template: str,
+    addons: list[str],
+    template_source: str = "native",
+    template_uri: str = "",
+    template_has_tasks: bool = False,
+    template_file_paths: list[str] | None = None,
+) -> tomlkit.items.Table:
+    """Build a ``[project]`` table with the standard fields."""
+    try:
+        zenit_version = get_version("zenit")
+    except Exception:
+        zenit_version = "dev"
+
+    table = tomlkit.table()
+    table.add("template", template)
+    table.add("addons", list(addons))
+    table.add("zenit_version", zenit_version)
+    table.add("schema_version", SCHEMA_VERSION)
+    if template_source != "native":
+        table.add("template_source", template_source)
+    if template_uri:
+        table.add("template_uri", template_uri)
+    if template_has_tasks:
+        table.add("template_has_tasks", template_has_tasks)
+    if template_file_paths:
+        arr = tomlkit.array()
+        arr.multiline(True)
+        for p in template_file_paths:
+            arr.append(p)
+        table.add("template_file_paths", arr)
+    return table
 
 
 def write_lockfile(
@@ -62,41 +98,15 @@ def write_lockfile(
     Uses tomlkit round-trip so any other sections already in the file
     (e.g. [manifest]) are preserved exactly.
     """
-    try:
-        zenit_version = get_version("zenit")
-    except Exception:
-        zenit_version = "dev"
-
-    path = project_dir / LOCKFILE_NAME
-    doc = (
-        tomlkit.parse(path.read_text(encoding="utf-8"))
-        if path.exists()
-        else tomlkit.document()
+    write_zenit_toml(
+        project_dir,
+        template=template,
+        addons=addons,
+        template_source=template_source,
+        template_uri=template_uri,
+        template_has_tasks=template_has_tasks,
+        template_file_paths=template_file_paths,
     )
-
-    project = tomlkit.table()
-    project.add("template", template)
-    project.add("addons", list(addons))
-    project.add("zenit_version", zenit_version)
-    project.add("schema_version", SCHEMA_VERSION)
-    if template_source != "native":
-        project.add("template_source", template_source)
-    if template_uri:
-        project.add("template_uri", template_uri)
-    if template_has_tasks:
-        project.add("template_has_tasks", template_has_tasks)
-    if template_file_paths:
-        file_paths = tomlkit.array()
-        file_paths.multiline(True)
-        for p in template_file_paths:
-            file_paths.append(p)
-        project.add("template_file_paths", file_paths)
-    doc["project"] = project
-
-    # Remove legacy [migrated] section if it exists
-    doc.pop("migrated", None)
-
-    atomic_write_text(path, tomlkit.dumps(doc))
 
 
 def write_zenit_toml(
@@ -128,30 +138,14 @@ def write_zenit_toml(
     )
 
     if template is not None:
-        try:
-            zenit_version = get_version("zenit")
-        except Exception:
-            zenit_version = "dev"
-
-        project = tomlkit.table()
-        project.add("template", template)
-        project.add("addons", list(addons or []))
-        project.add("zenit_version", zenit_version)
-        project.add("schema_version", SCHEMA_VERSION)
-        if template_source != "native":
-            project.add("template_source", template_source)
-        if template_uri:
-            project.add("template_uri", template_uri)
-        if template_has_tasks:
-            project.add("template_has_tasks", template_has_tasks)
-        if template_file_paths is not None:
-            file_paths = tomlkit.array()
-            file_paths.multiline(True)
-            for p in template_file_paths:
-                file_paths.append(p)
-            project.add("template_file_paths", file_paths)
-        doc["project"] = project
-
+        doc["project"] = _build_project_table(
+            template,
+            addons or [],
+            template_source=template_source,
+            template_uri=template_uri,
+            template_has_tasks=template_has_tasks,
+            template_file_paths=template_file_paths,
+        )
         doc.pop("migrated", None)
 
     if manifest is not None:
@@ -237,7 +231,10 @@ def read_lockfile(project_dir: Path) -> ZenitLockfile | None:
         zenit_version = ""
     if not isinstance(schema_version, int):
         schema_version = 0
-    if template_source not in ("native", "copier"):
+    if (
+        not isinstance(template_source, str)
+        or template_source not in VALID_TEMPLATE_SOURCES
+    ):
         template_source = "native"
     if not isinstance(template_uri, str):
         template_uri = ""

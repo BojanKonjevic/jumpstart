@@ -36,7 +36,7 @@ import tomlkit.items
 from jinja2 import Environment
 
 from zenit.core._filenames import LOCKFILE_NAME
-from zenit.core.constants import _RECIPE_NAME_RE
+from zenit.core.constants import RECIPE_NAME_RE
 from zenit.schema.models import (
     AddonConfig,
     DependencyEntry,
@@ -353,7 +353,7 @@ def record_addon_manifest_entries(
             adopted.append(f"dev_dependency:{pkg}")
     for recipe_raw in addon_cfg.just_recipes:
         rendered = string_env.from_string(recipe_raw).render(**render_vars)
-        m = _RECIPE_NAME_RE.search(rendered)
+        m = RECIPE_NAME_RE.search(rendered)
         if m and add_just_recipe(
             manifest, m.group(1), source=EntrySource.ADDON, addon=addon_id
         ):
