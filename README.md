@@ -47,10 +47,16 @@ Full documentation is available at **[bojankonjevic.github.io/zenit/docs](https:
 
 - [Getting Started](https://bojankonjevic.github.io/zenit/docs/getting-started) — install, create, and run in under five minutes
 - [Architecture](https://bojankonjevic.github.io/zenit/docs/architecture/) — how the manifest, libcst injection, and declarative addons work
-- [Commands](https://bojankonjevic.github.io/zenit/docs/commands/) — `create`, `add`, `remove`, `doctor`, `list`, `config`
+- [Commands](https://bojankonjevic.github.io/zenit/docs/commands/) — `create`, `add`, `remove`, `doctor`, `list`, `config`, `graph`, `migrate`
 - [Templates](https://bojankonjevic.github.io/zenit/docs/templates/) — `blank` and `fastapi`
 - [Addons](https://bojankonjevic.github.io/zenit/docs/addons/) — Docker, Redis, Celery, auth, Sentry, GitHub Actions, SQLAlchemy, PostgreSQL, SQLModel
 - [Contributing](https://bojankonjevic.github.io/zenit/docs/contributing) — coding standards, tests, and how to submit changes
+
+## Studio
+
+Explore templates, browse addons, inspect their files and dependencies, and build commands visually — all in your browser.
+
+**[bojankonjevic.github.io/zenit/studio/](https://bojankonjevic.github.io/zenit/studio/)**
 
 ## Why Zenit?
 
@@ -59,6 +65,8 @@ Full documentation is available at **[bojankonjevic.github.io/zenit/docs](https:
 - **Declarative addons** — addons describe what they add, not arbitrary scripts
 - **Structural injection** — libcst-based code injection that survives formatting
 - **Fingerprint tracking** — every injected block is hashed so removal is exact
+- **Copier migration** — `zenit migrate` imports any Copier template into a Zenit-managed project
+- **Dependency graph** — `zenit graph` renders addon dependencies in the terminal or as DOT/JSON
 
 ## License
 
