@@ -371,8 +371,9 @@ def _remove_files(
         if full.exists():
             if not _file_content_matches_contribution(full, fc):
                 warn(
-                    f"'{dest}' was modified since addon installation — deleting anyway"
+                    f"'{dest}' was modified since addon installation — skipping deletion"
                 )
+                continue
             full.unlink()
             removed.append(dest)
             _prune_empty_parents(full.parent, project_dir)
@@ -394,7 +395,7 @@ def _remove_files(
     return removed
 
 
-_ADDONS_CONDITIONAL_RE = re.compile(r'\[\%\s+if\s+"(\w+)"\s+in\s+addons\s*\%\]')
+_ADDONS_CONDITIONAL_RE = re.compile(r'\[\%\s+if\s+"(\w+)"\s+in\s+addons')
 
 
 def _check_addons_drift(
@@ -503,19 +504,24 @@ def _undo_injections_physical(
     write the manifest — that is the caller's responsibility, once all other
     physical removals have also succeeded.  This keeps manifest writes atomic
     with respect to the full removal sequence.
+
+    Detects overlapping blocks (from different addons or re-injections) and
+    uses ``relocate_block`` for overlapping blocks instead of relying on
+    recorded line numbers, which may be stale after a prior removal shifts
+    the file content.
     """
+
+    from zenit.core.handlers.python_handler import relocate_block
 
     dispatcher = HandlerDispatcher()
 
-    # Group blocks by file and remove bottom-to-top within each file so
-    # that earlier removals don't shift the line numbers of later ones.
+    # Group blocks by file.
     by_file: dict[str, list[ManifestBlock]] = {}
     for b in manifest.python_blocks:
         if b.addon == addon_id:
             by_file.setdefault(b.file, []).append(b)
 
     for file, blocks in by_file.items():
-        blocks.sort(key=lambda b: -int(b.lines.split("-")[0]))
         file_path = project_dir / file
         if not file_path.exists():
             print(
@@ -525,8 +531,46 @@ def _undo_injections_physical(
                 file=sys.stderr,
             )
             continue
-        for block in blocks:
-            dispatcher.remove(file_path, block)
+
+        # Sort bottom-to-top so non-overlapping removals don't shift
+        # subsequent line numbers.
+        blocks.sort(key=lambda b: -int(b.lines.split("-")[0]))
+
+        # Check for pairwise overlap.
+        has_overlap = False
+        parsed_blocks: list[tuple[ManifestBlock, int, int]] = [
+            (b, int(b.lines.split("-")[0]), int(b.lines.split("-")[1])) for b in blocks
+        ]
+        for i in range(len(parsed_blocks)):
+            for j in range(i + 1, len(parsed_blocks)):
+                _, s1, e1 = parsed_blocks[i]
+                _, s2, e2 = parsed_blocks[j]
+                if not (e1 < s2 or e2 < s1):
+                    has_overlap = True
+                    break
+            if has_overlap:
+                break
+
+        if has_overlap:
+            # Overlapping blocks: remove one at a time, re-locating each
+            # subsequent block via its stored locator so we don't rely on
+            # stale line numbers.
+            for block in blocks:
+                relocated = relocate_block(file_path, block)
+                if relocated is None:
+                    dispatcher.remove(file_path, block)
+                else:
+                    # Build a synthetic block with the relocated position
+                    # so the handler's fingerprint cascade still works.
+                    from copy import deepcopy
+
+                    adj = deepcopy(block)
+                    adj.lines = f"{relocated[0]}-{relocated[1]}"
+                    dispatcher.remove(file_path, adj)
+        else:
+            # No overlap — safe to remove bottom-to-top from recorded lines.
+            for block in blocks:
+                dispatcher.remove(file_path, block)
 
 
 def _remove_compose_services(

@@ -137,6 +137,18 @@ def _normalise_for_fuzzy(source: str) -> str:
         return "\n".join(lines)
 
 
+def _content_already_injected(
+    lines: list[str], content_lines: list[str], insertion_line: int
+) -> bool:
+    """Return True if *content_lines* already exist near *insertion_line*."""
+    window_start = max(0, insertion_line - 5)
+    window_end = min(len(lines), insertion_line + len(content_lines) + 5)
+    for i in range(window_start, window_end - len(content_lines) + 1):
+        if lines[i : i + len(content_lines)] == content_lines:
+            return True
+    return False
+
+
 # ── Core apply / remove ───────────────────────────────────────────────────────
 
 
@@ -167,6 +179,10 @@ def apply(
 
     lines = source.splitlines(keepends=True)
     content_lines = _ensure_trailing_newline(content.splitlines(keepends=True))
+
+    # Dedup: skip if content already exists near the insertion point.
+    if _content_already_injected(lines, content_lines, line_number):
+        return source, line_number + 1, line_number + len(content_lines)
 
     new_lines = lines[:line_number] + content_lines + lines[line_number:]
     new_source = "".join(new_lines)
@@ -418,13 +434,15 @@ def _assert_valid_python(file: Path, source: str) -> None:
     """Raise ``RemovalError`` if *source* is not syntactically valid Python.
 
     This is a safety net against removal leaving a corrupted file (e.g. when
-    fuzzy matching picks the wrong block boundaries).
+    fuzzy matching picks the wrong block boundaries).  If this raises, the
+    file is unchanged — no write has occurred.
     """
     try:
         cst.parse_module(source)
     except Exception as exc:
         raise RemovalError(
-            f"Removal left '{file}' with invalid Python syntax and was aborted.\n"
+            f"Removal would leave '{file}' with invalid Python syntax — "
+            f"aborted before writing.\n"
             f"  The injected block could not be located precisely enough.\n"
             f"  Manual steps:\n"
             f"    - Open {file}\n"

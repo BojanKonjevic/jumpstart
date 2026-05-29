@@ -126,10 +126,10 @@ def batch_snapshot(project_dir: Path, label: str = "operation") -> Generator[Non
 # These directories are never modified by addons.  Excluding them from the
 # snapshot eliminates the dominant performance bottleneck (copying a large
 # virtualenv or .git directory can take seconds).
-# _IGNORED_DIR_NAMES is the single source of truth for directory-name patterns;
-# _SNAPSHOT_IGNORE adds the glob pattern for egg-info directories.
+# _SNAPSHOT_EXCLUDE_DIRS is the single source of truth for directory-name
+# patterns; _SNAPSHOT_IGNORE adds the glob pattern for egg-info directories.
 
-_IGNORED_DIR_NAMES = frozenset(
+_SNAPSHOT_EXCLUDE_DIRS = frozenset(
     {
         ".venv",
         "venv",
@@ -145,11 +145,11 @@ _IGNORED_DIR_NAMES = frozenset(
     }
 )
 
-_SNAPSHOT_IGNORE = shutil.ignore_patterns(*_IGNORED_DIR_NAMES, "*.egg-info")
+_SNAPSHOT_IGNORE = shutil.ignore_patterns(*_SNAPSHOT_EXCLUDE_DIRS, "*.egg-info")
 
 
-def _is_ignored_dir(name: str) -> bool:
-    return name in _IGNORED_DIR_NAMES or name.endswith(".egg-info")
+def _is_excluded_dir(name: str) -> bool:
+    return name in _SNAPSHOT_EXCLUDE_DIRS or name.endswith(".egg-info")
 
 
 def _restore_snapshot(snapshot: Path, target: Path) -> None:
@@ -171,12 +171,12 @@ def _remove_orphans(reference: Path, target: Path) -> None:
     """Remove items in *target* that are not in *reference*.
 
     Recurses into directories present in both trees.  Items whose name
-    matches ``_is_ignored_dir`` are never removed since they were excluded
+    matches ``_is_excluded_dir`` are never removed since they were excluded
     from the snapshot at copy time.
     """
     ref_names = {p.name for p in reference.iterdir()} if reference.exists() else set()
     for item in list(target.iterdir()):
-        if item.is_dir() and _is_ignored_dir(item.name):
+        if item.is_dir() and _is_excluded_dir(item.name):
             continue
         if item.name not in ref_names:
             if item.is_dir():

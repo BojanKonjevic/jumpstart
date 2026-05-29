@@ -144,7 +144,7 @@ def write_zenit_toml(
             project.add("template_uri", template_uri)
         if template_has_tasks:
             project.add("template_has_tasks", template_has_tasks)
-        if template_file_paths:
+        if template_file_paths is not None:
             file_paths = tomlkit.array()
             file_paths.multiline(True)
             for p in template_file_paths:

@@ -1,14 +1,13 @@
 from __future__ import annotations
 
-import logging
 from abc import ABC, abstractmethod
 from collections.abc import Callable
 from pathlib import Path
 
+from zenit.cli.ui import warn
 from zenit.core.filesystem import atomic_write_text
+from zenit.schema.exceptions import ZenitError
 from zenit.schema.models import ManifestBlock
-
-logger = logging.getLogger(__name__)
 
 
 def _ensure_trailing_newline(content_lines: list[str]) -> list[str]:
@@ -16,7 +15,9 @@ def _ensure_trailing_newline(content_lines: list[str]) -> list[str]:
     if not content_lines or (len(content_lines) == 1 and content_lines[0] == ""):
         return content_lines
     if not content_lines[-1].endswith("\n"):
-        content_lines[-1] += "\n"
+        result = [*content_lines]
+        result[-1] += "\n"
+        return result
     return content_lines
 
 
@@ -51,10 +52,20 @@ class FileHandler(ABC):
 
             actual = hashlib.sha256("".join(lines[s : e + 1]).encode()).hexdigest()
             if f"sha256:{actual}" != block.fingerprint:
-                logger.warning(
-                    "Block content has changed since injection — skipping removal"
+                warn(
+                    f"Block content has changed since injection — "
+                    f"cannot safely remove from '{file}'."
                 )
-                return
+                raise ZenitError(
+                    f"Block content has changed since injection — "
+                    f"cannot safely remove from '{file}'.\n"
+                    f"  Expected fingerprint: {block.fingerprint}\n"
+                    f"  Actual fingerprint:   sha256:{actual}\n"
+                    f"  Manual steps:\n"
+                    f"    - Open {file}\n"
+                    f"    - Find the code added for point '{block.point}' and remove it\n"
+                    f"    - Run: zenit doctor"
+                )
         new_lines = lines[:s] + lines[e + 1 :]
         atomic_write_text(file, "".join(new_lines))
 

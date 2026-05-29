@@ -111,6 +111,9 @@ def _add_owned_entry(
     If an entry with the same *key_attr* value already exists and has
     ``source == TEMPLATE``, it is adopted (source changed, addon set).
     Returns True if adoption occurred.
+
+    If an ADDON-sourced entry already exists with the same key but a
+    different addon, a warning is emitted and the original is kept.
     """
     existing = next(
         (e for e in container if getattr(e, key_attr) == getattr(entry, key_attr)),
@@ -121,6 +124,13 @@ def _add_owned_entry(
             existing.source = source
             existing.addon = addon
             return True
+        if existing.addon != addon:
+            print(
+                f"Warning: addon '{addon}' declares '{getattr(entry, key_attr)}' "
+                f"which is already declared by addon '{existing.addon}'. "
+                f"Keeping the existing entry.",
+                file=sys.stderr,
+            )
         return False
     entry.source = source
     entry.addon = addon

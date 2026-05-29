@@ -164,6 +164,11 @@ def apply_contributions(
 
         rendered_content = string_env.from_string(content).render(**render_vars)
 
+        # .env files are handled by _merge_env_vars below (contributions.env_vars).
+        # Do NOT route them through the dispatcher to avoid dual env-var paths.
+        if file_path.name.startswith(".env"):
+            continue
+
         _, start_line, end_line = dispatcher.apply(
             file_path,
             rendered_content,
