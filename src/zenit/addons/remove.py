@@ -245,6 +245,24 @@ def remove_addon(
         # ── justfile recipes ──────────────────────────────────────────────────
         removed_recipes = _remove_just_recipes(project_dir, manifest, addon_id)
 
+        # ── backfill recipes when docker is removed (docker → native) ────────
+        if addon_id == "docker":
+            from zenit.addons.add import _backfill_just_recipes
+
+            remaining = [a for a in lockfile.addons if a != addon_id]
+            ctx_for_backfill = Context(
+                name=project_dir.name,
+                pkg_name=pkg_name,
+                template=lockfile.template,
+                addons=remaining,
+                zenit_root=get_zenit_root(),
+                project_dir=project_dir,
+            )
+            backfilled = _backfill_just_recipes(
+                ctx_for_backfill, project_dir, manifest, addon_id
+            )
+            removed_recipes.extend(backfilled)
+
         # ── ruff excludes ────────────────────────────────────────────────────
         removed_ruff_excludes = _remove_ruff_excludes(project_dir, manifest, addon_id)
 

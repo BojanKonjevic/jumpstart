@@ -359,21 +359,24 @@ def test_add_docker_then_postgres_has_recipes(tmp_path, monkeypatch):
 
 
 def test_add_postgres_then_docker_backfills_recipes(tmp_path, monkeypatch):
-    """Postgres first, then docker → recipes are backfilled."""
+    """Postgres first → native recipes; docker added → docker recipes."""
     project_dir = _scaffold(tmp_path, "myapp", "blank", [])
     monkeypatch.chdir(project_dir)
     with suppress_stdin():
         add_addon("postgres")
     justfile_before = (project_dir / "justfile").read_text()
-    assert "wait-db:" not in justfile_before
-    assert "db-create:" not in justfile_before
-    assert "db-reset:" not in justfile_before
+    assert "wait-db:" in justfile_before
+    assert "db-create:" in justfile_before
+    assert "db-reset:" in justfile_before
+    assert "pg_isready" in justfile_before  # native mode
+    assert "docker compose" not in justfile_before
     with suppress_stdin():
         add_addon("docker")
     justfile_after = (project_dir / "justfile").read_text()
     assert "wait-db:" in justfile_after
     assert "db-create:" in justfile_after
     assert "db-reset:" in justfile_after
+    assert "docker compose" in justfile_after  # docker mode
 
 
 def test_add_postgres_then_docker_records_recipes_in_manifest(tmp_path, monkeypatch):

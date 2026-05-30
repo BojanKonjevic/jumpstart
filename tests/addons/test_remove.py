@@ -661,6 +661,31 @@ class TestRemoveAddonIntegration:
         assert not (project_dir / "compose.yml").exists()
         assert not (project_dir / "Dockerfile").exists()
 
+    def test_remove_docker_backfills_native_postgres_recipes(
+        self, tmp_path, monkeypatch
+    ):
+        """Removing docker replaces docker-gated postgres recipes with native ones."""
+        project_dir = _scaffold(tmp_path, "myapp", "blank", ["docker", "postgres"])
+        monkeypatch.chdir(project_dir)
+
+        justfile = (project_dir / "justfile").read_text()
+        assert "docker compose" in justfile  # docker-gated recipes active
+
+        with suppress_stdin():
+            remove_addon("docker", project_dir=project_dir)
+
+        justfile = (project_dir / "justfile").read_text()
+        assert "wait-db:" in justfile
+        assert "db-create:" in justfile
+        assert "db-reset:" in justfile
+        assert "db-drop:" in justfile
+        assert "docker compose" not in justfile  # native mode now
+        assert "pg_isready" in justfile
+        assert "createdb" in justfile
+        assert "dropdb" in justfile
+        assert "docker-up:" not in justfile
+        assert "docker-down:" not in justfile
+
     def test_remove_sqlalchemy_skips_drifted_template_conftest(
         self, tmp_path, monkeypatch
     ):

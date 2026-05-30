@@ -379,18 +379,25 @@ def _backfill_just_recipes(
     manifest: Manifest,
     addon_id: str,
 ) -> list[str]:
-    """Re-render and inject docker-dependent just-recipes for earlier addons.
+    """Re-render just-recipes for earlier addons when the addon set changes.
 
     When Docker is added to a project, addons whose recipes were gated on
     ``[% if "docker" in addons %]`` need their recipes backfilled — they
-    rendered to empty strings during their own add pipeline because docker
-    was not present at the time.
+    rendered to empty strings (or native branches) during their own add
+    pipeline because docker was not present at the time.
 
-    Mirrors how ``_refresh_compose`` backfills compose entries for all
-    installed addons when Docker is (or becomes) available.
+    When Docker is removed from a project, the reverse — docker-gated
+    recipes are replaced with native alternatives from the ``[% else %]``
+    branch, or removed entirely if no native fallback exists.
+
+    Removes existing recipes for each target addon before injecting the
+    re-rendered versions so that ``inject_just_recipes`` doesn't skip them
+    as duplicates.
 
     Returns the list of recipe names that were added to the justfile.
     """
+    from zenit.addons.remove import _remove_just_recipes
+
     python_version = f"{sys.version_info.major}.{sys.version_info.minor}"
     all_added: list[str] = []
 
@@ -401,6 +408,8 @@ def _backfill_just_recipes(
         installed_cfg = get_addon(installed_id)
         if not installed_cfg.just_recipes:
             continue
+
+        _remove_just_recipes(project_dir, manifest, installed_id)
 
         recipe_render_vars = build_recipe_render_vars(
             name=ctx.name,

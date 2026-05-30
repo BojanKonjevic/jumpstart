@@ -60,10 +60,10 @@ config = AddonConfig(
         "python-dotenv",
     ],
     just_recipes=[
-        '[% if "docker" in addons %]# wait until postgres is ready\nwait-db:\n    uv run python scripts/wait_db.py\n[% endif %]',
-        '[% if "docker" in addons %]# start db container and create both databases\ndb-create:\n    docker compose up -d db\n    just wait-db\n    docker compose exec db createdb -U postgres (( pkg_name ))\n    docker compose exec db createdb -U postgres (( pkg_name ))_test\n[% endif %]',
-        '[% if "docker" in addons %]# drop and recreate both databases\ndb-reset:\n    docker compose exec db dropdb -U postgres --if-exists (( pkg_name ))\n    docker compose exec db dropdb -U postgres --if-exists (( pkg_name ))_test\n    just db-create\n[% endif %]',
-        '[% if "docker" in addons %]# drop both databases (keeps container running)\ndb-drop:\n    docker compose exec db dropdb -U postgres --if-exists (( pkg_name ))\n    docker compose exec db dropdb -U postgres --if-exists (( pkg_name ))_test\n[% endif %]',
+        '[% if "docker" in addons %]# wait until postgres is ready\nwait-db:\n    uv run python scripts/wait_db.py\n[% else %]# wait until postgres is ready\nwait-db:\n    pg_isready -U postgres\n[% endif %]',
+        '[% if "docker" in addons %]# start db container and create both databases\ndb-create:\n    docker compose up -d db\n    just wait-db\n    docker compose exec db createdb -U postgres (( pkg_name ))\n    docker compose exec db createdb -U postgres (( pkg_name ))_test\n[% else %]# create both databases\ndb-create:\n    just wait-db\n    createdb -U postgres (( pkg_name ))\n    createdb -U postgres (( pkg_name ))_test\n[% endif %]',
+        '[% if "docker" in addons %]# drop and recreate both databases\ndb-reset:\n    docker compose exec db dropdb -U postgres --if-exists (( pkg_name ))\n    docker compose exec db dropdb -U postgres --if-exists (( pkg_name ))_test\n    just db-create\n[% else %]# drop and recreate both databases\ndb-reset:\n    dropdb -U postgres --if-exists (( pkg_name ))\n    dropdb -U postgres --if-exists (( pkg_name ))_test\n    just db-create\n[% endif %]',
+        '[% if "docker" in addons %]# drop both databases (keeps container running)\ndb-drop:\n    docker compose exec db dropdb -U postgres --if-exists (( pkg_name ))\n    docker compose exec db dropdb -U postgres --if-exists (( pkg_name ))_test\n[% else %]# drop both databases\ndb-drop:\n    dropdb -U postgres --if-exists (( pkg_name ))\n    dropdb -U postgres --if-exists (( pkg_name ))_test\n[% endif %]',
     ],
     injections=[
         Injection(
@@ -112,11 +112,7 @@ def health_check(project_dir: Path, lockfile: object) -> list[HealthIssue]:
                     )
                 )
 
-    if (
-        isinstance(lockfile, ZenitLockfile)
-        and "docker" in lockfile.addons
-        and "postgres" in lockfile.addons
-    ):
+    if isinstance(lockfile, ZenitLockfile) and "postgres" in lockfile.addons:
         justfile_path = project_dir / JUSTFILE_NAME
         if justfile_path.exists():
             text = justfile_path.read_text(encoding="utf-8")
@@ -130,15 +126,15 @@ def health_check(project_dir: Path, lockfile: object) -> list[HealthIssue]:
                 issues.append(
                     HealthIssue(
                         Severity.WARN,
-                        f"Docker-dependent postgres recipes are missing from the justfile: {', '.join(sorted(missing))}.",
-                        hint="Run 'zenit add docker' again to backfill, or 'zenit doctor --fix'.",
+                        f"Postgres recipes are missing from the justfile: {', '.join(sorted(missing))}.",
+                        hint="Run 'zenit add postgres' again, or 'zenit doctor --fix'.",
                     )
                 )
             else:
                 issues.append(
                     HealthIssue(
                         Severity.OK,
-                        "All docker-dependent postgres recipes are present in the justfile.",
+                        "All postgres recipes are present in the justfile.",
                     )
                 )
 
