@@ -230,12 +230,13 @@ def _tui_multi(
 
     def _compute_locked() -> set[int]:
         locked = set(always_locked)
-        for sel_idx in selected:
-            sel_name = items[sel_idx][0]
-            for dep in graph.edges.get(sel_name, []):
-                idx = name_to_idx.get(dep)
-                if idx is not None and idx not in always_locked:
-                    locked.add(idx)
+        if context != "remove":
+            for sel_idx in selected:
+                sel_name = items[sel_idx][0]
+                for dep in graph.edges.get(sel_name, []):
+                    idx = name_to_idx.get(dep)
+                    if idx is not None and idx not in always_locked:
+                        locked.add(idx)
         return locked
 
     def _compute_unavailable() -> set[int]:
@@ -334,16 +335,18 @@ def _tui_multi(
                     flash = f"{item_name} is required by {', '.join(dep_names)}"
             elif orig_idx in selected:
                 selected.discard(orig_idx)
-                for dep_name in graph.dependents(item_name):
-                    dep_idx = name_to_idx.get(dep_name)
-                    if dep_idx is not None and dep_idx not in always_locked:
-                        selected.discard(dep_idx)
+                if context != "remove":
+                    for dep_name in graph.dependents(item_name):
+                        dep_idx = name_to_idx.get(dep_name)
+                        if dep_idx is not None and dep_idx not in always_locked:
+                            selected.discard(dep_idx)
             else:
                 selected.add(orig_idx)
-                for dep in graph.closure({item_name}):
-                    dep_idx = name_to_idx.get(dep)
-                    if dep_idx is not None and dep_idx != orig_idx:
-                        selected.add(dep_idx)
+                if context != "remove":
+                    for dep in graph.closure({item_name}):
+                        dep_idx = name_to_idx.get(dep)
+                        if dep_idx is not None and dep_idx != orig_idx:
+                            selected.add(dep_idx)
         elif key in ("\r", "\n"):
             return _DONE
         elif key == "\x1b":
