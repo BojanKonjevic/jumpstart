@@ -188,8 +188,12 @@
       ],
       "recipes": [
         "wait-db",
+        "wait-db",
+        "db-create",
         "db-create",
         "db-reset",
+        "db-reset",
+        "db-drop",
         "db-drop"
       ],
       "injections": [
