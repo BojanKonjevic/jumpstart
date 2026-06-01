@@ -302,7 +302,10 @@ def _render_copier_default(
         return value
     if "{{" not in value and "{%" not in value and "{#" not in value:
         return value
-    return COPIER_ENV.from_string(value).render(**render_vars)
+    try:
+        return COPIER_ENV.from_string(value).render(**render_vars)
+    except Exception:
+        return value
 
 
 def _coerce_question_value(
@@ -398,16 +401,23 @@ def _destination_template(rel_path: Path) -> str:
     return dest
 
 
-def _render_destination_path(dest_template: str, render_vars: dict[str, Any]) -> Path:
-    """Render a destination path template using Copier's Jinja environment."""
-    rendered = COPIER_ENV.from_string(dest_template).render(**render_vars).strip()
+def _render_destination_path(
+    dest_template: str, render_vars: dict[str, Any]
+) -> Path | None:
+    """Render a destination path template using Copier's Jinja environment.
+
+    Returns ``None`` when the path is empty, unsafe, or the template contains
+    conditional segments that collapse to nothing — the caller should skip it.
+    """
+    try:
+        rendered = COPIER_ENV.from_string(dest_template).render(**render_vars).strip()
+    except Exception:
+        return None
     if not rendered:
-        raise ZenitError("Migration produced an empty destination path.")
+        return None
     dest_path = Path(rendered)
     if dest_path.is_absolute() or ".." in dest_path.parts:
-        raise ZenitError(
-            f"Migration produced an unsafe destination path: '{rendered}'."
-        )
+        return None
     return dest_path
 
 
@@ -817,9 +827,20 @@ def run_migration(
                     f"variables (prefixed with _copier_)."
                 )
                 continue
-            dest_path = project_dir / _render_destination_path(
-                fc.dest, answers.render_vars
-            )
+            dest_rel = _render_destination_path(fc.dest, answers.render_vars)
+            if dest_rel is None:
+                warn(
+                    f"Skipping '{fc.dest}' — rendered destination is empty or unsafe "
+                    f"(likely a conditional path whose condition was false)."
+                )
+                continue
+            dest_path = project_dir / dest_rel
+            if dest_path.exists() and dest_path.is_dir():
+                warn(
+                    f"Skipping '{fc.dest}' — rendered path '{dest_rel}' already "
+                    f"exists as a directory."
+                )
+                continue
             rel = str(dest_path.relative_to(project_dir))
             file_paths.append(rel)
             dest_path.parent.mkdir(parents=True, exist_ok=True)

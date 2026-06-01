@@ -137,6 +137,11 @@ def parse_copier_yml(path: Path) -> CopierConfig:
         config.tasks = [task for task in raw_tasks if isinstance(task, (str, dict))]
     config.jinja_extensions = list(data.pop("_jinja_extensions", []) or [])
 
+    # Remove remaining Copier metadata keys that aren't questions
+    for key in list(data):
+        if key.startswith("_"):
+            data.pop(key)
+
     for name, spec in data.items():
         if not isinstance(spec, dict):
             config.questions.append(
