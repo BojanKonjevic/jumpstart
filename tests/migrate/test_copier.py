@@ -268,4 +268,4 @@ def test_classify_excluded_file(tmp_path: Path) -> None:
         jinja_extensions=[],
     )
     result = classify_file(p, cfg)
-    assert result == FileJinjaClass.STATIC
+    assert result == FileJinjaClass.EXCLUDED

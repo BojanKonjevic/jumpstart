@@ -504,6 +504,9 @@ def _build_file_contribution(
     config: CopierConfig,
 ) -> FileContribution | None:
     """Build a single ``FileContribution`` from a template file."""
+    if jclass == FileJinjaClass.EXCLUDED:
+        return None
+
     if jclass == FileJinjaClass.STATIC:
         try:
             content = f.read_bytes()
@@ -889,6 +892,10 @@ def run_migration(
         if data is not None:
             overrides.update(data)
         answers = _resolve_answers_noninteractive(config, overrides)
+        # When --name is given but the template has no project_name question,
+        # inject it so _pick_project_name uses it as the directory name.
+        if name is not None and "project_name" not in answers.render_vars:
+            answers.render_vars["project_name"] = name
     else:
         step("Prompting for template answers")
         answers = _prompt_questions(config, classes)

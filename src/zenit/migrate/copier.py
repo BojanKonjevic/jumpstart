@@ -40,6 +40,7 @@ class FileJinjaClass(Enum):
     JINJA2_TEMPLATE = "jinja2"
     STATIC = "static"
     UNTRANSLATABLE = "untranslatable"
+    EXCLUDED = "excluded"
 
 
 type CopierTask = str | dict[str, object]
@@ -446,7 +447,7 @@ def classify_file(
        Otherwise STATIC.
     """
     if _excluded_by_pattern(file_path, content_dir, config.exclude):
-        return FileJinjaClass.STATIC
+        return FileJinjaClass.EXCLUDED
 
     env: jinja2.Environment
     if config.jinja_extensions or config.envops:
