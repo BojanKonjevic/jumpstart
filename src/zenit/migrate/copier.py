@@ -96,6 +96,37 @@ COPIER_ENV.filters["to_nice_yaml"] = _to_nice_yaml
 COPIER_ENV.filters["to_nice_json"] = _to_nice_json
 
 
+def build_extended_env(config: CopierConfig) -> jinja2.Environment:
+    """Build a Jinja2 environment that includes the template's custom extensions.
+
+    Tries to import and load each extension in ``config.jinja_extensions``.
+    If an extension can't be imported or loaded, it is silently skipped.
+    Falls back to ``COPIER_ENV`` when no extensions can be loaded.
+    """
+    if not config.jinja_extensions:
+        return COPIER_ENV
+
+    env = jinja2.Environment(
+        variable_start_string="{{",
+        variable_end_string="}}",
+        block_start_string="{%",
+        block_end_string="%}",
+        comment_start_string="{#",
+        comment_end_string="#}",
+        keep_trailing_newline=True,
+    )
+    env.filters["to_nice_yaml"] = _to_nice_yaml
+    env.filters["to_nice_json"] = _to_nice_json
+
+    for ext_path in config.jinja_extensions:
+        try:
+            env.add_extension(ext_path)
+        except Exception:
+            continue
+
+    return env
+
+
 # ── Parser ─────────────────────────────────────────────────────────────────────
 
 
@@ -115,6 +146,23 @@ def _infer_question_type(raw: dict[str, Any]) -> QuestionType:
             return QuestionType.STR
 
 
+def _build_copier_yaml(template_root: Path) -> YAML:
+    """Build a YAML instance with ``!include`` support for multi-file configs."""
+    yaml = YAML()
+
+    def include_constructor(loader: Any, node: Any) -> Any:
+        filename: str = loader.construct_scalar(node)
+        included_path = template_root / filename
+        if not included_path.exists():
+            return {}
+        inc_yaml = _build_copier_yaml(template_root)
+        data = inc_yaml.load(included_path.read_text(encoding="utf-8"))
+        return data or {}
+
+    yaml.constructor.add_constructor("!include", include_constructor)
+    return yaml
+
+
 def parse_copier_yml(path: Path) -> CopierConfig:
     """Parse a ``copier.yml`` file into a ``CopierConfig``."""
     if not path.exists():
@@ -124,7 +172,14 @@ def parse_copier_yml(path: Path) -> CopierConfig:
     if not raw.strip():
         return CopierConfig()
 
-    data: dict[str, Any] = YAML().load(raw) or {}
+    template_root = path.parent
+    yaml = _build_copier_yaml(template_root)
+
+    docs = list(yaml.load_all(raw))
+    data: dict[str, Any] = {}
+    for doc in docs:
+        if doc is not None and isinstance(doc, dict):
+            data.update(doc)
 
     config = CopierConfig()
 
@@ -293,6 +348,23 @@ def _excluded_by_pattern(
     return False
 
 
+def _try_parse_with_env(
+    content: str, env: jinja2.Environment, question_names: set[str]
+) -> FileJinjaClass:
+    """Try to parse *content* with *env* and classify based on undeclared variables."""
+    try:
+        ast = env.parse(content)
+    except Exception:
+        return FileJinjaClass.STATIC
+    try:
+        undeclared = jinja2.meta.find_undeclared_variables(ast)
+    except Exception:
+        return FileJinjaClass.STATIC
+    if undeclared and (undeclared & question_names):
+        return FileJinjaClass.JINJA2_TEMPLATE
+    return FileJinjaClass.STATIC
+
+
 def classify_file(
     file_path: Path, config: CopierConfig, content_dir: Path | None = None
 ) -> FileJinjaClass:
@@ -302,21 +374,32 @@ def classify_file(
        matched against the path relative to *content_dir* when available,
        falling back to the full path and then the filename. This matches
        Copier's behavior where ``_exclude`` patterns are relative-path based.
-    2. If the file has a .jinja, .j2, or .jinja2 extension, it is a template.
-    3. If ``jinja_extensions`` is non-empty, mark as UNTRANSLATABLE.
+    2. If the file has a .jinja, .j2, or .jinja2 extension, treat as JINJA2.
+    3. If ``jinja_extensions`` is non-empty and the file requires custom
+       extensions to parse/render, mark as UNTRANSLATABLE.
     4. Otherwise, attempt to parse with Jinja2. If parsing succeeds and the AST
-       contains expressions, treat as JINJA2. Otherwise STATIC.
+       contains expressions referencing known questions, treat as JINJA2.
+       Otherwise STATIC.
     """
     if _excluded_by_pattern(file_path, content_dir, config.exclude):
         return FileJinjaClass.STATIC
 
+    env = build_extended_env(config) if config.jinja_extensions else COPIER_ENV
+    question_names = {q.name for q in config.questions}
+
     if file_path.suffix in (".jinja", ".j2", ".jinja2"):
+        try:
+            content = file_path.read_text(encoding="utf-8")
+        except Exception:
+            return FileJinjaClass.STATIC
+        if (
+            _try_parse_with_env(content, env, question_names)
+            == FileJinjaClass.JINJA2_TEMPLATE
+        ):
+            return FileJinjaClass.JINJA2_TEMPLATE
         if config.jinja_extensions:
             return FileJinjaClass.UNTRANSLATABLE
         return FileJinjaClass.JINJA2_TEMPLATE
-
-    if config.jinja_extensions:
-        return FileJinjaClass.UNTRANSLATABLE
 
     try:
         content = file_path.read_text(encoding="utf-8")
@@ -326,19 +409,4 @@ def classify_file(
     if not _has_jinja_expressions(content):
         return FileJinjaClass.STATIC
 
-    try:
-        ast = COPIER_ENV.parse(content)
-    except Exception:
-        return FileJinjaClass.STATIC
-
-    try:
-        undeclared = jinja2.meta.find_undeclared_variables(ast)
-    except Exception:
-        return FileJinjaClass.STATIC
-
-    if undeclared:
-        question_names = {q.name for q in config.questions}
-        if undeclared & question_names:
-            return FileJinjaClass.JINJA2_TEMPLATE
-
-    return FileJinjaClass.STATIC
+    return _try_parse_with_env(content, env, question_names)

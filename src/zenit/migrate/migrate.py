@@ -9,6 +9,7 @@ the result, and writing the lockfile and manifest.
 
 from __future__ import annotations
 
+import contextlib
 import shlex
 import shutil
 import subprocess
@@ -56,6 +57,7 @@ from .copier import (
     FileJinjaClass,
     QuestionClass,
     QuestionType,
+    build_extended_env,
     classify_file,
     classify_questions,
     parse_copier_yml,
@@ -415,6 +417,10 @@ def _render_destination_path(
         return None
     if not rendered:
         return None
+    # If the rendered path ends with /, the file portion collapsed to nothing
+    # (e.g. ``src/{% if x %}f{% endif %}`` when ``x`` is false → ``src/``).
+    if rendered.endswith("/"):
+        return None
     dest_path = Path(rendered)
     if dest_path.is_absolute() or ".." in dest_path.parts:
         return None
@@ -428,10 +434,12 @@ def _uses_copier_internal_path_vars(dest_template: str) -> bool:
     except Exception:
         return False
 
-    for name in jinja2.meta.find_undeclared_variables(referenced):
-        if name.startswith("_copier_"):
-            return True
-    return False
+    try:
+        undeclared = jinja2.meta.find_undeclared_variables(referenced)
+    except Exception:
+        return False
+
+    return any(name.startswith("_copier_") for name in undeclared)
 
 
 def _build_file_contribution(
@@ -605,8 +613,29 @@ def _inventory_compose(project_dir: Path) -> tuple[list[str], list[str]]:
     return services, volumes
 
 
+def _extract_poetry_deps(
+    poetry_section: dict[str, object],
+) -> list[tuple[str, str]]:
+    """Extract ``(package, spec)`` tuples from a Poetry dependencies section."""
+    result: list[tuple[str, str]] = []
+    for pkg_name, spec in poetry_section.items():
+        if pkg_name == "python":
+            continue
+        if isinstance(spec, str):
+            result.append((pkg_name, spec))
+        elif isinstance(spec, dict):
+            version = spec.get("version", "")
+            if isinstance(version, str):
+                result.append((pkg_name, version))
+    return result
+
+
 def _inventory_deps(project_dir: Path) -> list[tuple[str, str, bool]]:
     """Scan pyproject.toml for dependency entries.
+
+    Supports PEP 621 (``[project.dependencies]``, ``[dependency-groups]``)
+    and Poetry (``[tool.poetry.dependencies]``, ``[tool.poetry.dev-dependencies]``,
+    ``[tool.poetry.group.*.dependencies]``).
 
     Returns ``(package, spec, dev)`` tuples.
     """
@@ -620,6 +649,8 @@ def _inventory_deps(project_dir: Path) -> list[tuple[str, str, bool]]:
         return []
 
     result: list[tuple[str, str, bool]] = []
+
+    # PEP 621 — [project.dependencies]
     project = data.get("project", {})
     deps = project.get("dependencies", [])
     if isinstance(deps, list):
@@ -628,6 +659,7 @@ def _inventory_deps(project_dir: Path) -> list[tuple[str, str, bool]]:
                 pkg = dep_package_name(dep)
                 result.append((pkg, dep, False))
 
+    # PEP 621 — [dependency-groups]
     dep_groups = data.get("dependency-groups", {})
     if isinstance(dep_groups, dict):
         dev = dep_groups.get("dev", [])
@@ -636,6 +668,33 @@ def _inventory_deps(project_dir: Path) -> list[tuple[str, str, bool]]:
                 if isinstance(dep, str):
                     pkg = dep_package_name(dep)
                     result.append((pkg, dep, True))
+
+    # Poetry — [tool.poetry.dependencies]
+    tool = data.get("tool", {})
+    if isinstance(tool, dict):
+        poetry = tool.get("poetry", {})
+        if isinstance(poetry, dict):
+            prod = poetry.get("dependencies", {})
+            if isinstance(prod, dict):
+                for pkg_name, spec in _extract_poetry_deps(prod):
+                    result.append((pkg_name, spec, False))
+
+            # Legacy [tool.poetry.dev-dependencies]
+            dev_legacy = poetry.get("dev-dependencies", {})
+            if isinstance(dev_legacy, dict):
+                for pkg_name, spec in _extract_poetry_deps(dev_legacy):
+                    result.append((pkg_name, spec, True))
+
+            # Modern [tool.poetry.group.<name>.dependencies]
+            groups = poetry.get("group", {})
+            if isinstance(groups, dict):
+                for group_name, group_data in groups.items():
+                    if isinstance(group_data, dict):
+                        group_deps = group_data.get("dependencies", {})
+                        if isinstance(group_deps, dict):
+                            is_dev = group_name != "main"
+                            for pkg_name, spec in _extract_poetry_deps(group_deps):
+                                result.append((pkg_name, spec, is_dev))
 
     return result
 
@@ -817,6 +876,7 @@ def run_migration(
 
     step("Writing project")
     file_paths: list[str] = []
+    render_env = build_extended_env(config)
     with scaffold_or_rollback(project_dir):
         project_dir.mkdir(parents=True)
 
@@ -841,17 +901,36 @@ def run_migration(
                     f"exists as a directory."
                 )
                 continue
+            # Check that no parent component is an existing file (which would
+            # cause ``[Errno 20] Not a directory`` on mkdir later).
+            if any(
+                p.exists() and p.is_file()
+                for p in [dest_path] + list(dest_path.parents)
+                if p != project_dir
+            ):
+                warn(
+                    f"Skipping '{fc.dest}' — rendered path '{dest_rel}' "
+                    f"collides with an existing file."
+                )
+                continue
             rel = str(dest_path.relative_to(project_dir))
             file_paths.append(rel)
             dest_path.parent.mkdir(parents=True, exist_ok=True)
             if fc.content is not None:
                 if fc.template:
-                    try:
-                        rendered = COPIER_ENV.from_string(fc.content).render(
+                    rendered: str | None = None
+                    with contextlib.suppress(Exception):
+                        rendered = render_env.from_string(fc.content).render(
                             **answers.render_vars
                         )
+                    if rendered is None and render_env is not COPIER_ENV:
+                        with contextlib.suppress(Exception):
+                            rendered = COPIER_ENV.from_string(fc.content).render(
+                                **answers.render_vars
+                            )
+                    if rendered is not None:
                         dest_path.write_text(rendered, encoding="utf-8")
-                    except Exception:
+                    else:
                         warn(f"Failed to render '{fc.dest}' — copying verbatim.")
                         dest_path.write_text(fc.content, encoding="utf-8")
                 else:
