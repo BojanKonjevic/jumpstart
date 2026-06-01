@@ -48,7 +48,18 @@ class TestBlankFunctional:
         project_dir = class_tmp_path / "myapp"
         project_dir.mkdir(parents=True)
         scaffold_project_at(project_dir, "myapp", "blank", [])
-        _uv("sync", "--quiet", "--frozen", cwd=project_dir)
+        result = _uv("lock", cwd=project_dir)
+        assert result.returncode == 0, (
+            f"uv lock failed in scaffolded blank project:\n"
+            f"stdout:\n{result.stdout}\n"
+            f"stderr:\n{result.stderr}"
+        )
+        result = _uv("sync", "--quiet", cwd=project_dir)
+        assert result.returncode == 0, (
+            f"uv sync failed in scaffolded blank project:\n"
+            f"stdout:\n{result.stdout}\n"
+            f"stderr:\n{result.stderr}"
+        )
         return project_dir
 
     def test_uv_sync_succeeds(self, blank_project: Path) -> None:
@@ -112,7 +123,18 @@ class TestBlankDockerFunctional:
         project_dir = class_tmp_path / "myapp"
         project_dir.mkdir(parents=True)
         scaffold_project_at(project_dir, "myapp", "blank", ["docker"])
-        _uv("sync", "--quiet", "--frozen", cwd=project_dir)
+        result = _uv("lock", cwd=project_dir)
+        assert result.returncode == 0, (
+            f"uv lock failed in scaffolded blank+docker project:\n"
+            f"stdout:\n{result.stdout}\n"
+            f"stderr:\n{result.stderr}"
+        )
+        result = _uv("sync", "--quiet", cwd=project_dir)
+        assert result.returncode == 0, (
+            f"uv sync failed in scaffolded blank+docker project:\n"
+            f"stdout:\n{result.stdout}\n"
+            f"stderr:\n{result.stderr}"
+        )
         return project_dir
 
     def test_uv_sync_succeeds(self, blank_docker_project: Path) -> None:

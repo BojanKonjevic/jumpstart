@@ -206,7 +206,24 @@ def _prompt_questions(
             _render_copier_default(q.default, answers.render_vars),
         )
 
-        if q.type == QuestionType.BOOL:
+        if q.type == QuestionType.MULTISELECT:
+            choices_str = ", ".join(q.choices)
+            msg = f"{q.help or q.name} {DIM}(comma-separated, options: {choices_str}){RESET}"
+            default_str = ", ".join(
+                str(v)
+                for v in (
+                    default_value
+                    if isinstance(default_value, list)
+                    else [default_value]
+                )
+            )
+            raw = input(f"  {msg} [{default_str}]: ").strip()
+            if raw:
+                parts = [p.strip() for p in raw.split(",") if p.strip()]
+                answers.render_vars[q.name] = [q.choices_map.get(p, p) for p in parts]
+            else:
+                answers.render_vars[q.name] = default_value
+        elif q.type == QuestionType.BOOL:
             msg = f"{q.help or q.name}"
             raw = input(f"  {msg} {DIM}[Y/n]{RESET}  ").strip().lower()
             answer = raw in ("", "y", "yes") if raw else bool(default_value)
@@ -216,7 +233,7 @@ def _prompt_questions(
             msg = f"{q.help or q.name} {DIM}({choices_str}){RESET}"
             raw = input(f"  {msg} [{default_value}]: ").strip()
             if raw and raw in q.choices:
-                answers.render_vars[q.name] = raw
+                answers.render_vars[q.name] = q.choices_map.get(raw, raw)
             else:
                 answers.render_vars[q.name] = default_value
         elif q.type == QuestionType.INT:
@@ -279,12 +296,34 @@ def _resolve_answers_noninteractive(
                     answers.render_vars[q.name] = int(raw)
                 case QuestionType.FLOAT:
                     answers.render_vars[q.name] = float(raw)
+                case QuestionType.MULTISELECT:
+                    parts = [p.strip() for p in raw.split(",") if p.strip()]
+                    answers.render_vars[q.name] = [
+                        q.choices_map.get(p, p) for p in parts
+                    ]
+                case QuestionType.CHOICE:
+                    answers.render_vars[q.name] = q.choices_map.get(raw, raw)
                 case _:
                     answers.render_vars[q.name] = raw
         elif q.default is not None:
             answers.render_vars[q.name] = _coerce_question_value(
                 q,
                 _render_copier_default(q.default, answers.render_vars),
+            )
+        elif q.choices:
+            if q.type == QuestionType.MULTISELECT:
+                first_val = q.choices_map.get(q.choices[0], q.choices[0])
+                answers.render_vars[q.name] = [first_val]
+            else:
+                answers.render_vars[q.name] = q.choices_map.get(
+                    q.choices[0], q.choices[0]
+                )
+        elif q.when is False:
+            answers.render_vars[q.name] = _coerce_question_value(
+                q,
+                _render_copier_default(
+                    q.default if q.default is not None else "", answers.render_vars
+                ),
             )
         else:
             raise ZenitError(
@@ -300,6 +339,8 @@ def _render_copier_default(
     render_vars: dict[str, Any],
 ) -> object:
     """Render a Copier default value against answers resolved so far."""
+    if isinstance(value, list):
+        return [_render_copier_default(item, render_vars) for item in value]
     if not isinstance(value, str):
         return value
     if "{{" not in value and "{%" not in value and "{#" not in value:
@@ -315,6 +356,14 @@ def _coerce_question_value(
     value: object,
 ) -> object:
     """Coerce a rendered Copier answer/default to the declared question type."""
+    if question.type == QuestionType.MULTISELECT:
+        if isinstance(value, str):
+            parts = [p.strip() for p in value.split(",") if p.strip()]
+            return [question.choices_map.get(p, p) for p in parts]
+        if isinstance(value, list):
+            return [question.choices_map.get(str(v), v) for v in value]
+        return []
+
     if not isinstance(value, str):
         return value
 
@@ -325,6 +374,8 @@ def _coerce_question_value(
             return int(value) if value.strip() else 0
         case QuestionType.FLOAT:
             return float(value) if value.strip() else 0.0
+        case QuestionType.CHOICE:
+            return question.choices_map.get(value, value)
         case _:
             return value
 
@@ -358,9 +409,9 @@ def _render_template(
             continue
 
         rel = f.relative_to(content_dir)
-        dest = _destination_template(rel)
+        dest = _destination_template(rel, config.templates_suffix)
 
-        jclass = classify_file(f, config, content_dir)
+        jclass = classify_file(f, config, content_dir, template_dir)
 
         fc = _build_file_contribution(f, dest, jclass, config)
         if fc is not None:
@@ -391,9 +442,13 @@ def _resolve_content_dir(template_dir: Path, config: CopierConfig) -> Path:
     return template_dir
 
 
-def _destination_template(rel_path: Path) -> str:
+def _destination_template(rel_path: Path, templates_suffix: str | None = None) -> str:
     """Build the destination path template for a Copier source file."""
     dest = str(rel_path)
+    if templates_suffix is not None:
+        if dest.endswith(templates_suffix):
+            return dest[: -len(templates_suffix)]
+        return dest
     if dest.endswith(".jinja2"):
         return dest[: -len(".jinja2")]
     if dest.endswith(".jinja"):
@@ -876,7 +931,8 @@ def run_migration(
 
     step("Writing project")
     file_paths: list[str] = []
-    render_env = build_extended_env(config)
+    content_dir = _resolve_content_dir(template_dir, config)
+    render_env = build_extended_env(config, template_dir, content_dir)
     with scaffold_or_rollback(project_dir):
         project_dir.mkdir(parents=True)
 
@@ -991,7 +1047,12 @@ def run_migration(
 
 
 def _cleanup_temp(template_dir: Path) -> None:
-    """Clean up a temporary directory if it's in the system temp dir."""
-    tmp = Path(tempfile.gettempdir()).resolve()
-    if template_dir.resolve().is_relative_to(tmp):
+    """Clean up a temporary directory if we created it (zenit-migrate-* prefix).
+
+    Only cleans up directories created by ``_fetch_source`` via
+    ``tempfile.mkdtemp(prefix=\"zenit-migrate-\")``.  User-specified local
+    paths are never removed.
+    """
+    name = template_dir.resolve().name
+    if name.startswith("zenit-migrate-"):
         shutil.rmtree(template_dir, ignore_errors=True)

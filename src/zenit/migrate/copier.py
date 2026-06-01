@@ -5,6 +5,7 @@ from __future__ import annotations
 import contextlib
 import fnmatch
 import json
+import sys
 from dataclasses import dataclass, field
 from enum import Enum
 from io import StringIO
@@ -24,6 +25,7 @@ class QuestionType(Enum):
     INT = "int"
     FLOAT = "float"
     CHOICE = "choice"
+    MULTISELECT = "multiselect"
 
 
 class QuestionClass(Enum):
@@ -53,7 +55,8 @@ class CopierQuestion:
     default: Any = ""
     help: str = ""
     choices: list[str] = field(default_factory=list)
-    when: str | None = None
+    choices_map: dict[str, str] = field(default_factory=dict)
+    when: str | bool | None = None
 
 
 @dataclass
@@ -64,6 +67,8 @@ class CopierConfig:
     skip_if_exists: list[str] = field(default_factory=list)
     tasks: list[CopierTask] = field(default_factory=list)
     jinja_extensions: list[str] = field(default_factory=list)
+    templates_suffix: str | None = None
+    envops: dict[str, Any] = field(default_factory=dict)
 
 
 def _to_nice_yaml(value: object, indent: int = 2) -> str:
@@ -96,27 +101,48 @@ COPIER_ENV.filters["to_nice_yaml"] = _to_nice_yaml
 COPIER_ENV.filters["to_nice_json"] = _to_nice_json
 
 
-def build_extended_env(config: CopierConfig) -> jinja2.Environment:
-    """Build a Jinja2 environment that includes the template's custom extensions.
+def build_extended_env(
+    config: CopierConfig,
+    template_dir: Path | None = None,
+    content_dir: Path | None = None,
+) -> jinja2.Environment:
+    """Build a Jinja2 environment that includes envops and custom extensions.
 
-    Tries to import and load each extension in ``config.jinja_extensions``.
-    If an extension can't be imported or loaded, it is silently skipped.
-    Falls back to ``COPIER_ENV`` when no extensions can be loaded.
+    Applies ``_envops`` parameters (custom Jinja2 delimiters, whitespace
+    control, etc.) when specified in the template config, and tries to
+    import each extension in ``config.jinja_extensions``.
+
+    For local extension modules (e.g. ``extensions/slugify.py:SlugifyExtension``),
+    *template_dir* is added to ``sys.path`` during import.
+
+    When *content_dir* is provided, a ``FileSystemLoader`` pointing to it is
+    attached so that ``{% import %}`` and ``{% extends %}`` resolve correctly.
     """
-    if not config.jinja_extensions:
-        return COPIER_ENV
+    env_kw: dict[str, Any] = {
+        "variable_start_string": "{{",
+        "variable_end_string": "}}",
+        "block_start_string": "{%",
+        "block_end_string": "%}",
+        "comment_start_string": "{#",
+        "comment_end_string": "#}",
+        "keep_trailing_newline": True,
+    }
+    env_kw.update(config.envops)
 
-    env = jinja2.Environment(
-        variable_start_string="{{",
-        variable_end_string="}}",
-        block_start_string="{%",
-        block_end_string="%}",
-        comment_start_string="{#",
-        comment_end_string="#}",
-        keep_trailing_newline=True,
-    )
+    env = jinja2.Environment(**env_kw)
     env.filters["to_nice_yaml"] = _to_nice_yaml
     env.filters["to_nice_json"] = _to_nice_json
+
+    if content_dir is not None:
+        search_paths = [str(content_dir.resolve())]
+        if template_dir is not None:
+            search_paths.append(str(template_dir.resolve()))
+        env.loader = jinja2.FileSystemLoader(search_paths)
+
+    if config.jinja_extensions and template_dir is not None:
+        template_dir_str = str(template_dir.resolve())
+        if template_dir_str not in sys.path:
+            sys.path.insert(0, template_dir_str)
 
     for ext_path in config.jinja_extensions:
         try:
@@ -131,6 +157,8 @@ def build_extended_env(config: CopierConfig) -> jinja2.Environment:
 
 
 def _infer_question_type(raw: dict[str, Any]) -> QuestionType:
+    if raw.get("multiselect"):
+        return QuestionType.MULTISELECT
     type_str = raw.get("type", "str")
     choices = raw.get("choices")
     if choices:
@@ -187,10 +215,16 @@ def parse_copier_yml(path: Path) -> CopierConfig:
     config.subdirectory = data.pop("_subdirectory", None)
     config.exclude = list(data.pop("_exclude", []) or [])
     config.skip_if_exists = list(data.pop("_skip_if_exists", []) or [])
+    templates_suffix = data.pop("_templates_suffix", None)
+    if isinstance(templates_suffix, str):
+        config.templates_suffix = templates_suffix
     raw_tasks = data.pop("_tasks", []) or []
     if isinstance(raw_tasks, list):
         config.tasks = [task for task in raw_tasks if isinstance(task, (str, dict))]
     config.jinja_extensions = list(data.pop("_jinja_extensions", []) or [])
+    raw_envops = data.pop("_envops", None)
+    if isinstance(raw_envops, dict):
+        config.envops = raw_envops
 
     # Remove remaining Copier metadata keys that aren't questions
     for key in list(data):
@@ -209,6 +243,27 @@ def parse_copier_yml(path: Path) -> CopierConfig:
             )
             continue
         qtype = _infer_question_type(spec)
+        raw_choices = spec.get("choices")
+        choices_list: list[str] = []
+        choices_map: dict[str, str] = {}
+        if isinstance(raw_choices, dict):
+            for display_name, value in raw_choices.items():
+                if isinstance(value, dict):
+                    value = value.get("value", display_name)
+                if not isinstance(value, str):
+                    value = str(value)
+                choices_list.append(display_name)
+                choices_map[display_name] = value
+        elif isinstance(raw_choices, list):
+            choices_list = [
+                str(c) if not isinstance(c, dict) else str(c.get("value", str(c)))
+                for c in raw_choices
+            ]
+            choices_map = {c: c for c in choices_list}
+        elif raw_choices:
+            choices_list = [str(c) for c in raw_choices]
+            choices_map = {c: c for c in choices_list}
+
         default = spec.get("default")
         if default is None:
             if qtype == QuestionType.STR:
@@ -219,13 +274,16 @@ def parse_copier_yml(path: Path) -> CopierConfig:
                 default = 0
             elif qtype == QuestionType.FLOAT:
                 default = 0.0
+            elif qtype == QuestionType.MULTISELECT:
+                default = []
         config.questions.append(
             CopierQuestion(
                 name=name,
                 type=qtype,
                 default=default,
                 help=spec.get("help", ""),
-                choices=list(spec.get("choices", []) or []),
+                choices=choices_list,
+                choices_map=choices_map,
                 when=spec.get("when"),
             )
         )
@@ -290,7 +348,7 @@ def classify_questions(
     for q in config.questions:
         if q.type in (QuestionType.STR, QuestionType.INT, QuestionType.FLOAT):
             classes[q.name] = QuestionClass.RENDER_VAR
-        elif q.type == QuestionType.CHOICE:
+        elif q.type in (QuestionType.MULTISELECT, QuestionType.CHOICE):
             classes[q.name] = QuestionClass.CHOICE_VAR
         elif q.type == QuestionType.BOOL:
             files = question_files.get(q.name, set())
@@ -366,7 +424,10 @@ def _try_parse_with_env(
 
 
 def classify_file(
-    file_path: Path, config: CopierConfig, content_dir: Path | None = None
+    file_path: Path,
+    config: CopierConfig,
+    content_dir: Path | None = None,
+    template_dir: Path | None = None,
 ) -> FileJinjaClass:
     """Classify a single file as JINJA2, STATIC, or UNTRANSLATABLE.
 
@@ -374,18 +435,44 @@ def classify_file(
        matched against the path relative to *content_dir* when available,
        falling back to the full path and then the filename. This matches
        Copier's behavior where ``_exclude`` patterns are relative-path based.
-    2. If the file has a .jinja, .j2, or .jinja2 extension, treat as JINJA2.
-    3. If ``jinja_extensions`` is non-empty and the file requires custom
+    2. If ``_templates_suffix`` is set, only files ending with that suffix
+       are candidates for Jinja2 template classification.  All other files
+       are STATIC.
+    3. If the file has a .jinja, .j2, or .jinja2 extension, treat as JINJA2.
+    4. If ``jinja_extensions`` is non-empty and the file requires custom
        extensions to parse/render, mark as UNTRANSLATABLE.
-    4. Otherwise, attempt to parse with Jinja2. If parsing succeeds and the AST
+    5. Otherwise, attempt to parse with Jinja2. If parsing succeeds and the AST
        contains expressions referencing known questions, treat as JINJA2.
        Otherwise STATIC.
     """
     if _excluded_by_pattern(file_path, content_dir, config.exclude):
         return FileJinjaClass.STATIC
 
-    env = build_extended_env(config) if config.jinja_extensions else COPIER_ENV
+    env: jinja2.Environment
+    if config.jinja_extensions or config.envops:
+        env = build_extended_env(config, template_dir)
+    else:
+        env = COPIER_ENV
     question_names = {q.name for q in config.questions}
+
+    suffix = config.templates_suffix
+    if suffix is not None:
+        # Custom _templates_suffix — only files with this suffix are templates
+        name = file_path.name
+        if name.endswith(suffix):
+            try:
+                content = file_path.read_text(encoding="utf-8")
+            except Exception:
+                return FileJinjaClass.STATIC
+            if (
+                _try_parse_with_env(content, env, question_names)
+                == FileJinjaClass.JINJA2_TEMPLATE
+            ):
+                return FileJinjaClass.JINJA2_TEMPLATE
+            if config.jinja_extensions:
+                return FileJinjaClass.UNTRANSLATABLE
+            return FileJinjaClass.JINJA2_TEMPLATE
+        return FileJinjaClass.STATIC
 
     if file_path.suffix in (".jinja", ".j2", ".jinja2"):
         try:
