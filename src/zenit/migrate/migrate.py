@@ -333,6 +333,22 @@ def _prompt_questions(
     return answers
 
 
+def _prompt_required_noninteractive_fallback(q: CopierQuestion) -> str:
+    """Prompt for a single required question that has no default.
+
+    Called when stdin is a TTY but the question wasn't provided via ``-D``.
+    Returns the raw answer string, or empty string if the user declines.
+    """
+    msg = f"{q.help or q.name}"
+    if q.choices:
+        choices_str = ", ".join(q.choices)
+        print(f"  {msg} {DIM}({choices_str}){RESET}")
+        raw = input("  Enter value: ").strip()
+    else:
+        raw = input(f"  {msg}: ").strip()
+    return raw
+
+
 def _resolve_answers_noninteractive(
     config: CopierConfig,
     overrides: dict[str, str],
@@ -389,6 +405,17 @@ def _resolve_answers_noninteractive(
             if err:
                 raise ZenitError(err)
         elif q.required and not q.default:
+            if sys.stdin.isatty():
+                raw = _prompt_required_noninteractive_fallback(q)
+                if raw:
+                    answers.render_vars[q.name] = raw
+                    answers.explicit_names.add(q.name)
+                    err = _validate_answer(
+                        q, answers.render_vars[q.name], answers.render_vars
+                    )
+                    if err:
+                        raise ZenitError(err)
+                    continue
             raise ZenitError(
                 f"Question '{q.name}' is required and has no default. "
                 f"Pass it with -D {q.name}=<value>"
