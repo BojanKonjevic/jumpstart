@@ -1028,3 +1028,114 @@ def test_run_migration_skips_copier_internal_answers_file(
 
     assert (result.project_dir / "README.md").exists()
     assert not (result.project_dir / ".copier-answers.yml").exists()
+
+
+# ── Secret and YAML question types (Step 5) ─────────────────────────────────────
+
+
+def test_mask_secrets_replaces_value() -> None:
+    """_mask_secrets replaces secret values with ******."""
+    from zenit.migrate.migrate import _mask_secrets
+
+    result = _mask_secrets(
+        "api_key=sk-1234, other=foo",
+        {"db_password": "sk-1234"},
+        {"db_password"},
+    )
+    assert "sk-1234" not in result
+    assert "******" in result
+    assert "other=foo" in result
+
+
+def test_mask_secrets_multiple() -> None:
+    """Multiple secret values are all masked."""
+    from zenit.migrate.migrate import _mask_secrets
+
+    result = _mask_secrets(
+        "a=secret1, b=secret2",
+        {"pw1": "secret1", "pw2": "secret2"},
+        {"pw1", "pw2"},
+    )
+    assert "secret1" not in result
+    assert "secret2" not in result
+    assert result.count("******") == 2
+
+
+def test_mask_secrets_no_match() -> None:
+    """Text with no secret values is returned unchanged."""
+    from zenit.migrate.migrate import _mask_secrets
+
+    result = _mask_secrets(
+        "hello world",
+        {"pw": "secret"},
+        {"pw"},
+    )
+    assert result == "hello world"
+
+
+def test_mask_secrets_empty_value() -> None:
+    """Empty string value is not masked."""
+    from zenit.migrate.migrate import _mask_secrets
+
+    result = _mask_secrets(
+        "pw=",
+        {"pw": ""},
+        {"pw"},
+    )
+    assert result == "pw="
+
+
+def test_mask_secrets_non_string_value() -> None:
+    """Non-string value in render_vars is skipped."""
+    from zenit.migrate.migrate import _mask_secrets
+
+    result = _mask_secrets(
+        "port=5432",
+        {"port": 5432},
+        {"port"},
+    )
+    assert result == "port=5432"
+
+
+def test_resolve_secret_noninteractive() -> None:
+    """Secret value is resolved from -D override."""
+    config = CopierConfig(
+        questions=[CopierQuestion(name="api_key", type=QuestionType.SECRET)],
+    )
+    from zenit.migrate.migrate import _resolve_answers_noninteractive
+
+    answers = _resolve_answers_noninteractive(config, {"api_key": "sk-abc"})
+    assert answers.render_vars["api_key"] == "sk-abc"
+
+
+def test_resolve_yaml_noninteractive() -> None:
+    """YAML default is coerced to a Python object."""
+    config = CopierConfig(
+        questions=[
+            CopierQuestion(
+                name="config",
+                type=QuestionType.YAML,
+                default="key: value",
+            )
+        ],
+    )
+    from zenit.migrate.migrate import _resolve_answers_noninteractive
+
+    answers = _resolve_answers_noninteractive(config, {})
+    assert isinstance(answers.render_vars["config"], dict)
+    assert answers.render_vars["config"]["key"] == "value"
+
+
+def test_resolve_secret_default_coerces_as_string() -> None:
+    """Secret default is treated as plain string."""
+    config = CopierConfig(
+        questions=[
+            CopierQuestion(
+                name="api_key", type=QuestionType.SECRET, default="default_key"
+            ),
+        ],
+    )
+    from zenit.migrate.migrate import _resolve_answers_noninteractive
+
+    answers = _resolve_answers_noninteractive(config, {})
+    assert answers.render_vars["api_key"] == "default_key"

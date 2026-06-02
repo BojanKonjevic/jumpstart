@@ -34,6 +34,8 @@ class QuestionType(Enum):
     FLOAT = "float"
     CHOICE = "choice"
     MULTISELECT = "multiselect"
+    SECRET = "secret"
+    YAML = "yaml"
 
 
 class QuestionClass(Enum):
@@ -249,6 +251,19 @@ def build_extended_env(
 # ── Parser ─────────────────────────────────────────────────────────────────────
 
 
+def _coerce_yaml_value(value: object) -> object:
+    """Parse a YAML string into a Python object."""
+    if not isinstance(value, str):
+        return value
+    if not value.strip():
+        return ""
+    try:
+        parsed = YAML().load(value)
+        return parsed if parsed is not None else value
+    except Exception:
+        return value
+
+
 def _infer_question_type(raw: dict[str, Any]) -> QuestionType:
     if raw.get("multiselect"):
         return QuestionType.MULTISELECT
@@ -257,6 +272,10 @@ def _infer_question_type(raw: dict[str, Any]) -> QuestionType:
     if choices:
         return QuestionType.CHOICE
     match type_str:
+        case "secret":
+            return QuestionType.SECRET
+        case "yaml":
+            return QuestionType.YAML
         case "bool":
             return QuestionType.BOOL
         case "int":

@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import contextlib
 import fnmatch
+import getpass
 import shlex
 import shutil
 import subprocess
@@ -58,6 +59,7 @@ from .copier import (
     FileJinjaClass,
     QuestionClass,
     QuestionType,
+    _coerce_yaml_value,
     _has_jinja_expressions,
     build_extended_env,
     classify_file,
@@ -268,6 +270,23 @@ def _prompt_questions(
                 answers.explicit_names.add(q.name)
             else:
                 answers.render_vars[q.name] = default_value
+        elif q.type == QuestionType.SECRET:
+            msg = f"{q.help or q.name}"
+            raw = getpass.getpass(f"  {msg}: ").strip()
+            if raw:
+                answers.render_vars[q.name] = raw
+                answers.explicit_names.add(q.name)
+            else:
+                answers.render_vars[q.name] = default_value
+        elif q.type == QuestionType.YAML:
+            default_str = str(default_value) if default_value != "" else ""
+            msg = f"{q.help or q.name}"
+            raw = input(f"  {msg} [{default_str}]: ").strip()
+            if raw:
+                answers.render_vars[q.name] = _coerce_yaml_value(raw)
+                answers.explicit_names.add(q.name)
+            else:
+                answers.render_vars[q.name] = default_value
         else:
             default_str = str(default_value) if default_value != "" else ""
             msg = f"{q.help or q.name}"
@@ -329,6 +348,8 @@ def _resolve_answers_noninteractive(
                     ]
                 case QuestionType.CHOICE:
                     answers.render_vars[q.name] = q.choices_map.get(raw, raw)
+                case QuestionType.YAML:
+                    answers.render_vars[q.name] = _coerce_yaml_value(raw)
                 case _:
                     answers.render_vars[q.name] = raw
         elif q.default is not None:
@@ -377,6 +398,20 @@ def _render_copier_default(
         return value
 
 
+def _mask_secrets(
+    text: str,
+    render_vars: dict[str, Any],
+    secret_names: set[str],
+) -> str:
+    """Replace secret values in *text* with ``******`` for safe display."""
+    result = text
+    for name in secret_names:
+        value = render_vars.get(name)
+        if isinstance(value, str) and value:
+            result = result.replace(value, "******")
+    return result
+
+
 def _coerce_question_value(
     question: CopierQuestion,
     value: object,
@@ -402,6 +437,8 @@ def _coerce_question_value(
             return float(value) if value.strip() else 0.0
         case QuestionType.CHOICE:
             return question.choices_map.get(value, value)
+        case QuestionType.YAML:
+            return _coerce_yaml_value(value)
         case _:
             return value
 

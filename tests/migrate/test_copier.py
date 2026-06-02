@@ -12,6 +12,7 @@ from zenit.migrate.copier import (
     FileJinjaClass,
     QuestionClass,
     QuestionType,
+    _coerce_yaml_value,
     _make_secret,
     _safe_shell_filter,
     build_extended_env,
@@ -109,6 +110,57 @@ def test_parse_empty_yml(tmp_path: Path) -> None:
     config = parse_copier_yml(path)
     assert config.questions == []
     assert config.tasks == []
+
+
+def test_parse_secret_type(tmp_path: Path) -> None:
+    """secret type is parsed as QuestionType.SECRET."""
+    path = tmp_path / "copier.yml"
+    path.write_text(yaml.dump({"api_key": {"type": "secret", "help": "API key"}}))
+    config = parse_copier_yml(path)
+    assert config.questions[0].type == QuestionType.SECRET
+
+
+def test_parse_yaml_type(tmp_path: Path) -> None:
+    """yaml type is parsed as QuestionType.YAML."""
+    path = tmp_path / "copier.yml"
+    path.write_text(yaml.dump({"config": {"type": "yaml", "help": "Config"}}))
+    config = parse_copier_yml(path)
+    assert config.questions[0].type == QuestionType.YAML
+
+
+# ── _coerce_yaml_value ──────────────────────────────────────────────────────────
+
+
+def test_coerce_yaml_value_dict() -> None:
+    """YAML string with key-value pairs parses to a dict."""
+    result = _coerce_yaml_value("key: value\nnested:\n  a: 1\n")
+    assert isinstance(result, dict)
+    assert result["key"] == "value"
+    assert result["nested"]["a"] == 1
+
+
+def test_coerce_yaml_value_list() -> None:
+    """YAML list string parses to a list."""
+    result = _coerce_yaml_value("- one\n- two\n- three\n")
+    assert result == ["one", "two", "three"]
+
+
+def test_coerce_yaml_value_plain_string() -> None:
+    """Non-YAML string returns as-is."""
+    result = _coerce_yaml_value("hello world")
+    assert result == "hello world"
+
+
+def test_coerce_yaml_value_empty() -> None:
+    """Empty string returns empty string."""
+    result = _coerce_yaml_value("")
+    assert result == ""
+
+
+def test_coerce_yaml_value_non_string() -> None:
+    """Non-string value passes through unchanged."""
+    result = _coerce_yaml_value(42)
+    assert result == 42
 
 
 # ── classify_questions ─────────────────────────────────────────────────────────
