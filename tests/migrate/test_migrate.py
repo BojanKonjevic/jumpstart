@@ -15,12 +15,14 @@ from zenit.migrate.copier import (
     QuestionType,
 )
 from zenit.migrate.migrate import (
+    MigrationAnswers,
     _inventory_compose,
     _inventory_deps,
     _inventory_env,
     _normalise_source,
     _prompt_questions,
     _resolve_answers_noninteractive,
+    _stabilise_render_vars,
     run_migration,
 )
 from zenit.schema.exceptions import ZenitError
@@ -179,6 +181,186 @@ def test_resolve_noninteractive_renders_templated_default_values() -> None:
     answers = _resolve_answers_noninteractive(config, {})
     assert answers.render_vars["project_name"] == "my-proj"
     assert answers.render_vars["package_name"] == "my_proj"
+
+
+# ── _stabilise_render_vars ─────────────────────────────────────────────────────
+
+
+def test_stabilise_simple_chain() -> None:
+    """project_name → package_name converges in 1 iteration."""
+    config = CopierConfig(
+        questions=[
+            CopierQuestion(
+                name="project_name", type=QuestionType.STR, default="my-app"
+            ),
+            CopierQuestion(
+                name="package_name",
+                type=QuestionType.STR,
+                default="{{ project_name | replace('-', '_') }}",
+            ),
+        ]
+    )
+    answers = MigrationAnswers()
+    answers.render_vars["project_name"] = "my-app"
+    answers.render_vars["package_name"] = ""
+
+    _stabilise_render_vars(config, answers, set())
+
+    assert answers.render_vars["package_name"] == "my_app"
+
+
+def test_stabilise_3level_chain() -> None:
+    """a → b → c converges in multiple iterations."""
+    config = CopierConfig(
+        questions=[
+            CopierQuestion(name="a", type=QuestionType.STR, default="hello"),
+            CopierQuestion(name="b", type=QuestionType.STR, default="{{ a }}_b"),
+            CopierQuestion(name="c", type=QuestionType.STR, default="{{ b }}_c"),
+        ]
+    )
+    answers = MigrationAnswers()
+    answers.render_vars["a"] = "hello"
+    answers.render_vars["b"] = ""
+    answers.render_vars["c"] = ""
+
+    _stabilise_render_vars(config, answers, set())
+
+    assert answers.render_vars["b"] == "hello_b"
+    assert answers.render_vars["c"] == "hello_b_c"
+
+
+def test_stabilise_when_false_computed() -> None:
+    """when: false var gets re-resolved against current context."""
+    config = CopierConfig(
+        questions=[
+            CopierQuestion(name="flag_a", type=QuestionType.BOOL, default=True),
+            CopierQuestion(
+                name="flag_b",
+                type=QuestionType.BOOL,
+                default="{{ flag_a }}",
+                when=False,
+            ),
+        ]
+    )
+    answers = MigrationAnswers()
+    answers.render_vars["flag_a"] = True
+    answers.render_vars["flag_b"] = False  # Initial resolution got this wrong
+
+    _stabilise_render_vars(config, answers, set())
+
+    assert answers.render_vars["flag_b"] is True
+
+
+def test_stabilise_self_referential() -> None:
+    """Self-referential default does not loop."""
+    config = CopierConfig(
+        questions=[
+            CopierQuestion(
+                name="a",
+                type=QuestionType.STR,
+                default="{{ a | default('val') }}",
+            ),
+        ]
+    )
+    answers = MigrationAnswers()
+    answers.render_vars["a"] = "val"
+
+    _stabilise_render_vars(config, answers, set())
+
+    assert answers.render_vars["a"] == "val"
+
+
+def test_stabilise_no_jinja_defaults() -> None:
+    """No Jinja2 defaults — no changes to answers."""
+    config = CopierConfig(
+        questions=[
+            CopierQuestion(name="name", type=QuestionType.STR, default="myapp"),
+            CopierQuestion(name="port", type=QuestionType.INT, default=8080),
+        ]
+    )
+    answers = MigrationAnswers()
+    answers.render_vars["name"] = "myapp"
+    answers.render_vars["port"] = 8080
+
+    _stabilise_render_vars(config, answers, set())
+
+    assert answers.render_vars["name"] == "myapp"
+    assert answers.render_vars["port"] == 8080
+
+
+def test_stabilise_override_skipped() -> None:
+    """Overridden names are never re-resolved."""
+    config = CopierConfig(
+        questions=[
+            CopierQuestion(name="name", type=QuestionType.STR, default="default"),
+            CopierQuestion(
+                name="derived",
+                type=QuestionType.STR,
+                default="{{ name }}_suffix",
+            ),
+        ]
+    )
+    answers = MigrationAnswers()
+    answers.render_vars["name"] = "custom"
+
+    _stabilise_render_vars(config, answers, {"name"})
+
+    assert answers.render_vars["derived"] == "custom_suffix"
+    assert answers.render_vars["name"] == "custom"
+
+
+def test_stabilise_circular_dependency_warns(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Circular dependency emits warning after max iterations."""
+    # Each pass appends a character — never converges.
+    config = CopierConfig(
+        questions=[
+            CopierQuestion(name="a", type=QuestionType.STR, default="{{ b }}x"),
+            CopierQuestion(name="b", type=QuestionType.STR, default="{{ a }}x"),
+        ]
+    )
+    answers = MigrationAnswers()
+    answers.render_vars["a"] = ""
+    answers.render_vars["b"] = ""
+
+    warnings: list[str] = []
+    monkeypatch.setattr(
+        "zenit.migrate.migrate.warn",
+        lambda msg: warnings.append(msg),
+    )
+
+    _stabilise_render_vars(config, answers, set())
+
+    assert len(warnings) == 1
+    assert "not stabilize" in warnings[0]
+
+
+def test_stabilise_preserves_user_explicit_values(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Questions where user typed a value are not overwritten."""
+    config = CopierConfig(
+        questions=[
+            CopierQuestion(name="a", type=QuestionType.STR, default="default_a"),
+            CopierQuestion(
+                name="b",
+                type=QuestionType.STR,
+                default="{{ a }}_from_b",
+            ),
+        ]
+    )
+    answers = MigrationAnswers()
+    answers.render_vars["a"] = "user_value"  # User explicitly typed this
+    answers.render_vars["b"] = "user_b_value"  # User explicitly typed this
+
+    # "a" and "b" are both explicit — neither should be re-resolved
+    _stabilise_render_vars(config, answers, {"a", "b"})
+
+    assert answers.render_vars["b"] == "user_b_value"
+
+
+# ── run_migration (end-to-end) ─────────────────────────────────────────────────
 
 
 def test_run_migration_noninteractive_with_name(

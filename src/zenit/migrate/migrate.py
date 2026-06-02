@@ -57,6 +57,7 @@ from .copier import (
     FileJinjaClass,
     QuestionClass,
     QuestionType,
+    _has_jinja_expressions,
     build_extended_env,
     classify_file,
     classify_questions,
@@ -69,6 +70,7 @@ class MigrationAnswers:
     """User-provided answers to the template questions."""
 
     render_vars: dict[str, Any] = field(default_factory=dict)
+    explicit_names: set[str] = field(default_factory=set)
 
 
 @dataclass
@@ -201,6 +203,15 @@ def _prompt_questions(
 
     for q in config.questions:
         qclass = classes.get(q.name, QuestionClass.RENDER_VAR)
+
+        # Hidden questions (when: false) are auto-resolved, never prompted.
+        if q.when is False:
+            answers.render_vars[q.name] = _coerce_question_value(
+                q,
+                _render_copier_default(q.default, answers.render_vars),
+            )
+            continue
+
         default_value = _coerce_question_value(
             q,
             _render_copier_default(q.default, answers.render_vars),
@@ -209,24 +220,25 @@ def _prompt_questions(
         if q.type == QuestionType.MULTISELECT:
             choices_str = ", ".join(q.choices)
             msg = f"{q.help or q.name} {DIM}(comma-separated, options: {choices_str}){RESET}"
-            default_str = ", ".join(
-                str(v)
-                for v in (
-                    default_value
-                    if isinstance(default_value, list)
-                    else [default_value]
-                )
+            default_list = (
+                default_value if isinstance(default_value, list) else [default_value]
             )
+            default_str = ", ".join(str(v) for v in default_list)
             raw = input(f"  {msg} [{default_str}]: ").strip()
             if raw:
                 parts = [p.strip() for p in raw.split(",") if p.strip()]
                 answers.render_vars[q.name] = [q.choices_map.get(p, p) for p in parts]
+                answers.explicit_names.add(q.name)
             else:
                 answers.render_vars[q.name] = default_value
         elif q.type == QuestionType.BOOL:
             msg = f"{q.help or q.name}"
             raw = input(f"  {msg} {DIM}[Y/n]{RESET}  ").strip().lower()
-            answer = raw in ("", "y", "yes") if raw else bool(default_value)
+            if raw:
+                answer = raw in ("y", "yes")
+                answers.explicit_names.add(q.name)
+            else:
+                answer = bool(default_value)
             answers.render_vars[q.name] = answer
         elif qclass == QuestionClass.CHOICE_VAR:
             choices_str = ", ".join(q.choices)
@@ -234,23 +246,36 @@ def _prompt_questions(
             raw = input(f"  {msg} [{default_value}]: ").strip()
             if raw and raw in q.choices:
                 answers.render_vars[q.name] = q.choices_map.get(raw, raw)
+                answers.explicit_names.add(q.name)
             else:
                 answers.render_vars[q.name] = default_value
         elif q.type == QuestionType.INT:
             default_str = str(default_value) if default_value != "" else ""
             msg = f"{q.help or q.name}"
             raw = input(f"  {msg} [{default_str}]: ").strip()
-            answers.render_vars[q.name] = int(raw) if raw else default_value
+            if raw:
+                answers.render_vars[q.name] = int(raw)
+                answers.explicit_names.add(q.name)
+            else:
+                answers.render_vars[q.name] = default_value
         elif q.type == QuestionType.FLOAT:
             default_str = str(default_value) if default_value != "" else ""
             msg = f"{q.help or q.name}"
             raw = input(f"  {msg} [{default_str}]: ").strip()
-            answers.render_vars[q.name] = float(raw) if raw else default_value
+            if raw:
+                answers.render_vars[q.name] = float(raw)
+                answers.explicit_names.add(q.name)
+            else:
+                answers.render_vars[q.name] = default_value
         else:
             default_str = str(default_value) if default_value != "" else ""
             msg = f"{q.help or q.name}"
             raw = input(f"  {msg} [{default_str}]: ").strip()
-            answers.render_vars[q.name] = raw if raw else default_value
+            if raw:
+                answers.render_vars[q.name] = raw
+                answers.explicit_names.add(q.name)
+            else:
+                answers.render_vars[q.name] = default_value
 
     return answers
 
@@ -378,6 +403,61 @@ def _coerce_question_value(
             return question.choices_map.get(value, value)
         case _:
             return value
+
+
+# ── Variable stabilization ─────────────────────────────────────────────────────
+
+
+def _stabilise_render_vars(
+    config: CopierConfig,
+    answers: MigrationAnswers,
+    overridden_names: set[str],
+    max_iterations: int = 5,
+) -> None:
+    """Re-render Jinja2-backed defaults until the answer set stabilizes.
+
+    Processes questions in declaration order so derived variables are
+    resolved after the variables they depend on.  Stops early if no
+    values changed in the last pass.
+
+    Parameters
+    ----------
+    config:
+        Parsed Copier configuration — questions are iterated in order.
+    answers:
+        Current answers — defaults with Jinja2 expressions are re-rendered.
+    overridden_names:
+        Question names that should never be re-resolved (user-provided values
+        from ``-D`` flags or explicit interactive input).
+    max_iterations:
+        Safety limit to prevent infinite loops from circular dependencies.
+    """
+    for _iteration in range(1, max_iterations + 1):
+        changed = False
+
+        for q in config.questions:
+            if q.name in overridden_names:
+                continue
+            if not isinstance(q.default, str):
+                continue
+            if not _has_jinja_expressions(q.default):
+                continue
+
+            rendered = _render_copier_default(q.default, answers.render_vars)
+            coerced = _coerce_question_value(q, rendered)
+            current = answers.render_vars.get(q.name)
+
+            if coerced != current:
+                answers.render_vars[q.name] = coerced
+                changed = True
+
+        if not changed:
+            return
+
+    warn(
+        f"Variable resolution did not stabilize after {max_iterations} "
+        f"iterations. Check for circular dependencies in template defaults."
+    )
 
 
 # ── Template rendering ────────────────────────────────────────────────────────
@@ -896,9 +976,11 @@ def run_migration(
         # inject it so _pick_project_name uses it as the directory name.
         if name is not None and "project_name" not in answers.render_vars:
             answers.render_vars["project_name"] = name
+        overridden_names: set[str] = set(overrides.keys())
     else:
         step("Prompting for template answers")
         answers = _prompt_questions(config, classes)
+        overridden_names = answers.explicit_names
 
     # Derive directory name from the user's project_name answer, or fall back to
     # a name derived from the template source URL/path.
@@ -910,17 +992,12 @@ def run_migration(
     )
     answers.render_vars["project_name"] = project_name
 
-    # Re-derive any variable whose default references project_name (e.g.
-    # package_name = "{{ project_name | replace('-', '_') }}"). Without this,
-    # interactive mode with an empty project_name input would leave dependent
-    # vars as empty strings even after _pick_project_name fills in a real name.
-    for q in config.questions:
-        if q.name == "project_name":
-            continue
-        if isinstance(q.default, str) and "project_name" in q.default:
-            answers.render_vars[q.name] = _coerce_question_value(
-                q, _render_copier_default(q.default, answers.render_vars)
-            )
+    # project_name is never re-resolved — it was carefully chosen above.
+    overridden_names.add("project_name")
+
+    # Stabilize computed/derived variables by re-rendering Jinja2-backed
+    # defaults until the answer set converges.
+    _stabilise_render_vars(config, answers, overridden_names)
 
     project_dir = (Path.cwd() / project_name).resolve()
 
