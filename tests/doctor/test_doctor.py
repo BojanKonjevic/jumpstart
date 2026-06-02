@@ -1357,3 +1357,147 @@ class TestCheckTemplateHealth:
         result = _check_template_health(Path("/nonexistent"), lockfile)
         ok_items = [i for i in result.issues if i.severity == Severity.OK]
         assert any("No Copier template" in i.message for i in ok_items)
+
+
+# ── _check_copier_unmanaged_content (Step 11) ────────────────────────────────
+
+
+def test_unmanaged_native_project_ok() -> None:
+    """Native project returns OK — no unmanaged content expected."""
+    from zenit.doctor.doctor import _check_copier_unmanaged_content
+
+    lockfile = ZenitLockfile(
+        template="blank",
+        addons=[],
+        zenit_version="1.0.0",
+        schema_version=4,
+        template_source="native",
+    )
+    result = _check_copier_unmanaged_content(Path("/nonexistent"), lockfile)
+    ok_items = [i for i in result.issues if i.severity == Severity.OK]
+    assert any("native template" in i.message for i in ok_items)
+
+
+def test_unmanaged_copier_no_unmanaged_entries() -> None:
+    """Copier project with all entries managed returns OK."""
+    from zenit.doctor.doctor import _check_copier_unmanaged_content
+    from zenit.schema.models import EntrySource, EnvEntry, Manifest
+
+    lockfile = ZenitLockfile(
+        template="https://example.com/template",
+        addons=["redis"],
+        zenit_version="1.0.0",
+        schema_version=4,
+        template_source="copier",
+        template_uri="https://example.com/template",
+    )
+    manifest = Manifest(
+        env=[EnvEntry(key="REDIS_URL", source=EntrySource.ADDON, addon="redis")],
+        dependencies=[],
+        compose_services=[],
+        compose_volumes=[],
+        just_recipes=[],
+    )
+    result = _check_copier_unmanaged_content(Path("/nonexistent"), lockfile, manifest)
+    ok_items = [i for i in result.issues if i.severity == Severity.OK]
+    assert any("managed by native addons" in i.message for i in ok_items)
+
+
+def test_unmanaged_copier_detects_unmanaged_env() -> None:
+    """Copier project with unmanaged TEMPLATE env var warns and suggests addon."""
+    from zenit.doctor.doctor import _check_copier_unmanaged_content
+    from zenit.schema.models import EntrySource, EnvEntry, Manifest
+
+    lockfile = ZenitLockfile(
+        template="https://example.com/template",
+        addons=[],
+        zenit_version="1.0.0",
+        schema_version=4,
+        template_source="copier",
+        template_uri="https://example.com/template",
+    )
+    manifest = Manifest(
+        env=[EnvEntry(key="REDIS_URL", source=EntrySource.TEMPLATE, addon="")],
+    )
+    result = _check_copier_unmanaged_content(Path("/nonexistent"), lockfile, manifest)
+    warns = [i for i in result.issues if i.severity == Severity.WARN]
+    assert len(warns) == 1
+    assert "REDIS_URL" in warns[0].message
+    assert "zenit add redis" in warns[0].hint
+
+
+def test_unmanaged_copier_detects_unmanaged_deps(tmp_path: Path) -> None:
+    """Copier project with unmanaged TEMPLATE dep warns and suggests addon."""
+    from zenit.doctor.doctor import _check_copier_unmanaged_content
+    from zenit.schema.models import DependencyEntry, EntrySource, Manifest
+
+    lockfile = ZenitLockfile(
+        template="https://example.com/template",
+        addons=[],
+        zenit_version="1.0.0",
+        schema_version=4,
+        template_source="copier",
+        template_uri="https://example.com/template",
+    )
+    manifest = Manifest(
+        dependencies=[
+            DependencyEntry(
+                package="asyncpg",
+                spec="asyncpg>=0.28",
+                source=EntrySource.TEMPLATE,
+                addon="",
+                dev=False,
+            )
+        ],
+    )
+    result = _check_copier_unmanaged_content(tmp_path, lockfile, manifest)
+    warns = [i for i in result.issues if i.severity == Severity.WARN]
+    assert len(warns) >= 1
+    messages = " ".join(w.message for w in warns)
+    assert "asyncpg" in messages
+
+
+def test_unmanaged_copier_multiple_entry_types() -> None:
+    """Multiple unmanaged entry types each get a separate warn."""
+    from zenit.doctor.doctor import _check_copier_unmanaged_content
+    from zenit.schema.models import EntrySource, EnvEntry, Manifest, OwnedEntry
+
+    lockfile = ZenitLockfile(
+        template="https://example.com/template",
+        addons=[],
+        zenit_version="1.0.0",
+        schema_version=4,
+        template_source="copier",
+        template_uri="https://example.com/template",
+    )
+    manifest = Manifest(
+        env=[EnvEntry(key="REDIS_URL", source=EntrySource.TEMPLATE, addon="")],
+        compose_services=[
+            OwnedEntry(name="redis", source=EntrySource.TEMPLATE, addon="")
+        ],
+    )
+    result = _check_copier_unmanaged_content(Path("/nonexistent"), lockfile, manifest)
+    warns = [i for i in result.issues if i.severity == Severity.WARN]
+    assert len(warns) == 2
+
+
+def test_template_health_with_stub_file(tmp_path: Path) -> None:
+    """_check_template_health counts tasks when .zenit-tasks.md exists."""
+    from zenit.doctor.doctor import _check_template_health
+
+    (tmp_path / ".zenit-tasks.md").write_text(
+        "## 1. false\n- **Status:** Failed (exit 1)\n## 2. rm -rf /\n- **Status:** Blocked\n",
+        encoding="utf-8",
+    )
+    lockfile = ZenitLockfile(
+        template="https://example.com/template",
+        addons=[],
+        zenit_version="1.0.0",
+        schema_version=4,
+        template_source="copier",
+        template_uri="https://example.com/template",
+        template_has_tasks=True,
+    )
+    result = _check_template_health(tmp_path, lockfile)
+    errors = [i for i in result.issues if i.severity == Severity.ERROR]
+    assert any("2 pending task" in i.message for i in errors)

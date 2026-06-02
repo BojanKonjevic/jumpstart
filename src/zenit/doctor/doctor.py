@@ -29,8 +29,10 @@ from zenit.core.manifest import dep_package_name, read_manifest, write_manifest
 from zenit.core.pkg_name import normalise_pkg_name, resolve_dest_placeholder
 from zenit.schema.models import (
     AddonConfig,
+    AddonMeta,
     Contributions,
     DependencyEntry,
+    EntrySource,
     EnvEntry,
     Manifest,
     ManifestBlock,
@@ -153,6 +155,7 @@ def run_doctor(
     results.append(_check_manifest_recipes(project_dir, manifest))
     results.append(_check_python_line_presence(project_dir, manifest))
     results.append(_check_python_integrity(project_dir, manifest))
+    results.append(_check_copier_unmanaged_content(project_dir, lockfile, manifest))
 
     return results
 
@@ -632,14 +635,24 @@ def _check_template_health(
         return result
 
     if lockfile.template_has_tasks:
-        result.error(
-            "This project has pending manual steps from Copier _tasks that "
-            "were not executed automatically.",
-            hint=(
-                "Check .zenit-tasks.md in the project root "
-                "for the list of commands to run manually."
-            ),
-        )
+        stub_path = project_dir / ".zenit-tasks.md"
+        if stub_path.exists():
+            text = stub_path.read_text(encoding="utf-8")
+            task_count = text.count("\n## ") + (1 if text.startswith("## ") else 0)
+            result.error(
+                f"Project has {task_count} pending task(s) from Copier _tasks "
+                f"that failed or were not executed.",
+                hint="Check .zenit-tasks.md for the commands and error output.",
+            )
+        else:
+            result.error(
+                "This project has pending manual steps from Copier _tasks that "
+                "were not executed automatically.",
+                hint=(
+                    "Check .zenit-tasks.md in the project root "
+                    "for the list of commands to run manually."
+                ),
+            )
 
     file_count = len(lockfile.template_file_paths)
     if file_count > 0:
@@ -651,6 +664,111 @@ def _check_template_health(
         result.ok("No Copier template file paths tracked.")
 
     result.ok(f"Copier template source: {lockfile.template_uri or lockfile.template}.")
+
+    return result
+
+
+def _suggest_addons_for_entries(
+    entries: list[str],
+    entry_type: str,
+    available: list[AddonMeta],
+) -> list[str]:
+    """Return addon IDs whose known contributions overlap with *entries*."""
+    suggestions: list[str] = []
+    for meta in available:
+        try:
+            cfg = get_addon(meta.id)
+        except Exception:
+            continue
+
+        matched = False
+        if entry_type == "env":
+            matched = any(ev.key in entries for ev in cfg.env_vars)
+        elif entry_type == "deps":
+            cfg_pkgs = {dep_package_name(d) for d in cfg.deps + cfg.dev_deps}
+            matched = bool(cfg_pkgs & set(entries))
+        elif entry_type == "compose_services":
+            matched = any(svc.name in entries for svc in cfg.compose_services)
+        elif entry_type == "compose_volumes":
+            matched = any(vol in entries for vol in cfg.compose_volumes)
+
+        if matched:
+            suggestions.append(meta.id)
+
+    return suggestions
+
+
+def _check_copier_unmanaged_content(
+    project_dir: Path,
+    lockfile: ZenitLockfile,
+    manifest: Manifest | None = None,
+) -> HealthResult:
+    """For Copier-migrated projects, report unmanaged content by component.
+
+    Lists env vars, deps, compose services, and volumes that are still
+    source=TEMPLATE with addon=\"\", and suggests which native addon could
+    take ownership.
+    """
+    result = HealthResult("Unmanaged content")
+
+    if lockfile.template_source != "copier":
+        result.ok("Project uses a native template — no unmanaged content expected.")
+        return result
+
+    if manifest is None:
+        manifest = read_manifest(project_dir)
+
+    template_entries: dict[str, list[str]] = {
+        "env": [],
+        "deps": [],
+        "compose_services": [],
+        "compose_volumes": [],
+        "just_recipes": [],
+    }
+
+    for e in manifest.env:
+        if e.source == EntrySource.TEMPLATE and e.addon == "":
+            template_entries["env"].append(e.key)
+
+    for d in manifest.dependencies:
+        if d.source == EntrySource.TEMPLATE and d.addon == "":
+            template_entries["deps"].append(d.package)
+
+    for s in manifest.compose_services:
+        if s.source == EntrySource.TEMPLATE and s.addon == "":
+            template_entries["compose_services"].append(s.name)
+
+    for v in manifest.compose_volumes:
+        if v.source == EntrySource.TEMPLATE and v.addon == "":
+            template_entries["compose_volumes"].append(v.name)
+
+    for r in manifest.just_recipes:
+        if r.source == EntrySource.TEMPLATE and r.addon == "":
+            template_entries["just_recipes"].append(r.name)
+
+    available = list_addons()
+    total_unmanaged = sum(len(v) for v in template_entries.values())
+
+    if total_unmanaged == 0:
+        result.ok("All manifest content is managed by native addons.")
+        return result
+
+    for entry_type, entries in template_entries.items():
+        if not entries:
+            continue
+        suggestions = _suggest_addons_for_entries(entries, entry_type, available)
+        display = ", ".join(entries[:5])
+        if len(entries) > 5:
+            display += "..."
+        hint = (
+            f"Run: zenit add {' | zenit add '.join(suggestions)}"
+            if suggestions
+            else "No matching native addon found — content must be managed manually."
+        )
+        result.warn(
+            f"{len(entries)} unmanaged {entry_type}: {display}",
+            hint=hint,
+        )
 
     return result
 
