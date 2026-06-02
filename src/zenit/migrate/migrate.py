@@ -10,6 +10,7 @@ the result, and writing the lockfile and manifest.
 from __future__ import annotations
 
 import contextlib
+import fnmatch
 import shlex
 import shutil
 import subprocess
@@ -664,6 +665,39 @@ def _apply_safe_task_file_ops(
     return updated, remaining_tasks
 
 
+def _matches_any_skip_pattern(path: str, patterns: list[str]) -> bool:
+    """Return True when *path* matches any *patterns* via fnmatch."""
+    return any(fnmatch.fnmatch(path, p) for p in patterns)
+
+
+def _apply_skip_if_exists(
+    contributions: list[FileContribution],
+    patterns: list[str],
+    project_dir: Path,
+    render_vars: dict[str, Any],
+) -> list[FileContribution]:
+    """Filter contributions whose destination exists and matches a skip pattern."""
+    if not patterns:
+        return contributions
+
+    filtered: list[FileContribution] = []
+    for fc in contributions:
+        rendered_dest = _render_destination_path(fc.dest, render_vars)
+        if rendered_dest is None:
+            continue
+        dest_path = project_dir / rendered_dest
+        if dest_path.exists() and _matches_any_skip_pattern(
+            str(rendered_dest), patterns
+        ):
+            warn(
+                f"Skipping '{rendered_dest}' — _skip_if_exists pattern matched "
+                f"and file already exists."
+            )
+            continue
+        filtered.append(fc)
+    return filtered
+
+
 def _rewrite_contribution_prefixes(
     contributions: list[FileContribution],
     source: str,
@@ -955,13 +989,6 @@ def run_migration(
     step("Analyzing template questions")
     classes = classify_questions(config, template_dir)
 
-    if config.skip_if_exists:
-        for pattern in config.skip_if_exists:
-            warn(
-                f"'_skip_if_exists' pattern '{pattern}' is not supported in migration. "
-                f"Any matching files were written unconditionally."
-            )
-
     non_interactive = name is not None or data
 
     if non_interactive:
@@ -1011,6 +1038,9 @@ def run_migration(
     file_contributions = _render_template(template_dir)
     file_contributions, pending_tasks = _apply_safe_task_file_ops(
         file_contributions, config.tasks, answers.render_vars
+    )
+    file_contributions = _apply_skip_if_exists(
+        file_contributions, config.skip_if_exists, project_dir, answers.render_vars
     )
 
     step("Writing project")

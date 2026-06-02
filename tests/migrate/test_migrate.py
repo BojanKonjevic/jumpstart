@@ -753,6 +753,135 @@ def test_run_migration_applies_safe_mv_and_rm_tasks(
     assert "rm -rf" not in task_stub
 
 
+# ── _apply_skip_if_exists ───────────────────────────────────────────────────────
+
+
+def test_apply_skip_if_exists_file_exists_pattern_matches(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """File exists and pattern matches → skipped with warning."""
+    warnings: list[str] = []
+    monkeypatch.setattr(
+        "zenit.migrate.migrate.warn",
+        lambda msg: warnings.append(msg),
+    )
+    (tmp_path / "CHANGELOG.md").write_text("existing")
+
+    from zenit.migrate.migrate import _apply_skip_if_exists
+    from zenit.schema.models import FileContribution
+
+    contributions = [
+        FileContribution(dest="CHANGELOG.md"),
+        FileContribution(dest="README.md"),
+    ]
+    result = _apply_skip_if_exists(contributions, ["CHANGELOG.md"], tmp_path, {})
+    assert len(result) == 1
+    assert result[0].dest == "README.md"
+    assert len(warnings) == 1
+    assert "CHANGELOG.md" in warnings[0]
+
+
+def test_apply_skip_if_exists_file_absent(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """File absent even though pattern matches → written normally, no warning."""
+    warnings: list[str] = []
+    monkeypatch.setattr(
+        "zenit.migrate.migrate.warn",
+        lambda msg: warnings.append(msg),
+    )
+    from zenit.migrate.migrate import _apply_skip_if_exists
+    from zenit.schema.models import FileContribution
+
+    contributions = [FileContribution(dest="NEW_FILE.md")]
+    result = _apply_skip_if_exists(contributions, ["NEW_FILE.md"], tmp_path, {})
+    assert len(result) == 1
+    assert result[0].dest == "NEW_FILE.md"
+    assert len(warnings) == 0
+
+
+def test_apply_skip_if_exists_pattern_no_match(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """File exists but pattern doesn't match → written normally."""
+    warnings: list[str] = []
+    monkeypatch.setattr(
+        "zenit.migrate.migrate.warn",
+        lambda msg: warnings.append(msg),
+    )
+    (tmp_path / "CHANGELOG.md").write_text("existing")
+
+    from zenit.migrate.migrate import _apply_skip_if_exists
+    from zenit.schema.models import FileContribution
+
+    contributions = [FileContribution(dest="CHANGELOG.md")]
+    result = _apply_skip_if_exists(contributions, ["README.md"], tmp_path, {})
+    assert len(result) == 1
+    assert result[0].dest == "CHANGELOG.md"
+    assert len(warnings) == 0
+
+
+def test_apply_skip_if_exists_glob_pattern(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Glob pattern matches existing file → skipped."""
+    warnings: list[str] = []
+    monkeypatch.setattr(
+        "zenit.migrate.migrate.warn",
+        lambda msg: warnings.append(msg),
+    )
+    sub = tmp_path / "odoo" / "custom" / "dependencies"
+    sub.mkdir(parents=True)
+    (sub / "external.txt").write_text("existing")
+
+    from zenit.migrate.migrate import _apply_skip_if_exists
+    from zenit.schema.models import FileContribution
+
+    contributions = [FileContribution(dest="odoo/custom/dependencies/external.txt")]
+    result = _apply_skip_if_exists(
+        contributions, ["odoo/custom/dependencies/*.txt"], tmp_path, {}
+    )
+    assert len(result) == 0
+    assert len(warnings) == 1
+
+
+def test_apply_skip_if_exists_no_patterns(
+    tmp_path: Path,
+) -> None:
+    """No skip_if_exists patterns → all files written normally."""
+    from zenit.migrate.migrate import _apply_skip_if_exists
+    from zenit.schema.models import FileContribution
+
+    contributions = [
+        FileContribution(dest="a.txt"),
+        FileContribution(dest="b.txt"),
+    ]
+    result = _apply_skip_if_exists(contributions, [], tmp_path, {})
+    assert len(result) == 2
+
+
+def test_apply_skip_if_exists_renders_jinja_dest(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Jinja in destination path is rendered before skip check."""
+    warnings: list[str] = []
+    monkeypatch.setattr(
+        "zenit.migrate.migrate.warn",
+        lambda msg: warnings.append(msg),
+    )
+    (tmp_path / "myproj.conf").write_text("existing")
+
+    from zenit.migrate.migrate import _apply_skip_if_exists
+    from zenit.schema.models import FileContribution
+
+    contributions = [FileContribution(dest="{{ name }}.conf")]
+    result = _apply_skip_if_exists(
+        contributions, ["*.conf"], tmp_path, {"name": "myproj"}
+    )
+    assert len(result) == 0
+    assert len(warnings) == 1
+
+
 def test_run_migration_skips_copier_internal_answers_file(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
