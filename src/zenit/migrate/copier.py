@@ -334,7 +334,12 @@ def parse_copier_yml(path: Path) -> CopierConfig:
         config.templates_suffix = templates_suffix
     raw_tasks = data.pop("_tasks", []) or []
     if isinstance(raw_tasks, list):
-        config.tasks = [task for task in raw_tasks if isinstance(task, (str, dict))]
+        config.tasks = []
+        for task in raw_tasks:
+            if isinstance(task, (str, dict)):
+                config.tasks.append(task)
+            elif isinstance(task, bool):
+                config.tasks.append(str(task).lower())
     config.jinja_extensions = list(data.pop("_jinja_extensions", []) or [])
     config.message_before_copy = str(data.pop("_message_before_copy", "") or "")
     config.message_after_copy = str(data.pop("_message_after_copy", "") or "")

@@ -77,6 +77,21 @@ class MigrationAnswers:
 
 
 @dataclass
+@dataclass
+class TaskResult:
+    command: str
+    rendered_command: str
+    exit_code: int
+    stdout: str
+    stderr: str
+    timed_out: bool = False
+
+    @property
+    def succeeded(self) -> bool:
+        return self.exit_code == 0 and not self.timed_out
+
+
+@dataclass
 class MigrationResult:
     """Result of a completed migration."""
 
@@ -457,6 +472,25 @@ _KNOWN_JINJA2_TAGS: set[str] = {
     "namespace",
     "endnamespace",
 }
+
+DESTRUCTIVE_PATTERNS: list[str] = [
+    "rm *",
+    "rm -rf *",
+    "rm -rf /*",
+    "rm -fr /*",
+    "dd *",
+    "> /dev/*",
+    "> /dev/sd*",
+    "mkfs*",
+    "fdisk*",
+    "format *",
+    ":(){ :|:& };:",
+    "mv /*",
+    "chmod -R 0",
+    "chown -R",
+    "sudo",
+    "pkexec",
+]
 
 
 def _diagnose_failed_render(
@@ -861,6 +895,7 @@ def _apply_safe_task_file_ops(
     contributions: list[FileContribution],
     tasks: list[CopierTask],
     render_vars: dict[str, Any],
+    project_dir: Path | None = None,
 ) -> tuple[list[FileContribution], list[CopierTask]]:
     """Apply safe Copier file-layout tasks and return remaining manual tasks."""
     remaining_tasks: list[CopierTask] = []
@@ -886,6 +921,10 @@ def _apply_safe_task_file_ops(
             continue
         if len(parts) >= 3 and parts[0] == "rm" and parts[1] in ("-f", "-rf", "-fr"):
             updated = _remove_contribution_targets(updated, parts[2:])
+            continue
+        if len(parts) == 3 and parts[0] == "mkdir" and parts[1] == "-p":
+            target = project_dir / parts[2] if project_dir else Path(parts[2])
+            target.mkdir(parents=True, exist_ok=True)
             continue
 
         remaining_tasks.append(task)
@@ -972,6 +1011,92 @@ def _remove_contribution_targets(
         kept.append(contribution)
 
     return kept
+
+
+# ── Task execution (Step 9) ────────────────────────────────────────────────────
+
+
+def _check_destructive_command(command: str) -> str | None:
+    """Return a description if *command* matches a known destructive pattern."""
+    command_lower = command.lower().strip()
+    for pattern in DESTRUCTIVE_PATTERNS:
+        if fnmatch.fnmatch(command_lower, pattern) or fnmatch.fnmatch(
+            command_lower, f"* {pattern}"
+        ):
+            return pattern
+    return None
+
+
+def _execute_task(
+    task: CopierTask,
+    project_dir: Path,
+    render_vars: dict[str, Any],
+    timeout: float = 300.0,
+) -> TaskResult | None:
+    if not _task_enabled(task, render_vars):
+        return None
+
+    command = _task_command(task)
+    if command is None:
+        return None
+
+    rendered = COPIER_ENV.from_string(command).render(**render_vars)
+    destructive = _check_destructive_command(rendered)
+    if destructive:
+        warn(
+            f"Skipping destructive-looking task: {rendered!r} "
+            f"(matched pattern: {destructive}). "
+            f"Run it manually after review."
+        )
+        return TaskResult(
+            command,
+            rendered,
+            -1,
+            "",
+            "blocked by destructive pattern check",
+            timed_out=False,
+        )
+
+    try:
+        proc = subprocess.run(
+            rendered,
+            shell=True,
+            capture_output=True,
+            text=True,
+            cwd=str(project_dir),
+            timeout=timeout,
+        )
+    except subprocess.TimeoutExpired:
+        warn(f"Task timed out after {timeout}s: {rendered!r}")
+        return TaskResult(
+            command, rendered, -1, "", f"timed out after {timeout}s", timed_out=True
+        )
+
+    if proc.returncode != 0:
+        warn(f"Task failed (exit {proc.returncode}): {rendered!r}")
+
+    return TaskResult(
+        command,
+        rendered,
+        proc.returncode,
+        proc.stdout,
+        proc.stderr,
+        timed_out=False,
+    )
+
+
+def _execute_tasks(
+    tasks: list[CopierTask],
+    project_dir: Path,
+    render_vars: dict[str, Any],
+    timeout: float = 300.0,
+) -> list[TaskResult]:
+    failed: list[TaskResult] = []
+    for task in tasks:
+        result = _execute_task(task, project_dir, render_vars, timeout)
+        if result is not None and not result.succeeded:
+            failed.append(result)
+    return failed
 
 
 # ── Inventory scan ─────────────────────────────────────────────────────────────
@@ -1102,25 +1227,31 @@ def _inventory_deps(project_dir: Path) -> list[tuple[str, str, bool]]:
 # ── Task stubs ─────────────────────────────────────────────────────────────────
 
 
-def _write_task_stub(project_dir: Path, tasks: list[CopierTask]) -> None:
-    """Write a task-stub file that lists the pending _tasks."""
-    if not tasks:
+def _write_task_stub(project_dir: Path, failed: list[TaskResult]) -> None:
+    """Write a task-stub file listing failed tasks for manual execution."""
+    if not failed:
         return
     stub_path = project_dir / ".zenit-tasks.md"
     lines = [
         "# Manual Tasks (from Copier _tasks)",
         "",
-        "This project was migrated from a Copier template that defined",
-        "the following tasks. They were not executed automatically.",
+        "The following tasks failed or were blocked during migration.",
+        "Review and run them manually if needed.",
         "",
     ]
-    for i, task in enumerate(tasks, 1):
-        command = _task_command(task)
-        if isinstance(task, dict) and isinstance(task.get("when"), str):
-            lines.append(f"  {i}. {command}  [when: {task['when']}]")
+    for i, task in enumerate(failed, 1):
+        lines.append(f"## {i}. {task.rendered_command}")
+        if task.exit_code != -1:
+            lines.append(f"- **Status:** Failed (exit {task.exit_code})")
+        elif task.timed_out:
+            lines.append("- **Status:** Timed out")
         else:
-            lines.append(f"  {i}. {command or task}")
-    lines.append("")
+            lines.append("- **Status:** Blocked")
+        if task.stderr:
+            lines.append(f"- **Stderr:** {task.stderr.strip()}")
+        if task.stdout:
+            lines.append(f"- **Stdout:** {task.stdout.strip()}")
+        lines.append("")
     stub_path.write_text("\n".join(lines), encoding="utf-8")
 
 
@@ -1182,6 +1313,7 @@ def run_migration(
     *,
     name: str | None = None,
     data: dict[str, str] | None = None,
+    task_timeout: float = 300.0,
 ) -> MigrationResult:
     """Run the full migration pipeline.
 
@@ -1200,6 +1332,9 @@ def run_migration(
     data:
         Additional key=value overrides for non-interactive mode (e.g.
         ``{"use_redis": "yes"}``).  Ignored when ``name`` is ``None``.
+    task_timeout:
+        Per-task timeout in seconds (default 300).  Tasks that exceed this
+        limit are reported as timed out and written to the manual stub.
 
     Returns
     -------
@@ -1265,7 +1400,7 @@ def run_migration(
     step("Rendering template files")
     file_contributions = _render_template(template_dir)
     file_contributions, pending_tasks = _apply_safe_task_file_ops(
-        file_contributions, config.tasks, answers.render_vars
+        file_contributions, config.tasks, answers.render_vars, project_dir
     )
     file_contributions = _apply_skip_if_exists(
         file_contributions, config.skip_if_exists, project_dir, answers.render_vars
@@ -1393,15 +1528,17 @@ def run_migration(
     )
 
     step("Processing tasks")
-    if pending_tasks:
-        _write_task_stub(project_dir, pending_tasks)
+    failed_tasks = _execute_tasks(
+        pending_tasks, project_dir, answers.render_vars, task_timeout
+    )
+    _write_task_stub(project_dir, failed_tasks)
 
     result = MigrationResult(
         project_dir=project_dir,
         template_source=template_source,
         file_paths=sorted(set(file_paths)),
         addon_ids=[],
-        has_tasks=bool(pending_tasks),
+        has_tasks=bool(failed_tasks),
         env_count=len(env_keys),
         compose_service_count=len(compose_services),
         compose_volume_count=len(compose_volumes),

@@ -99,6 +99,20 @@ def test_parse_default_handling(tmp_path: Path) -> None:
     assert q_flag.default is True
 
 
+def test_parse_tasks_with_bool_converts_to_string(tmp_path: Path) -> None:
+    """YAML ``false`` / ``true`` in _tasks is parsed as bool and converted to string."""
+    from zenit.migrate.migrate import parse_copier_yml
+
+    (tmp_path / "copier.yml").write_text(
+        "project_name:\n  type: str\n_tasks:\n  - echo hello\n  - false\n  - true\n",
+        encoding="utf-8",
+    )
+    config = parse_copier_yml(tmp_path / "copier.yml")
+    assert len(config.tasks) == 3
+    assert config.tasks[1] == "false"
+    assert config.tasks[2] == "true"
+
+
 def test_parse_missing_file_raises(tmp_path: Path) -> None:
     with pytest.raises(FileNotFoundError):
         parse_copier_yml(tmp_path / "copier.yml")

@@ -726,7 +726,7 @@ def test_run_migration_applies_safe_mv_and_rm_tasks(
         "    when: \"{{ package_name != 'project_name' }}\"\n"
         '  - command: rm -rf "src/{{ package_name }}/api/" docs/\n'
         '    when: "{{ not use_api }}"\n'
-        "  - echo keep-manual\n"
+        "  - false\n"
         "use_api:\n"
         "  type: bool\n"
         "  default: false\n",
@@ -749,7 +749,7 @@ def test_run_migration_applies_safe_mv_and_rm_tasks(
     assert not (result.project_dir / "docs").exists()
 
     task_stub = (result.project_dir / ".zenit-tasks.md").read_text(encoding="utf-8")
-    assert "echo keep-manual" in task_stub
+    assert "false" in task_stub
     assert "mv src/project_name" not in task_stub
     assert "rm -rf" not in task_stub
 
@@ -1490,3 +1490,171 @@ def test_diagnose_failed_render_parse_error() -> None:
         COPIER_ENV,
     )
     assert diagnostic is not None
+
+
+# ── Task execution (Step 9) ────────────────────────────────────────────────────
+
+
+def test_task_command_string() -> None:
+    """String task returns the string as command."""
+    from zenit.migrate.migrate import _task_command
+
+    result = _task_command("echo hello")
+    assert result == "echo hello"
+
+
+def test_task_command_dict() -> None:
+    """Dict task returns the 'command' field."""
+    from zenit.migrate.migrate import _task_command
+
+    result = _task_command({"command": "echo hello", "when": "True"})
+    assert result == "echo hello"
+
+
+def test_task_command_dict_no_command() -> None:
+    """Dict task without 'command' returns None."""
+    from zenit.migrate.migrate import _task_command
+
+    result = _task_command({"when": "True"})
+    assert result is None
+
+
+def test_task_enabled_string() -> None:
+    """String task is always enabled."""
+    from zenit.migrate.migrate import _task_enabled
+
+    assert _task_enabled("echo hi", {}) is True
+
+
+def test_task_enabled_when_true() -> None:
+    """Task with true when condition is enabled."""
+    from zenit.migrate.migrate import _task_enabled
+
+    t = {"command": "echo hi", "when": "{{ use_it }}"}
+    assert _task_enabled(t, {"use_it": "True"}) is True
+
+
+def test_task_enabled_when_false() -> None:
+    """Task with false when condition is disabled."""
+    from zenit.migrate.migrate import _task_enabled
+
+    t = {"command": "echo hi", "when": "{{ use_it }}"}
+    assert _task_enabled(t, {"use_it": "false"}) is False
+
+
+def test_execute_task_simple(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """Simple echo task succeeds."""
+    from zenit.migrate.migrate import _execute_task
+
+    monkeypatch.setattr(
+        "zenit.migrate.migrate.subprocess.run",
+        lambda *a, **kw: type(
+            "Proc",
+            (),
+            {
+                "returncode": 0,
+                "stdout": "hello",
+                "stderr": "",
+            },
+        )(),
+    )
+    result = _execute_task("echo hello", tmp_path, {})
+    assert result is not None
+    assert result.succeeded
+
+
+def test_execute_task_fails(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """Task with non-zero exit returns failed result."""
+    from zenit.migrate.migrate import _execute_task
+
+    monkeypatch.setattr(
+        "zenit.migrate.migrate.subprocess.run",
+        lambda *a, **kw: type(
+            "Proc",
+            (),
+            {
+                "returncode": 1,
+                "stdout": "",
+                "stderr": "error",
+            },
+        )(),
+    )
+    result = _execute_task("false", tmp_path, {})
+    assert result is not None
+    assert not result.succeeded
+    assert result.exit_code == 1
+
+
+def test_execute_task_skipped_by_when(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Task with when=False is skipped (returns None)."""
+    from zenit.migrate.migrate import _execute_task
+
+    result = _execute_task(
+        {"command": "echo hi", "when": "{{ use_it }}"},
+        tmp_path,
+        {"use_it": "false"},
+    )
+    assert result is None
+
+
+def test_execute_tasks_returns_failed_only(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """_execute_tasks returns only failed/timed-out tasks."""
+    from zenit.migrate.migrate import _execute_tasks
+
+    return_codes: list[int] = [0, 1]
+    monkeypatch.setattr(
+        "zenit.migrate.migrate.subprocess.run",
+        lambda *a, **kw: type(
+            "Proc",
+            (),
+            {
+                "returncode": return_codes.pop(0) if return_codes else 0,
+                "stdout": "",
+                "stderr": "",
+            },
+        )(),
+    )
+    failed = _execute_tasks(
+        ["echo ok", "echo fail"],
+        tmp_path,
+        {},
+    )
+    assert len(failed) == 1
+    assert failed[0].exit_code == 1
+
+
+def test_write_task_stub_skipped_no_failed(tmp_path: Path) -> None:
+    """No stub written when no tasks failed."""
+    from zenit.migrate.migrate import _write_task_stub
+
+    _write_task_stub(tmp_path, [])
+    assert not (tmp_path / ".zenit-tasks.md").exists()
+
+
+def test_write_task_stub_writes_failed(tmp_path: Path) -> None:
+    """Stub written with failed task details."""
+    from zenit.migrate.migrate import TaskResult, _write_task_stub
+
+    _write_task_stub(
+        tmp_path,
+        [
+            TaskResult("echo fail", "echo fail", 1, "", "error msg", timed_out=False),
+        ],
+    )
+    content = (tmp_path / ".zenit-tasks.md").read_text()
+    assert "echo fail" in content
+    assert "Failed (exit 1)" in content
+    assert "error msg" in content
+
+
+def test_apply_safe_mkdir_p(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """mkdir -p task creates directory safely."""
+    from zenit.migrate.migrate import _apply_safe_task_file_ops
+
+    results, pending = _apply_safe_task_file_ops([], ["mkdir -p dir/sub"], {}, tmp_path)
+    assert (tmp_path / "dir" / "sub").exists()
+    assert len(pending) == 0

@@ -466,6 +466,13 @@ def cmd_migrate(
             help="Override a template question: -D use_redis=yes (can be repeated)",
         ),
     ] = None,
+    task_timeout: Annotated[
+        float,
+        typer.Option(
+            "--task-timeout",
+            help="Per-task timeout in seconds (default 300)",
+        ),
+    ] = 300.0,
 ) -> None:
     """Create a new project from a Copier template.
 
@@ -482,7 +489,9 @@ def cmd_migrate(
     overrides = _parse_data_flags(data) if data else None
 
     try:
-        result = run_migration(source, name=name, data=overrides)
+        result = run_migration(
+            source, name=name, data=overrides, task_timeout=task_timeout
+        )
         _print_migration_result(result)
     except Exception as exc:
         from zenit.cli.ui import error
