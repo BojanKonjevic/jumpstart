@@ -78,6 +78,8 @@ class CopierConfig:
     jinja_extensions: list[str] = field(default_factory=list)
     templates_suffix: str | None = None
     envops: dict[str, Any] = field(default_factory=dict)
+    message_before_copy: str = ""
+    message_after_copy: str = ""
 
 
 def _to_nice_yaml(value: object, indent: int = 2) -> str:
@@ -120,24 +122,6 @@ class CopierNamespaceExtension(jinja2.ext.Extension):
         body = parser.parse_statements(
             ("name:endnamespace",),
             drop_needle=True,
-        )
-        return jinja2.nodes.CallBlock(
-            self.call_method("_render_namespace", [jinja2.nodes.Const(name)]),
-            [],
-            [],
-            body,
-        )
-        return jinja2.nodes.CallBlock(
-            self.call_method("_render_namespace", [jinja2.nodes.Const(name)]),
-            [],
-            [],
-            body,
-        )
-        return jinja2.nodes.CallBlock(
-            self.call_method("_render_namespace", [jinja2.nodes.Const(name)]),
-            [],
-            [],
-            body,
         )
         return jinja2.nodes.CallBlock(
             self.call_method("_render_namespace", [jinja2.nodes.Const(name)]),
@@ -331,6 +315,8 @@ def parse_copier_yml(path: Path) -> CopierConfig:
     if isinstance(raw_tasks, list):
         config.tasks = [task for task in raw_tasks if isinstance(task, (str, dict))]
     config.jinja_extensions = list(data.pop("_jinja_extensions", []) or [])
+    config.message_before_copy = str(data.pop("_message_before_copy", "") or "")
+    config.message_after_copy = str(data.pop("_message_after_copy", "") or "")
     raw_envops = data.pop("_envops", None)
     if isinstance(raw_envops, dict):
         config.envops = raw_envops

@@ -1043,10 +1043,18 @@ def run_migration(
         file_contributions, config.skip_if_exists, project_dir, answers.render_vars
     )
 
-    step("Writing project")
-    file_paths: list[str] = []
     content_dir = _resolve_content_dir(template_dir, config)
     render_env = build_extended_env(config, template_dir, content_dir)
+
+    if config.message_before_copy:
+        step("Template message")
+        msg = render_env.from_string(config.message_before_copy).render(
+            **answers.render_vars
+        )
+        print(f"\n{msg}\n")
+
+    step("Writing project")
+    file_paths: list[str] = []
     with scaffold_or_rollback(project_dir):
         project_dir.mkdir(parents=True)
 
@@ -1107,6 +1115,13 @@ def run_migration(
                     dest_path.write_text(fc.content, encoding="utf-8")
             elif fc.source is not None:
                 shutil.copy2(fc.source, dest_path)
+
+    if config.message_after_copy:
+        step("Template message (after copy)")
+        msg = render_env.from_string(config.message_after_copy).render(
+            **answers.render_vars
+        )
+        print(f"\n{msg}\n")
 
     step("Scanning project inventory")
     env_keys = _inventory_env(project_dir)

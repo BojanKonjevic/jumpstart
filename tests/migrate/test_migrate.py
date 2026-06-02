@@ -13,6 +13,7 @@ from zenit.migrate.copier import (
     CopierQuestion,
     QuestionClass,
     QuestionType,
+    parse_copier_yml,
 )
 from zenit.migrate.migrate import (
     MigrationAnswers,
@@ -880,6 +881,123 @@ def test_apply_skip_if_exists_renders_jinja_dest(
     )
     assert len(result) == 0
     assert len(warnings) == 1
+
+
+# ── _messages display ──────────────────────────────────────────────────────────
+
+
+def test_run_migration_message_before_copy(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    template_dir = tmp_path / "copier-template"
+    template_dir.mkdir()
+    (template_dir / "copier.yml").write_text(
+        yaml.dump(
+            {
+                "project_name": {"type": "str", "help": "Project name"},
+                "_message_before_copy": "Setting up {{ project_name }}...",
+            }
+        ),
+        encoding="utf-8",
+    )
+    (template_dir / "README.md.jinja").write_text(
+        "# {{ project_name }}\n", encoding="utf-8"
+    )
+
+    monkeypatch.chdir(tmp_path)
+    run_migration(str(template_dir), name="myproj")
+
+    captured = capsys.readouterr()
+    assert "Setting up myproj..." in captured.out
+
+
+def test_run_migration_message_after_copy(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    template_dir = tmp_path / "copier-template"
+    template_dir.mkdir()
+    (template_dir / "copier.yml").write_text(
+        yaml.dump(
+            {
+                "project_name": {"type": "str", "help": "Project name"},
+                "_message_after_copy": "Done! cd {{ project_name }} && make install",
+            }
+        ),
+        encoding="utf-8",
+    )
+    (template_dir / "README.md.jinja").write_text(
+        "# {{ project_name }}\n", encoding="utf-8"
+    )
+
+    monkeypatch.chdir(tmp_path)
+    run_migration(str(template_dir), name="myproj")
+
+    captured = capsys.readouterr()
+    assert "Done! cd myproj && make install" in captured.out
+
+
+def test_run_migration_no_messages(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    template_dir = tmp_path / "copier-template"
+    template_dir.mkdir()
+    (template_dir / "copier.yml").write_text(
+        yaml.dump({"project_name": {"type": "str", "help": "Project name"}}),
+        encoding="utf-8",
+    )
+    (template_dir / "README.md.jinja").write_text(
+        "# {{ project_name }}\n", encoding="utf-8"
+    )
+
+    monkeypatch.chdir(tmp_path)
+    run_migration(str(template_dir), name="myproj")
+
+    captured = capsys.readouterr()
+    assert "Template message" not in captured.out
+
+
+def test_run_migration_message_with_jinja(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    template_dir = tmp_path / "copier-template"
+    template_dir.mkdir()
+    (template_dir / "copier.yml").write_text(
+        yaml.dump(
+            {
+                "project_name": {"type": "str", "help": "Project name"},
+                "version": {"type": "str", "default": "1.0"},
+                "_message_before_copy": "Version: {{ version }}",
+            }
+        ),
+        encoding="utf-8",
+    )
+    (template_dir / "README.md.jinja").write_text(
+        "# {{ project_name }}\n", encoding="utf-8"
+    )
+
+    monkeypatch.chdir(tmp_path)
+    run_migration(str(template_dir), name="myproj")
+
+    captured = capsys.readouterr()
+    assert "Version: 1.0" in captured.out
+
+
+def test_parse_copier_yml_messages(tmp_path: Path) -> None:
+    """_message_before_copy and _message_after_copy are parsed correctly."""
+    path = tmp_path / "copier.yml"
+    path.write_text(
+        yaml.dump(
+            {
+                "name": {"type": "str", "help": "Name"},
+                "_message_before_copy": "Before",
+                "_message_after_copy": "After",
+            }
+        ),
+        encoding="utf-8",
+    )
+    config = parse_copier_yml(path)
+    assert config.message_before_copy == "Before"
+    assert config.message_after_copy == "After"
 
 
 def test_run_migration_skips_copier_internal_answers_file(
