@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import dataclasses
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -437,6 +438,7 @@ def add_addon(
     addon_id: str,
     dry_run: bool = False,
     yes: bool = False,
+    accept_overwrites: bool = False,
     project_dir: Path | None = None,
 ) -> None:
     """Apply a single addon to an existing zenit project."""
@@ -510,8 +512,19 @@ def add_addon(
         print()
         return
 
-    # ── Real path: warn about overrides ───────────────────────────────────────
-    if overrides:
+    # ── Overwrite pre-check for Copier-migrated projects ──────────────────────
+    if overrides and lockfile.template_source == "copier":
+        if accept_overwrites or yes:
+            for f in overrides:
+                warn(f"Overwriting '{f}' (previously from Copier template)")
+        elif not sys.stdin.isatty():
+            error(
+                f"Running 'zenit add' would overwrite files from the "
+                f"Copier template: {', '.join(overrides)}. "
+                f"Re-run with --accept-overwrites / -y to proceed."
+            )
+            raise typer.Exit(1)
+    elif overrides:
         warn(
             "This addon will override files from the Copier template: "
             + ", ".join(overrides)
@@ -530,6 +543,43 @@ def add_addon(
             raise typer.Exit(0)
     elif not yes:
         warn("Non‑interactive mode — proceeding automatically.")
+
+    # ── Interactive per-file overwrite confirmation ──────────────────────────
+    if (
+        overrides
+        and lockfile.template_source == "copier"
+        and not accept_overwrites
+        and not yes
+    ):
+        accept_all = False
+        files_to_skip: set[str] = set()
+        for f in overrides:
+            if accept_all:
+                warn(f"Overwriting '{f}' (accepted all)")
+                continue
+            raw = (
+                input(f"  Overwrite '{f}' (written by Copier template)? [y/N/a(ll)]: ")
+                .strip()
+                .lower()
+            )
+            if raw == "a":
+                accept_all = True
+                warn(f"Overwriting '{f}' (accepted all)")
+            elif raw == "y":
+                warn(f"Overwriting '{f}'")
+            else:
+                files_to_skip.add(f)
+                info(f"Skipping '{f}' — addon file not written.")
+
+        if files_to_skip:
+            addon_cfg = dataclasses.replace(
+                addon_cfg,
+                files=[
+                    fc
+                    for fc in addon_cfg.files
+                    if resolve_dest_placeholder(fc.dest, pkg_name) not in files_to_skip
+                ],
+            )
 
     with addon_or_rollback(project_dir, addon_id):
         ctx = Context(

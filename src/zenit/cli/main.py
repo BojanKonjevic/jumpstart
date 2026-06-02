@@ -294,6 +294,13 @@ def cmd_add(
         bool,
         typer.Option("--yes", "-y", help="Skip confirmation prompt"),
     ] = False,
+    accept_overwrites: Annotated[
+        bool,
+        typer.Option(
+            "--accept-overwrites",
+            help="Accept overwriting files from Copier template without prompting",
+        ),
+    ] = False,
     dry_run: Annotated[
         bool, typer.Option("--dry-run", help="Preview without writing anything")
     ] = False,
@@ -317,7 +324,13 @@ def cmd_add(
         known_ids = {m.id for m in available_meta}
         unknown = [a for a in parsed if a not in known_ids]
         if unknown:
-            add_addon(unknown[0], dry_run=dry_run, yes=yes, project_dir=project_dir)
+            add_addon(
+                unknown[0],
+                dry_run=dry_run,
+                yes=yes,
+                accept_overwrites=accept_overwrites,
+                project_dir=project_dir,
+            )
             return
 
         from zenit.core.rollback import batch_snapshot
@@ -328,11 +341,21 @@ def cmd_add(
             with batch_snapshot(project_dir, f"addons: {', '.join(sorted_ids)}"):
                 for addon_id in sorted_ids:
                     add_addon(
-                        addon_id, dry_run=dry_run, yes=yes, project_dir=project_dir
+                        addon_id,
+                        dry_run=dry_run,
+                        yes=yes,
+                        accept_overwrites=accept_overwrites,
+                        project_dir=project_dir,
                     )
         else:
             for addon_id in sorted_ids:
-                add_addon(addon_id, dry_run=dry_run, yes=yes, project_dir=project_dir)
+                add_addon(
+                    addon_id,
+                    dry_run=dry_run,
+                    yes=yes,
+                    accept_overwrites=accept_overwrites,
+                    project_dir=project_dir,
+                )
 
 
 @app.command("remove")

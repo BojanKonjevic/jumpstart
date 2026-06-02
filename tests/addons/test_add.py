@@ -94,10 +94,10 @@ def _scaffold(tmp_path: Path, name: str, template: str, addons: list[str]) -> Pa
 # ── add_addon — migrated-project tests ─────────────────────────────────────────
 
 
-def test_add_overwrite_warning_fires(
+def test_add_overwrite_non_tty_errors(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    """Addon file destinations overlapping with template_file_paths must warn."""
+    """Non-interactive add on migrated project with conflicts raises an error."""
     project_dir = _scaffold(tmp_path, "myapp", "blank", [])
     write_lockfile(
         project_dir,
@@ -108,12 +108,12 @@ def test_add_overwrite_warning_fires(
         template_file_paths=["Dockerfile"],
     )
 
-    with suppress_stdin():
+    with pytest.raises(ClickExit), suppress_stdin():
         add_addon("docker", project_dir=project_dir)
 
     stderr = capsys.readouterr().err
     assert "Dockerfile" in stderr
-    assert "override" in stderr
+    assert "--accept-overwrites" in stderr
 
 
 def test_full_add_on_migrated_lifecycle(
@@ -770,3 +770,154 @@ def test_multi_addon_all_succeed_when_no_failure(tmp_path, monkeypatch):
     lockfile = read_lockfile(project_dir)
     assert "postgres" in lockfile.addons
     assert "docker" in lockfile.addons
+
+
+# ── Overwrite confirmation (Step 10) ──────────────────────────────────────────
+
+
+def test_add_native_project_no_overwrite_flow(tmp_path, monkeypatch):
+    """Native project never triggers the overwrite flow, even with conflicts."""
+    project_dir = _scaffold(tmp_path, "myapp", "blank", [])
+    write_lockfile(
+        project_dir,
+        "blank",
+        [],
+        template_source="native",
+        template_file_paths=["Dockerfile"],
+    )
+    monkeypatch.chdir(project_dir)
+    with suppress_stdin():
+        add_addon("docker")
+    assert (project_dir / "Dockerfile").exists()
+
+
+def test_add_migrated_accept_overwrites_flag(tmp_path, monkeypatch):
+    """--accept-overwrites auto-accepts all overrides on a migrated project."""
+    project_dir = _scaffold(tmp_path, "myapp", "blank", [])
+    write_lockfile(
+        project_dir,
+        "https://example.com/template",
+        [],
+        template_source="copier",
+        template_uri="https://example.com/template",
+        template_file_paths=["Dockerfile"],
+    )
+    monkeypatch.chdir(project_dir)
+    add_addon("docker", accept_overwrites=True)
+    assert (project_dir / "Dockerfile").exists()
+
+
+def test_add_migrated_yes_flag_auto_accepts_overwrites(tmp_path, monkeypatch):
+    """--yes also auto-accepts overwrites on a migrated project."""
+    project_dir = _scaffold(tmp_path, "myapp", "blank", [])
+    write_lockfile(
+        project_dir,
+        "https://example.com/template",
+        [],
+        template_source="copier",
+        template_uri="https://example.com/template",
+        template_file_paths=["Dockerfile"],
+    )
+    monkeypatch.chdir(project_dir)
+    add_addon("docker", yes=True)
+    assert (project_dir / "Dockerfile").exists()
+
+
+def test_add_migrated_non_tty_no_flag_errors(tmp_path, monkeypatch):
+    """Non-TTY without --accept-overwrites raises an error listing the conflicts."""
+    from unittest.mock import patch
+
+    project_dir = _scaffold(tmp_path, "myapp", "blank", [])
+    write_lockfile(
+        project_dir,
+        "https://example.com/template",
+        [],
+        template_source="copier",
+        template_uri="https://example.com/template",
+        template_file_paths=["Dockerfile"],
+    )
+    monkeypatch.chdir(project_dir)
+    with (
+        patch("sys.stdin.isatty", return_value=False),
+        pytest.raises(ClickExit),
+    ):
+        add_addon("docker")
+
+
+def test_add_migrated_tty_respond_y(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Interactive TTY answering 'y' overwrites the file."""
+    from unittest.mock import patch
+
+    project_dir = _scaffold(tmp_path, "myapp", "blank", [])
+    write_lockfile(
+        project_dir,
+        "https://example.com/template",
+        [],
+        template_source="copier",
+        template_uri="https://example.com/template",
+        template_file_paths=["Dockerfile"],
+    )
+    monkeypatch.chdir(project_dir)
+    with (
+        patch("sys.stdin.isatty", return_value=True),
+        patch("builtins.input", side_effect=["y", "y"]),
+    ):
+        add_addon("docker")
+    stderr = capsys.readouterr().err
+    assert "Overwriting 'Dockerfile'" in stderr
+
+
+def test_add_migrated_tty_respond_n_skips_file(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Interactive TTY answering 'n' skips the file — addon is added but file absent."""
+    from unittest.mock import patch
+
+    project_dir = _scaffold(tmp_path, "myapp", "blank", [])
+    write_lockfile(
+        project_dir,
+        "https://example.com/template",
+        [],
+        template_source="copier",
+        template_uri="https://example.com/template",
+        template_file_paths=["Dockerfile"],
+    )
+    monkeypatch.chdir(project_dir)
+    with (
+        patch("sys.stdin.isatty", return_value=True),
+        patch("builtins.input", side_effect=["y", "n"]),
+    ):
+        add_addon("docker")
+
+    lockfile = read_lockfile(project_dir)
+    assert "docker" in lockfile.addons
+    assert not (project_dir / "Dockerfile").exists(), (
+        "Dockerfile should not exist because the user answered 'n'"
+    )
+
+
+def test_add_migrated_tty_respond_a_accepts_all(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Interactive TTY answering 'a' accepts all remaining overrides."""
+    from unittest.mock import patch
+
+    project_dir = _scaffold(tmp_path, "myapp", "blank", [])
+    write_lockfile(
+        project_dir,
+        "https://example.com/template",
+        [],
+        template_source="copier",
+        template_uri="https://example.com/template",
+        template_file_paths=["Dockerfile", "compose.yml"],
+    )
+    monkeypatch.chdir(project_dir)
+    with (
+        patch("sys.stdin.isatty", return_value=True),
+        patch("builtins.input", side_effect=["y", "a"]),
+    ):
+        add_addon("docker")
+    assert (project_dir / "Dockerfile").exists()
+    assert (project_dir / "compose.yml").exists()
