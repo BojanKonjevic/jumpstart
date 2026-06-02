@@ -1254,3 +1254,134 @@ def test_run_migration_warns_unresolved_markers(
         w for w in warnings if "unresolved" in w.lower() or "marker" in w.lower()
     ]
     assert len(unresolved_warnings) > 0
+
+
+# ── Validator and required enforcement (Step 7) ────────────────────────────────
+
+
+def test_validate_answer_passes(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Validator expression that evaluates to truthy passes."""
+    from zenit.migrate.migrate import _validate_answer
+
+    result = _validate_answer(
+        CopierQuestion(
+            name="version", type=QuestionType.STR, validator="answer == '3.14'"
+        ),
+        "3.14",
+        {"version": "3.14"},
+    )
+    assert result is None
+
+
+def test_validate_answer_fails(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Validator expression that evaluates to falsy fails."""
+    from zenit.migrate.migrate import _validate_answer
+
+    result = _validate_answer(
+        CopierQuestion(
+            name="version", type=QuestionType.STR, validator=r"'\d+' in answer"
+        ),
+        "abc",
+        {"version": "abc"},
+    )
+    assert result is not None
+    assert "version" in result
+
+
+def test_validate_answer_no_validator() -> None:
+    """Question with no validator always passes."""
+    from zenit.migrate.migrate import _validate_answer
+
+    result = _validate_answer(
+        CopierQuestion(name="x", type=QuestionType.STR),
+        "anything",
+        {},
+    )
+    assert result is None
+
+
+def test_regex_search_func() -> None:
+    """regex_search helper works as a Jinja2-compatible validator."""
+    from zenit.migrate.migrate import _regex_search_func
+
+    assert _regex_search_func(r"^[a-z]+$", "hello") is True
+    assert _regex_search_func(r"^[a-z]+$", "HELLO") is False
+    assert _regex_search_func(r"hello", "say hello world") is True
+
+
+def test_required_no_default_raises() -> None:
+    """required=True with no default and no override raises ZenitError."""
+    config = CopierConfig(
+        questions=[
+            CopierQuestion(name="api_key", type=QuestionType.STR, required=True),
+        ],
+    )
+    from zenit.migrate.migrate import _resolve_answers_noninteractive
+
+    with pytest.raises(ZenitError, match="required"):
+        _resolve_answers_noninteractive(config, {})
+
+
+def test_required_with_override() -> None:
+    """required=True with override resolves normally."""
+    config = CopierConfig(
+        questions=[
+            CopierQuestion(name="api_key", type=QuestionType.STR, required=True),
+        ],
+    )
+    from zenit.migrate.migrate import _resolve_answers_noninteractive
+
+    answers = _resolve_answers_noninteractive(config, {"api_key": "sk-abc"})
+    assert answers.render_vars["api_key"] == "sk-abc"
+
+
+def test_required_false_allows_empty_default() -> None:
+    """required=False with empty default resolves without error."""
+    config = CopierConfig(
+        questions=[
+            CopierQuestion(name="opt", type=QuestionType.STR, required=False),
+        ],
+    )
+    from zenit.migrate.migrate import _resolve_answers_noninteractive
+
+    answers = _resolve_answers_noninteractive(config, {})
+    assert answers.render_vars["opt"] == ""
+
+
+def test_parse_required_and_validator(tmp_path: Path) -> None:
+    """required and validator fields are parsed from copier.yml."""
+    path = tmp_path / "copier.yml"
+    path.write_text(
+        yaml.dump(
+            {
+                "version": {
+                    "type": "str",
+                    "required": True,
+                    "validator": r"regex_search('^\d+\.\d+$', answer)",
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    config = parse_copier_yml(path)
+    q = config.questions[0]
+    assert q.required is True
+    assert q.validator is not None
+    assert "regex_search" in q.validator
+
+
+def test_validate_answer_uses_regex_search() -> None:
+    """regex_search function is available to validator expressions."""
+    from zenit.migrate.migrate import _validate_answer
+
+    # Validator uses regex_search — should fail for non-matching value
+    result = _validate_answer(
+        CopierQuestion(
+            name="version",
+            type=QuestionType.STR,
+            validator=r"regex_search('^\d+\.\d+$', answer)",
+        ),
+        "abc",
+        {"version": "abc"},
+    )
+    assert result is not None

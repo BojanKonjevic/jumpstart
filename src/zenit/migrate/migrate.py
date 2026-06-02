@@ -215,87 +215,102 @@ def _prompt_questions(
             )
             continue
 
-        default_value = _coerce_question_value(
-            q,
-            _render_copier_default(q.default, answers.render_vars),
-        )
-
-        if q.type == QuestionType.MULTISELECT:
-            choices_str = ", ".join(q.choices)
-            msg = f"{q.help or q.name} {DIM}(comma-separated, options: {choices_str}){RESET}"
-            default_list = (
-                default_value if isinstance(default_value, list) else [default_value]
+        while True:
+            default_value = _coerce_question_value(
+                q,
+                _render_copier_default(q.default, answers.render_vars),
             )
-            default_str = ", ".join(str(v) for v in default_list)
-            raw = input(f"  {msg} [{default_str}]: ").strip()
-            if raw:
-                parts = [p.strip() for p in raw.split(",") if p.strip()]
-                answers.render_vars[q.name] = [q.choices_map.get(p, p) for p in parts]
-                answers.explicit_names.add(q.name)
+
+            if q.type == QuestionType.MULTISELECT:
+                choices_str = ", ".join(q.choices)
+                msg = f"{q.help or q.name} {DIM}(comma-separated, options: {choices_str}){RESET}"
+                default_list = (
+                    default_value
+                    if isinstance(default_value, list)
+                    else [default_value]
+                )
+                default_str = ", ".join(str(v) for v in default_list)
+                raw = input(f"  {msg} [{default_str}]: ").strip()
+                if raw:
+                    parts = [p.strip() for p in raw.split(",") if p.strip()]
+                    answers.render_vars[q.name] = [
+                        q.choices_map.get(p, p) for p in parts
+                    ]
+                    answers.explicit_names.add(q.name)
+                else:
+                    answers.render_vars[q.name] = default_value
+            elif q.type == QuestionType.BOOL:
+                msg = f"{q.help or q.name}"
+                raw = input(f"  {msg} {DIM}[Y/n]{RESET}  ").strip().lower()
+                if raw:
+                    answer = raw in ("y", "yes")
+                    answers.explicit_names.add(q.name)
+                else:
+                    answer = bool(default_value)
+                answers.render_vars[q.name] = answer
+            elif qclass == QuestionClass.CHOICE_VAR:
+                choices_str = ", ".join(q.choices)
+                msg = f"{q.help or q.name} {DIM}({choices_str}){RESET}"
+                raw = input(f"  {msg} [{default_value}]: ").strip()
+                if raw and raw in q.choices:
+                    answers.render_vars[q.name] = q.choices_map.get(raw, raw)
+                    answers.explicit_names.add(q.name)
+                else:
+                    answers.render_vars[q.name] = default_value
+            elif q.type == QuestionType.INT:
+                default_str = str(default_value) if default_value != "" else ""
+                msg = f"{q.help or q.name}"
+                raw = input(f"  {msg} [{default_str}]: ").strip()
+                if raw:
+                    answers.render_vars[q.name] = int(raw)
+                    answers.explicit_names.add(q.name)
+                else:
+                    answers.render_vars[q.name] = default_value
+            elif q.type == QuestionType.FLOAT:
+                default_str = str(default_value) if default_value != "" else ""
+                msg = f"{q.help or q.name}"
+                raw = input(f"  {msg} [{default_str}]: ").strip()
+                if raw:
+                    answers.render_vars[q.name] = float(raw)
+                    answers.explicit_names.add(q.name)
+                else:
+                    answers.render_vars[q.name] = default_value
+            elif q.type == QuestionType.SECRET:
+                msg = f"{q.help or q.name}"
+                raw = getpass.getpass(f"  {msg}: ").strip()
+                if raw:
+                    answers.render_vars[q.name] = raw
+                    answers.explicit_names.add(q.name)
+                else:
+                    answers.render_vars[q.name] = default_value
+            elif q.type == QuestionType.YAML:
+                default_str = str(default_value) if default_value != "" else ""
+                msg = f"{q.help or q.name}"
+                raw = input(f"  {msg} [{default_str}]: ").strip()
+                if raw:
+                    answers.render_vars[q.name] = _coerce_yaml_value(raw)
+                    answers.explicit_names.add(q.name)
+                else:
+                    answers.render_vars[q.name] = default_value
             else:
-                answers.render_vars[q.name] = default_value
-        elif q.type == QuestionType.BOOL:
-            msg = f"{q.help or q.name}"
-            raw = input(f"  {msg} {DIM}[Y/n]{RESET}  ").strip().lower()
-            if raw:
-                answer = raw in ("y", "yes")
-                answers.explicit_names.add(q.name)
-            else:
-                answer = bool(default_value)
-            answers.render_vars[q.name] = answer
-        elif qclass == QuestionClass.CHOICE_VAR:
-            choices_str = ", ".join(q.choices)
-            msg = f"{q.help or q.name} {DIM}({choices_str}){RESET}"
-            raw = input(f"  {msg} [{default_value}]: ").strip()
-            if raw and raw in q.choices:
-                answers.render_vars[q.name] = q.choices_map.get(raw, raw)
-                answers.explicit_names.add(q.name)
-            else:
-                answers.render_vars[q.name] = default_value
-        elif q.type == QuestionType.INT:
-            default_str = str(default_value) if default_value != "" else ""
-            msg = f"{q.help or q.name}"
-            raw = input(f"  {msg} [{default_str}]: ").strip()
-            if raw:
-                answers.render_vars[q.name] = int(raw)
-                answers.explicit_names.add(q.name)
-            else:
-                answers.render_vars[q.name] = default_value
-        elif q.type == QuestionType.FLOAT:
-            default_str = str(default_value) if default_value != "" else ""
-            msg = f"{q.help or q.name}"
-            raw = input(f"  {msg} [{default_str}]: ").strip()
-            if raw:
-                answers.render_vars[q.name] = float(raw)
-                answers.explicit_names.add(q.name)
-            else:
-                answers.render_vars[q.name] = default_value
-        elif q.type == QuestionType.SECRET:
-            msg = f"{q.help or q.name}"
-            raw = getpass.getpass(f"  {msg}: ").strip()
-            if raw:
-                answers.render_vars[q.name] = raw
-                answers.explicit_names.add(q.name)
-            else:
-                answers.render_vars[q.name] = default_value
-        elif q.type == QuestionType.YAML:
-            default_str = str(default_value) if default_value != "" else ""
-            msg = f"{q.help or q.name}"
-            raw = input(f"  {msg} [{default_str}]: ").strip()
-            if raw:
-                answers.render_vars[q.name] = _coerce_yaml_value(raw)
-                answers.explicit_names.add(q.name)
-            else:
-                answers.render_vars[q.name] = default_value
-        else:
-            default_str = str(default_value) if default_value != "" else ""
-            msg = f"{q.help or q.name}"
-            raw = input(f"  {msg} [{default_str}]: ").strip()
-            if raw:
-                answers.render_vars[q.name] = raw
-                answers.explicit_names.add(q.name)
-            else:
-                answers.render_vars[q.name] = default_value
+                default_str = str(default_value) if default_value != "" else ""
+                msg = f"{q.help or q.name}"
+                raw = input(f"  {msg} [{default_str}]: ").strip()
+                if raw:
+                    answers.render_vars[q.name] = raw
+                    answers.explicit_names.add(q.name)
+                else:
+                    answers.render_vars[q.name] = default_value
+
+            err = _validate_answer(q, answers.render_vars[q.name], answers.render_vars)
+            if err:
+                if q.name in answers.explicit_names:
+                    print(f"  {YELLOW}{err}{RESET}")
+                    answers.explicit_names.discard(q.name)
+                    del answers.render_vars[q.name]
+                    continue
+                warn(f"{err} — using default anyway.")
+            break
 
     return answers
 
@@ -352,11 +367,22 @@ def _resolve_answers_noninteractive(
                     answers.render_vars[q.name] = _coerce_yaml_value(raw)
                 case _:
                     answers.render_vars[q.name] = raw
+            err = _validate_answer(q, answers.render_vars[q.name], answers.render_vars)
+            if err:
+                raise ZenitError(err)
+        elif q.required and not q.default:
+            raise ZenitError(
+                f"Question '{q.name}' is required and has no default. "
+                f"Pass it with -D {q.name}=<value>"
+            )
         elif q.default is not None:
             answers.render_vars[q.name] = _coerce_question_value(
                 q,
                 _render_copier_default(q.default, answers.render_vars),
             )
+            err = _validate_answer(q, answers.render_vars[q.name], answers.render_vars)
+            if err:
+                raise ZenitError(err)
         elif q.choices:
             if q.type == QuestionType.MULTISELECT:
                 first_val = q.choices_map.get(q.choices[0], q.choices[0])
@@ -415,6 +441,42 @@ def _scan_for_unresolved_markers(
         if "{{" in content or "{%" in content or "{#" in content:
             flagged.append(rel_path)
     return flagged
+
+
+def _regex_search_func(pattern: str, value: str) -> bool:
+    """Jinja2-compatible regex search for validator expressions."""
+    import re
+
+    return bool(re.search(pattern, str(value)))
+
+
+def _validate_answer(
+    question: CopierQuestion,
+    value: object,
+    render_vars: dict[str, Any],
+) -> str | None:
+    """Validate an answer against the question's validator expression.
+
+    Returns an error message string on failure, or None if valid.
+    """
+    if not question.validator:
+        return None
+
+    context = dict(render_vars)
+    context["regex_search"] = _regex_search_func
+    context["answer"] = value  # Older Copier convention
+    context[question.name] = value
+
+    try:
+        result = COPIER_ENV.from_string(
+            f"{{% if ({question.validator}) %}}ok{{% else %}}fail{{% endif %}}"
+        ).render(**context)
+    except Exception:
+        return None
+
+    if result.strip() == "fail":
+        return f"Validation failed for '{question.name}': {question.validator}"
+    return None
 
 
 def _mask_secrets(

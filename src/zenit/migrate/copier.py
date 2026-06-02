@@ -68,6 +68,8 @@ class CopierQuestion:
     choices: list[str] = field(default_factory=list)
     choices_map: dict[str, str] = field(default_factory=dict)
     when: str | bool | None = None
+    validator: str | None = None
+    required: bool = False
 
 
 @dataclass
@@ -399,6 +401,8 @@ def parse_copier_yml(path: Path) -> CopierConfig:
                 choices=choices_list,
                 choices_map=choices_map,
                 when=spec.get("when"),
+                validator=spec.get("validator"),
+                required=bool(spec.get("required", False)),
             )
         )
 
