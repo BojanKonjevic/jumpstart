@@ -1,14 +1,20 @@
 """Tests for Copier YAML parsing, question classification, and delimiter swap."""
 
+import re
 from pathlib import Path
 
 import pytest
 import yaml
 
 from zenit.migrate.copier import (
+    COPIER_ENV,
+    CopierConfig,
     FileJinjaClass,
     QuestionClass,
     QuestionType,
+    _make_secret,
+    _safe_shell_filter,
+    build_extended_env,
     classify_file,
     classify_questions,
     parse_copier_yml,
@@ -257,7 +263,6 @@ def test_classify_file_with_jinja_extension(tmp_path: Path) -> None:
 def test_classify_excluded_file(tmp_path: Path) -> None:
     p = tmp_path / "secret.md"
     p.write_text("secret")
-    from zenit.migrate.copier import CopierConfig
 
     cfg = CopierConfig(
         questions=[],
@@ -269,3 +274,100 @@ def test_classify_excluded_file(tmp_path: Path) -> None:
     )
     result = classify_file(p, cfg)
     assert result == FileJinjaClass.EXCLUDED
+
+
+# ── Extended Jinja2 environment (Phase 2, Step 2) ─────────────────────────────
+
+
+def test_do_extension_loaded() -> None:
+    """{% do %} tag is available on COPIER_ENV."""
+    result = COPIER_ENV.from_string(
+        "{% set items = [] %}{% do items.append(1) %}{{ items }}"
+    ).render()
+    assert result == "[1]"
+
+
+def test_loopcontrols_extension_loaded() -> None:
+    """{% break %} is available on COPIER_ENV."""
+    result = COPIER_ENV.from_string(
+        "{% for i in range(10) %}{% if i == 3 %}{% break %}{% endif %}{{ i }}{% endfor %}"
+    ).render()
+    assert result == "012"
+
+
+def test_namespace_extension_loaded_and_works() -> None:
+    """{% namespace %} renders its body as-is."""
+    result = COPIER_ENV.from_string(
+        "{% namespace mygroup %}hello{% endnamespace %}"
+    ).render()
+    assert "hello" in result
+
+
+def test_unknown_extension_emits_warning(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Unknown extension in build_extended_env emits WARN."""
+    config = CopierConfig(
+        jinja_extensions=["nonexistent.module.Extension"],
+    )
+    warnings: list[str] = []
+    monkeypatch.setattr(
+        "zenit.migrate.copier.warn",
+        lambda msg: warnings.append(msg),
+    )
+    build_extended_env(config)
+    assert len(warnings) == 1
+    assert "nonexistent.module.Extension" in warnings[0]
+
+
+def test_shell_filter_emits_warning_and_returns_empty(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """shell() filter emits WARN and returns empty string."""
+    warnings: list[str] = []
+    monkeypatch.setattr(
+        "zenit.migrate.copier.warn",
+        lambda msg: warnings.append(msg),
+    )
+    result = _safe_shell_filter("echo hi")
+    assert result == ""
+    assert len(warnings) == 1
+    assert "shell()" in warnings[0]
+
+
+def test_make_secret_default_length() -> None:
+    """make_secret() returns a 32-char alphanumeric string."""
+    result = _make_secret()
+    assert isinstance(result, str)
+    assert len(result) == 32
+    assert re.fullmatch(r"[a-zA-Z0-9]+", result)
+
+
+def test_make_secret_custom_length() -> None:
+    """make_secret(16) returns a 16-char alphanumeric string."""
+    result = _make_secret(16)
+    assert isinstance(result, str)
+    assert len(result) == 16
+    assert re.fullmatch(r"[a-zA-Z0-9]+", result)
+
+
+def test_make_secret_is_available_as_global() -> None:
+    """make_secret is registered as a global on COPIER_ENV."""
+    result = COPIER_ENV.from_string("{{ make_secret() }}").render()
+    assert isinstance(result, str)
+    assert len(result) == 32
+
+
+def test_make_secret_custom_length_in_template() -> None:
+    """make_secret(8) works inside a template."""
+    result = COPIER_ENV.from_string("{{ make_secret(8) }}").render()
+    assert isinstance(result, str)
+    assert len(result) == 8
+
+
+def test_build_extended_env_preserves_standard_extensions() -> None:
+    """build_extended_env includes standard extensions."""
+    config = CopierConfig()
+    env = build_extended_env(config)
+    result = env.from_string(
+        "{% set items = [] %}{% do items.append(42) %}{{ items }}"
+    ).render()
+    assert result == "[42]"

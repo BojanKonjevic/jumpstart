@@ -5,7 +5,10 @@ from __future__ import annotations
 import contextlib
 import fnmatch
 import json
+import secrets
+import string
 import sys
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from enum import Enum
 from io import StringIO
@@ -13,8 +16,13 @@ from pathlib import Path
 from typing import Any
 
 import jinja2
+import jinja2.ext
 import jinja2.meta
+import jinja2.nodes
+import jinja2.parser
 from ruamel.yaml import YAML
+
+from zenit.cli.ui import warn
 
 # ── Question types ─────────────────────────────────────────────────────────────
 
@@ -87,6 +95,88 @@ def _to_nice_json(value: object, indent: int = 2) -> str:
     return json.dumps(value, indent=indent, ensure_ascii=False)
 
 
+# ── Copier Jinja2 namespace extension ─────────────────────────────────────────
+
+
+class CopierNamespaceExtension(jinja2.ext.Extension):
+    """Handle ``{% namespace name %}``/``{% endnamespace %}`` blocks.
+
+    Copier templates use this extension to group variables under a prefix.
+    The extension was originally provided by ``copier.template`` and is
+    registered here as a standalone Jinja2 extension class.
+    """
+
+    tags = {"namespace", "endnamespace"}
+
+    def parse(self, parser: jinja2.parser.Parser) -> jinja2.nodes.Node:
+        # ``{% endnamespace %}`` — consume the name token, return empty output.
+        if parser.stream.current.value == "endnamespace":
+            next(parser.stream)
+            return jinja2.nodes.Output([])
+        # ``{% namespace name %}`` — consume tag name, then the group name.
+        next(parser.stream)
+        token = parser.stream.expect("name")
+        name = token.value
+        body = parser.parse_statements(
+            ("name:endnamespace",),
+            drop_needle=True,
+        )
+        return jinja2.nodes.CallBlock(
+            self.call_method("_render_namespace", [jinja2.nodes.Const(name)]),
+            [],
+            [],
+            body,
+        )
+        return jinja2.nodes.CallBlock(
+            self.call_method("_render_namespace", [jinja2.nodes.Const(name)]),
+            [],
+            [],
+            body,
+        )
+        return jinja2.nodes.CallBlock(
+            self.call_method("_render_namespace", [jinja2.nodes.Const(name)]),
+            [],
+            [],
+            body,
+        )
+        return jinja2.nodes.CallBlock(
+            self.call_method("_render_namespace", [jinja2.nodes.Const(name)]),
+            [],
+            [],
+            body,
+        )
+
+    @staticmethod
+    def _render_namespace(name: str, caller: Callable[[], str]) -> str:
+        return caller()
+
+
+# ── Safe stubs for security-sensitive Jinja2 features ─────────────────────────
+
+
+def _safe_shell_filter(command: str) -> str:
+    """Safe stub for the ``shell()`` Jinja2 filter.
+
+    The real ``shell()`` filter (from ``jinja2_shell_extension``) executes
+    shell commands during rendering — a security concern in migration
+    context.  This stub warns and returns an empty string.
+    """
+    warn(
+        f"shell() filter called with: '{command[:80]}"
+        f"{'...' if len(command) > 80 else ''}'. "
+        f"Shell execution during rendering is not supported. "
+        f"Returning empty string — provide the value with "
+        f"-D <name>=<value>."
+    )
+    return ""
+
+
+def _make_secret(length: int = 32) -> str:
+    """Generate a random alphanumeric string (replaces Copier's ``make_secret()``)."""
+    alphabet = string.ascii_letters + string.digits
+    return "".join(secrets.choice(alphabet) for _ in range(length))
+
+
 # ── Copier delimiters (standard Jinja2) ────────────────────────────────────────
 
 COPIER_ENV = jinja2.Environment(
@@ -100,6 +190,12 @@ COPIER_ENV = jinja2.Environment(
 )
 COPIER_ENV.filters["to_nice_yaml"] = _to_nice_yaml
 COPIER_ENV.filters["to_nice_json"] = _to_nice_json
+
+COPIER_ENV.add_extension("jinja2.ext.do")
+COPIER_ENV.add_extension("jinja2.ext.loopcontrols")
+COPIER_ENV.add_extension(CopierNamespaceExtension)
+COPIER_ENV.filters["shell"] = _safe_shell_filter
+COPIER_ENV.globals["make_secret"] = _make_secret
 
 
 def build_extended_env(
@@ -134,6 +230,13 @@ def build_extended_env(
     env.filters["to_nice_yaml"] = _to_nice_yaml
     env.filters["to_nice_json"] = _to_nice_json
 
+    # Standard extensions (Phase 2, Step 2)
+    env.add_extension("jinja2.ext.do")
+    env.add_extension("jinja2.ext.loopcontrols")
+    env.add_extension(CopierNamespaceExtension)
+    env.filters["shell"] = _safe_shell_filter
+    env.globals["make_secret"] = _make_secret
+
     if content_dir is not None:
         search_paths = [str(content_dir.resolve())]
         if template_dir is not None:
@@ -148,8 +251,13 @@ def build_extended_env(
     for ext_path in config.jinja_extensions:
         try:
             env.add_extension(ext_path)
-        except Exception:
-            continue
+        except Exception as e:
+            warn(
+                f"Failed to load Jinja2 extension '{ext_path}': {e}. "
+                f"Files requiring this extension may render incompletely. "
+                f"Install the extension package and re-run, or provide "
+                f"values with -D <name>=<value>."
+            )
 
     return env
 
