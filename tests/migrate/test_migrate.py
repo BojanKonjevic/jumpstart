@@ -1250,10 +1250,10 @@ def test_run_migration_warns_unresolved_markers(
 
     run_migration(str(template_dir), name="myproj")
 
-    unresolved_warnings = [
-        w for w in warnings if "unresolved" in w.lower() or "marker" in w.lower()
+    rendering_warnings = [
+        w for w in warnings if "Failed to render" in w or "unknown_tag" in w
     ]
-    assert len(unresolved_warnings) > 0
+    assert len(rendering_warnings) > 0
 
 
 # ── Validator and required enforcement (Step 7) ────────────────────────────────
@@ -1385,3 +1385,108 @@ def test_validate_answer_uses_regex_search() -> None:
         {"version": "abc"},
     )
     assert result is not None
+
+
+# ── Multi-pass file rendering (Step 8) ─────────────────────────────────────────
+
+
+def test_render_file_content_standard() -> None:
+    """Simple {{ var }} template renders cleanly."""
+    from zenit.migrate.migrate import _render_file_content
+
+    content, diagnostic = _render_file_content(
+        "Hello {{ name }}",
+        None,
+        {"name": "world"},
+        {"name"},
+    )
+    assert content == "Hello world"
+    assert diagnostic is None
+
+
+def test_render_file_content_namespace() -> None:
+    """{% namespace %} block renders cleanly."""
+    from zenit.migrate.copier import COPIER_ENV
+    from zenit.migrate.migrate import _render_file_content
+
+    content, diagnostic = _render_file_content(
+        "{% namespace x %}hello{% endnamespace %}",
+        COPIER_ENV,
+        {},
+        set(),
+    )
+    assert content is not None
+    assert "hello" in content
+    assert diagnostic is None
+
+
+def test_render_file_content_unknown_tag() -> None:
+    """File with unknown Jinja2 tag gets a diagnostic."""
+    from zenit.migrate.copier import COPIER_ENV
+    from zenit.migrate.migrate import _render_file_content
+
+    content, diagnostic = _render_file_content(
+        "{% unknown_tag %}",
+        COPIER_ENV,
+        {},
+        set(),
+    )
+    assert content is None
+    assert diagnostic is not None
+    assert "unknown_tag" in diagnostic
+
+
+def test_render_file_content_parsing_error() -> None:
+    """Malformed template fails and gives diagnostic."""
+    from zenit.migrate.copier import COPIER_ENV
+    from zenit.migrate.migrate import _render_file_content
+
+    content, diagnostic = _render_file_content(
+        "{% if missing %}",
+        COPIER_ENV,
+        {},
+        set(),
+    )
+    assert content is None
+    assert diagnostic is not None
+
+
+def test_diagnose_failed_render_unknown_var() -> None:
+    """Diagnostic lists unknown variables."""
+    from zenit.migrate.copier import COPIER_ENV
+    from zenit.migrate.migrate import _diagnose_failed_render
+
+    diagnostic = _diagnose_failed_render(
+        "Hello {{ unknown_var }}",
+        {"name"},
+        COPIER_ENV,
+    )
+    assert diagnostic is not None
+    assert "unknown_var" in diagnostic
+
+
+def test_diagnose_failed_render_unknown_tag() -> None:
+    """Diagnostic lists unknown tags."""
+    from zenit.migrate.copier import COPIER_ENV
+    from zenit.migrate.migrate import _diagnose_failed_render
+
+    diagnostic = _diagnose_failed_render(
+        "{% custom_tag %}",
+        set(),
+        COPIER_ENV,
+    )
+    assert diagnostic is not None
+    assert "custom_tag" in diagnostic
+
+
+def test_diagnose_failed_render_parse_error() -> None:
+    """Diagnostic shows parse error for malformed template."""
+    from zenit.migrate.copier import COPIER_ENV
+    from zenit.migrate.migrate import _diagnose_failed_render
+
+    diagnostic = _diagnose_failed_render(
+        "{% if missing %}",
+        set(),
+        COPIER_ENV,
+    )
+    assert diagnostic is not None

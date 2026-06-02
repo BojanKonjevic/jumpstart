@@ -9,9 +9,9 @@ the result, and writing the lockfile and manifest.
 
 from __future__ import annotations
 
-import contextlib
 import fnmatch
 import getpass
+import re
 import shlex
 import shutil
 import subprocess
@@ -422,6 +422,116 @@ def _render_copier_default(
         return COPIER_ENV.from_string(value).render(**render_vars)
     except Exception:
         return value
+
+
+_KNOWN_JINJA2_TAGS: set[str] = {
+    "if",
+    "elif",
+    "else",
+    "endif",
+    "for",
+    "endfor",
+    "set",
+    "endset",
+    "block",
+    "endblock",
+    "extends",
+    "include",
+    "import",
+    "from",
+    "macro",
+    "endmacro",
+    "call",
+    "endcall",
+    "filter",
+    "endfilter",
+    "raw",
+    "endraw",
+    "autoescape",
+    "endautoescape",
+    "do",
+    "break",
+    "continue",
+    "with",
+    "endwith",
+    "namespace",
+    "endnamespace",
+}
+
+
+def _diagnose_failed_render(
+    content: str,
+    question_names: set[str],
+    render_env: jinja2.Environment,
+) -> str:
+    """Explain why rendering failed or left unresolved markers."""
+    issues: list[str] = []
+
+    try:
+        ast = render_env.parse(content)
+        undeclared = jinja2.meta.find_undeclared_variables(ast)
+        env_known: set[str] = set(render_env.globals.keys()) | set(
+            render_env.filters.keys()
+        )
+        unknown = undeclared - question_names - env_known
+        if unknown:
+            issues.append(
+                f"unknown variables: {', '.join(sorted(unknown))} "
+                f"(provide with -D <name>=<value>)"
+            )
+    except Exception as e:
+        issues.append(f"parse error: {e}")
+
+    found_tags = set(re.findall(r"{%[-\s]*(\w+)", content))
+    unknown_tags = found_tags - _KNOWN_JINJA2_TAGS
+    if unknown_tags:
+        issues.append(f"unknown tags: {', '.join(sorted(unknown_tags))}")
+
+    if not issues:
+        issues.append("complex Jinja2 pattern — not fully supported")
+
+    return "; ".join(issues)
+
+
+def _render_file_content(
+    content: str,
+    render_env: jinja2.Environment | None,
+    render_vars: dict[str, Any],
+    question_names: set[str],
+) -> tuple[str | None, str | None]:
+    """Render file content through progressive passes.
+
+    Returns (rendered_content, diagnostic).
+    """
+    passes: list[tuple[str, jinja2.Environment]] = []
+    if render_env is not None:
+        passes.append(("extended", render_env))
+    from zenit.migrate.copier import COPIER_ENV
+
+    passes.append(("standard", COPIER_ENV))
+
+    last_rendered: str | None = None
+    last_env: jinja2.Environment = COPIER_ENV
+    for _pass_name, env in passes:
+        last_env = env
+        try:
+            rendered = env.from_string(content).render(**render_vars)
+            last_rendered = rendered
+        except Exception:
+            continue
+
+        if "{{" not in rendered and "{%" not in rendered:
+            return rendered, None
+
+        diagnostic = _diagnose_failed_render(content, question_names, env)
+        return rendered, diagnostic
+
+    if last_rendered is not None:
+        diagnostic = _diagnose_failed_render(content, question_names, last_env)
+        return last_rendered, diagnostic
+
+    diagnostic = _diagnose_failed_render(content, question_names, last_env)
+    return None, diagnostic
 
 
 def _scan_for_unresolved_markers(
@@ -1174,6 +1284,7 @@ def run_migration(
     step("Writing project")
     file_paths: list[str] = []
     rendered_file_paths: set[str] = set()
+    question_names: set[str] = {q.name for q in config.questions}
     with scaffold_or_rollback(project_dir):
         project_dir.mkdir(parents=True)
 
@@ -1215,22 +1326,23 @@ def run_migration(
             dest_path.parent.mkdir(parents=True, exist_ok=True)
             if fc.content is not None:
                 if fc.template:
-                    rendered_file_paths.add(str(dest_rel))
-                    rendered: str | None = None
-                    with contextlib.suppress(Exception):
-                        rendered = render_env.from_string(fc.content).render(
-                            **answers.render_vars
-                        )
-                    if rendered is None and render_env is not COPIER_ENV:
-                        with contextlib.suppress(Exception):
-                            rendered = COPIER_ENV.from_string(fc.content).render(
-                                **answers.render_vars
-                            )
-                    if rendered is not None:
-                        dest_path.write_text(rendered, encoding="utf-8")
+                    rendered_content, diagnostic = _render_file_content(
+                        fc.content,
+                        render_env,
+                        answers.render_vars,
+                        question_names,
+                    )
+                    if rendered_content is not None:
+                        dest_path.write_text(rendered_content, encoding="utf-8")
+                        rendered_file_paths.add(str(dest_rel))
+                        if diagnostic:
+                            warn(f"Partially rendered '{dest_rel}': {diagnostic}")
                     else:
-                        warn(f"Failed to render '{fc.dest}' — copying verbatim.")
                         dest_path.write_text(fc.content, encoding="utf-8")
+                        warn(
+                            f"Failed to render '{dest_rel}' — written verbatim. "
+                            f"Reason: {diagnostic}"
+                        )
                 else:
                     dest_path.write_text(fc.content, encoding="utf-8")
             elif fc.source is not None:
