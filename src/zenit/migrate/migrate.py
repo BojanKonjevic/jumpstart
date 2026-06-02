@@ -15,6 +15,7 @@ import re
 import shlex
 import shutil
 import subprocess
+import sys
 import tempfile
 import tomllib
 from dataclasses import dataclass, field
@@ -212,17 +213,19 @@ def _prompt_questions(
 ) -> MigrationAnswers:
     """Prompt the user for answers to all Copier template questions.
 
-    Uses zenit's existing prompt patterns (simple input prompts, no TUI).
-
-    All question types — including boolean ADDON_CANDIDATE questions — are
-    stored as render-time variables. No inline addon stubs are generated.
+    Uses rich TUI widgets when stdin is a TTY, falls back to simple
+    input() prompts otherwise.
     """
+    if sys.stdin.isatty():
+        from zenit.cli.copier_prompt import prompt_copier_questions
+
+        return prompt_copier_questions(config, classes)
+
     answers = MigrationAnswers()
 
     for q in config.questions:
         qclass = classes.get(q.name, QuestionClass.RENDER_VAR)
 
-        # Hidden questions (when: false) are auto-resolved, never prompted.
         if q.when is False:
             answers.render_vars[q.name] = _coerce_question_value(
                 q,
