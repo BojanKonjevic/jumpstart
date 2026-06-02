@@ -398,6 +398,25 @@ def _render_copier_default(
         return value
 
 
+def _scan_for_unresolved_markers(
+    project_dir: Path,
+    rendered_file_paths: set[str],
+) -> list[str]:
+    """Scan only rendered files for unresolved Copier Jinja2 markers."""
+    flagged: list[str] = []
+    for rel_path in rendered_file_paths:
+        full = project_dir / rel_path
+        if not full.exists():
+            continue
+        try:
+            content = full.read_text(encoding="utf-8")
+        except UnicodeDecodeError:
+            continue
+        if "{{" in content or "{%" in content or "{#" in content:
+            flagged.append(rel_path)
+    return flagged
+
+
 def _mask_secrets(
     text: str,
     render_vars: dict[str, Any],
@@ -1092,6 +1111,7 @@ def run_migration(
 
     step("Writing project")
     file_paths: list[str] = []
+    rendered_file_paths: set[str] = set()
     with scaffold_or_rollback(project_dir):
         project_dir.mkdir(parents=True)
 
@@ -1133,6 +1153,7 @@ def run_migration(
             dest_path.parent.mkdir(parents=True, exist_ok=True)
             if fc.content is not None:
                 if fc.template:
+                    rendered_file_paths.add(str(dest_rel))
                     rendered: str | None = None
                     with contextlib.suppress(Exception):
                         rendered = render_env.from_string(fc.content).render(
@@ -1159,6 +1180,13 @@ def run_migration(
             **answers.render_vars
         )
         print(f"\n{msg}\n")
+
+    unresolved = _scan_for_unresolved_markers(project_dir, rendered_file_paths)
+    for path in unresolved:
+        warn(
+            f"Unresolved Copier marker(s) found in '{path}' — "
+            f"the template variable may be misspelled or missing."
+        )
 
     step("Scanning project inventory")
     env_keys = _inventory_env(project_dir)

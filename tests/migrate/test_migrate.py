@@ -1139,3 +1139,118 @@ def test_resolve_secret_default_coerces_as_string() -> None:
 
     answers = _resolve_answers_noninteractive(config, {})
     assert answers.render_vars["api_key"] == "default_key"
+
+
+# ── Rendered-file tracking for marker scan (Step 6) ────────────────────────────
+
+
+def test_scan_unresolved_markers_flags_rendered_file(tmp_path: Path) -> None:
+    """File with unresolved var is flagged."""
+    from zenit.migrate.migrate import _scan_for_unresolved_markers
+
+    d = tmp_path / "proj"
+    d.mkdir()
+    (d / "config.py").write_text("NAME = {{ unknown_var }}\n")
+    flagged = _scan_for_unresolved_markers(d, {"config.py"})
+    assert "config.py" in flagged
+
+
+def test_scan_unresolved_markers_skips_static_copy(tmp_path: Path) -> None:
+    """Static-copied GHA file is not scanned, so not flagged."""
+    from zenit.migrate.migrate import _scan_for_unresolved_markers
+
+    d = tmp_path / "proj"
+    d.mkdir()
+    (d / "ci.yml").write_text("on: push\n  ${{ github.ref }}")
+    flagged = _scan_for_unresolved_markers(d, set())  # not in rendered set
+    assert "ci.yml" not in flagged
+
+
+def test_scan_unresolved_markers_rendered_and_resolved(tmp_path: Path) -> None:
+    """Rendered file with all vars resolved is not flagged."""
+    from zenit.migrate.migrate import _scan_for_unresolved_markers
+
+    d = tmp_path / "proj"
+    d.mkdir()
+    (d / "app.py").write_text("NAME = myproj\n")
+    flagged = _scan_for_unresolved_markers(d, {"app.py"})
+    assert "app.py" not in flagged
+
+
+def test_scan_unresolved_markers_block_tag(tmp_path: Path) -> None:
+    """Unresolved block tag is flagged."""
+    from zenit.migrate.migrate import _scan_for_unresolved_markers
+
+    d = tmp_path / "proj"
+    d.mkdir()
+    (d / "template.txt").write_text("{% if x %}hello{% endif %}")
+    flagged = _scan_for_unresolved_markers(d, {"template.txt"})
+    assert "template.txt" in flagged
+
+
+def test_run_migration_tracks_rendered_files(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Rendered file with unresolved marker is warned at migration end."""
+    template_dir = tmp_path / "copier-template"
+    template_dir.mkdir()
+    (template_dir / "copier.yml").write_text(
+        yaml.dump({"name": {"type": "str", "help": "Name"}}),
+        encoding="utf-8",
+    )
+    (template_dir / "README.md.jinja").write_text(
+        "Hello {{ name }}\n", encoding="utf-8"
+    )
+    (template_dir / "LICENSE").write_text("{{ unknown_var }}\n", encoding="utf-8")
+
+    monkeypatch.chdir(tmp_path)
+
+    warnings: list[str] = []
+    monkeypatch.setattr(
+        "zenit.migrate.migrate.warn",
+        lambda msg: warnings.append(msg),
+    )
+
+    from zenit.migrate.migrate import run_migration
+
+    run_migration(str(template_dir), name="myproj")
+
+    # README.md was rendered (no .jinja → stripped), LICENSE was static copy
+    # Only rendered files are scanned, so LICENSE should not be flagged
+    unresolved_warnings = [
+        w for w in warnings if "unresolved" in w.lower() or "marker" in w.lower()
+    ]
+    # README.md has no unresolved markers (name is provided)
+    assert len(unresolved_warnings) == 0
+
+
+def test_run_migration_warns_unresolved_markers(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Rendered file with residual Jinja2 markers triggers warning."""
+    template_dir = tmp_path / "copier-template"
+    template_dir.mkdir()
+    (template_dir / "copier.yml").write_text(
+        yaml.dump({"name": {"type": "str", "help": "Name"}}),
+        encoding="utf-8",
+    )
+    (template_dir / "README.md.jinja").write_text(
+        "Hello {{ name }} {% unknown_tag %}\n", encoding="utf-8"
+    )
+
+    monkeypatch.chdir(tmp_path)
+
+    warnings: list[str] = []
+    monkeypatch.setattr(
+        "zenit.migrate.migrate.warn",
+        lambda msg: warnings.append(msg),
+    )
+
+    from zenit.migrate.migrate import run_migration
+
+    run_migration(str(template_dir), name="myproj")
+
+    unresolved_warnings = [
+        w for w in warnings if "unresolved" in w.lower() or "marker" in w.lower()
+    ]
+    assert len(unresolved_warnings) > 0
