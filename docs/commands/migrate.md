@@ -46,6 +46,9 @@ the current directory with this name.
 zenit migrate gh:user/template -D use_redis=yes -D project_name=myapp
 ```
 
+**`--task-timeout`** — Per-task timeout in seconds for Copier `_tasks` execution.
+Default is 300.
+
 ---
 
 ## Interactive mode
@@ -79,20 +82,26 @@ are resolved in question order at render time, matching Copier's behavior.
 | Artifact | Description |
 |---|---|
 | **Template files** | Rendered using Copier's Jinja2 environment and written as static content |
-| **`.zenit.toml`** | `[project]` section with `template = "migrated:<source>"`, `[migrated]` section with source, file paths, and task flag |
-| **Manifest** | `source = "migrated"` entries for all detected env vars, compose services, and dependencies |
-| **`.zenit-tasks.md`** | Written when `_tasks` are present and cannot be automatically applied |
+| **`.zenit.toml`** | `[project]` section with `template`, `template_source = "copier"`, `template_uri`, `template_file_paths`, and `template_has_tasks` |
+| **Manifest** | `source = "template"` entries for all detected env vars, compose services, dependencies, and compose volumes |
+| **`.zenit-tasks.md`** | Written when `_tasks` fail or are blocked and cannot be automatically applied |
 
 Safe tasks (`mv` and `rm -f` / `rm -rf`) are applied automatically during
-migration and do not appear as manual steps.
+migration and do not appear as manual steps. `mkdir -p` tasks are also
+applied automatically.
 
-The `[migrated]` lockfile section contains:
+The `[project]` section contains:
 
 ```
-[migrated]
-source = "https://github.com/user/repo"
-has_tasks = false
-file_paths = ["README.md", "main.py", ...]
+[project]
+template = "https://github.com/user/repo"
+template_source = "copier"
+template_uri = "https://github.com/user/repo"
+template_has_tasks = false
+template_file_paths = [
+    "README.md",
+    "main.py",
+]
 ```
 
 ---
@@ -108,10 +117,10 @@ Migration complete.
   Project:    myproject/
 
   Presence-tracked only:
-    ~ 12 files tracked in [migrated].file_paths
-    ~ 3 env var(s) with source=migrated
-    ~ 1 compose service(s) with source=migrated
-    ~ 5 dependencies with source=migrated
+    ~ 12 files tracked via template_file_paths
+    ~ 3 env var(s) with source=template
+    ~ 1 compose service(s) with source=template
+    ~ 5 dependencies with source=template
 
   ! Manual steps required: Copier _tasks were not executed.
       See .zenit-tasks.md for the list of commands to run manually.
@@ -131,9 +140,9 @@ entries. The following commands work with caveats:
 
 | Command | Behavior |
 |---|---|
-| `zenit add <addon>` | Upgrades presence-tracked (MIGRATED) entries to ADDON ownership. Warns before overriding files from the Copier template. |
-| `zenit remove <addon>` | Removes ADDON-owned entries only. Never touches MIGRATED entries. Preserves the `[migrated]` section. |
-| `zenit doctor` | Reports MIGRATED entries as warnings. Reports an ERROR if `has_tasks` is true, with a hint to check `.zenit-tasks.md`. |
+| `zenit add <addon>` | Upgrades presence-tracked (template-sourced) entries to ADDON ownership. Warns before overriding files from the Copier template. |
+| `zenit remove <addon>` | Removes ADDON-owned entries only. Never touches template-sourced entries. |
+| `zenit doctor` | Reports template-sourced entries as warnings via the unmanaged-content check. Reports an ERROR if `template_has_tasks` is true, with a hint to check `.zenit-tasks.md`. |
 
 ---
 
@@ -148,11 +157,8 @@ entries. The following commands work with caveats:
 
 ## Limitations
 
-- **`_tasks`** are not executed. Safe `mv`/`rm` operations are applied automatically;
-  remaining tasks are written to `.zenit-tasks.md`.
-- **`_skip_if_exists`** is not supported. Zenit always writes files unconditionally.
-- **`jinja_extensions`** is not supported. Templates using custom Jinja2 extensions
-  may not render correctly.
+- **`_tasks`** are not executed automatically. Safe `mv`/`rm`/`mkdir -p` operations
+  are applied automatically; remaining tasks are written to `.zenit-tasks.md`.
 - **Content is presence-tracked only, not fully managed.**
 - **Choice questions** (e.g. `database: [postgres, mysql, sqlite]`) become render
   variables. They do not produce addon stubs.

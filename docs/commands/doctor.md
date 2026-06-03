@@ -6,89 +6,115 @@ Verify that the project's current state matches what `.zenit.toml` records.
 zenit doctor
 ```
 
-Without `--fix`, `doctor` is read-only. It never modifies any file. It exits with code `0` if everything is consistent, and code `1` if any check fails.
+Without `--fix`, `doctor` is read-only. It never modifies any file. It exits
+with code `0` if everything is consistent, and code `1` if any check fails.
 
 ---
 
 ## What it checks
 
-Checks run in the following order. All checks always run — `doctor` does not stop at the first failure.
+Checks run in the following order. All checks always run — `doctor` does not
+stop at the first failure.
 
-**1. Manifest files exist**
+**1. Metadata**
 
-Every file listed in the manifest is checked for existence on disk. A missing file is an error.
+- `.zenit.toml` is present and valid
+- Template field is set
+- All installed addons are known to the current zenit version
+- Addon dependency requirements are satisfied
+- Zenit version matches the current installation (warning on mismatch)
 
-**2. File content hashes match**
+**2. Template health**
 
-For each file in the manifest, the current content hash is compared against the recorded hash. A mismatch means the file has been modified since Zenit created it. This is reported as a warning, not an error — modifying generated files is expected and supported. It becomes relevant when you later run `zenit remove`, which will ask for confirmation before deleting a modified file.
+For native (zenit) templates, this check passes immediately.
 
-**3. Injection markers are present and match**
+For Copier-migrated projects (`template_source == "copier"`):
 
-For each injection in the manifest, the fingerprint pipeline is run against the current file. If the exact or normalised fingerprint matches, the check passes. If only the fuzzy match succeeds, it is reported as a warning. If none of the three strategies find the block, it is reported as an error.
+- **Error** if `template_has_tasks` is true — pending Copier `_tasks` were not
+  executed. Check `.zenit-tasks.md` for the command list.
+- **Warning** with the count of files tracked via `template_file_paths` — these
+  files are presence-tracked but not under full lifecycle management.
 
-**4. Dependencies are present in `pyproject.toml`**
+**3. Manifest schema**
 
-Every package recorded in the manifest is checked against the current `[project.dependencies]` and `[project.optional-dependencies.dev]` sections. A missing package is an error.
+- Verifies `schema_version` matches the current version
+- Detects orphan manifest blocks — entries whose addon is no longer in the
+  lockfile's addon list
 
-**5. Compose services are present**
+**4. Dependencies**
 
-Only runs when the `docker` addon is installed. If any installed addon (or the template) declares compose services, `compose.yml` is checked for each service name. A missing service is an error. If docker is not installed or no addon has compose services, this check is skipped.
+Loads the template and addon configurations, then checks every expected
+dependency against the current `[project] dependencies` and
+`[dependency-groups] dev` in `pyproject.toml`. Missing runtime dependencies
+are errors; missing dev dependencies are warnings.
 
-**6. Migration status**
+**5. Generated files**
 
-When the project was created via `zenit migrate`, a `[migrated]` section is
-present in `.zenit.toml`. A migration health check reports:
+Every file declared by the template and installed addons is checked for
+existence on disk. A missing file is an error.
 
-- **Warnings** for each unmanaged env var, compose service, and dependency
-  (written by the Copier template and presence-tracked only).
-- **Warning** with the count of unmanaged files listed in
-  `[migrated].file_paths`.
-- **Error** if the Copier template had `_tasks` that were not automatically
-  applied. Check `.zenit-tasks.md` for the list of commands to run manually.
-- **Warning** identifying the migration source.
-- **OK** if the project has no migration metadata (native project).
+**6. Compose**
 
-**7. Env vars are defined**
+- Detects duplicate service definitions in `compose.yml`
+- Checks every expected compose service (from template and addons) is present
+  in `compose.yml`
 
-Every env var recorded in the manifest is checked against `.env.example`. A missing key is a warning — you may have intentionally removed it from `.env.example` after deciding not to use it.
+**7. Env vars**
 
----
+Every env var declared by the template and addons is checked against
+`.env` and `.env.example`. A missing key is an error.
 
-## Output format
+**8. Addon integrity**
 
-Each check prints one line. Passed checks use `✔`, warnings use `⚠`, errors use `✗`:
+Calls each installed addon's `health_check` hook if one is defined. Addon
+authors use this to run custom validation (e.g. checking that a service
+responds).
 
-```
-$ zenit doctor
+**9. Manifest env integrity**
 
-  ✔ my_project/redis.py  exists
-  ⚠ my_project/redis.py  content hash mismatch (file has been modified)
-  ✔ my_project/settings.py  injection: settings_fields
-  ✔ my_project/lifecycle.py  injection: lifespan_startup
-  ✔ my_project/lifecycle.py  injection: lifespan_shutdown
-  ✔ redis>=5  in pyproject.toml
-  ✔ redis service  in compose.yml
-  ✔ REDIS_URL  in .env.example
-  ⚠ REDIS_POOL_SIZE  missing from .env.example
+Every key recorded in `[[manifest.env]]` is checked against `.env` and
+`.env.example`. A missing key is an error.
 
-2 warnings, 0 errors.
-```
+**10. Manifest compose integrity**
 
-When errors are present:
+Every service and volume recorded in the manifest is checked against
+`compose.yml`. A missing entry is an error.
 
-```
-$ zenit doctor
+**11. Manifest dependency integrity**
 
-  ✔ my_project/redis.py  exists
-  ✔ my_project/redis.py  content hash matches
-  ✗ my_project/lifecycle.py  injection: lifespan_startup — block not found
-  ✔ redis>=5  in pyproject.toml
-  ✔ redis service  in compose.yml
-  ✔ REDIS_URL  in .env.example
-  ✔ REDIS_POOL_SIZE  in .env.example
+Every dependency recorded in the manifest is checked against
+`pyproject.toml`. A missing entry is an error.
 
-0 warnings, 1 error.
-```
+**12. Manifest just-recipe integrity**
+
+Every recipe name recorded in `[[manifest.just_recipes]]` is checked against
+the `justfile`. A missing entry is an error.
+
+**13. Python block line presence (fast)**
+
+For every `[[manifest.python_blocks]]`, verifies that the recorded line range
+does not exceed the file's current line count. This fast check runs first.
+
+**14. Python block integrity (thorough)**
+
+For every `[[manifest.python_blocks]]`, parses the target file, extracts the
+recorded line range, and recomputes the fingerprint. Reports:
+
+- **OK** if fingerprint matches exactly
+- **Warning** if only the normalised fingerprint matches (file was
+  reformatted)
+- **Warning** if the block has drifted (found at different lines via the
+  locator)
+- **Error** if the block cannot be found by any strategy
+
+**15. Unmanaged content (Copier-migrated projects only)**
+
+Scans the manifest for entries still marked `source = "template"` with
+`addon = ""` — env vars, dependencies, compose services, compose volumes, and
+just recipes that the Copier template contributed but no zenit addon has
+adopted. Suggests which native addon could take ownership.
+
+Native projects report that no unmanaged content is expected.
 
 ---
 
@@ -98,21 +124,13 @@ $ zenit doctor
 zenit doctor --fix
 ```
 
-Re-syncs stale line numbers and fingerprints in the manifest from the current file content. After editing files or running formatters, the line ranges recorded in `.zenit.toml` may be outdated — `--fix` recalculates them without changing any source file.
+Re-syncs stale line numbers and fingerprints in the manifest from the current
+file content. After editing files or running formatters, the line ranges
+recorded in `.zenit.toml` may be outdated — `--fix` recalculates them without
+changing any source file.
 
-```
-$ zenit doctor --fix
-
-  Fixing stale line numbers in the manifest.
-  ✔ my_project/redis.py  exists
-  ✔ my_project/redis.py  content hash matches
-  ✔ redis>=5  in pyproject.toml
-  ✔ REDIS_URL  in .env.example
-
-  0 warnings, 0 errors.
-```
-
-Use `--fix` after editing or reformatting a Zenit-managed file to keep the manifest accurate for future `remove` operations.
+Use `--fix` after editing or reformatting a Zenit-managed file to keep the
+manifest accurate for future `remove` operations.
 
 ---
 
@@ -127,23 +145,32 @@ Use `--fix` after editing or reformatting a Zenit-managed file to keep the manif
 
 ## When to run it
 
-**After pulling changes from collaborators.** If a teammate edited a file that Zenit manages, `doctor` will surface the mismatch before it causes a problem at `remove` time.
+**After pulling changes from collaborators.** If a teammate edited a file that
+Zenit manages, `doctor` will surface the mismatch before it causes a problem
+at `remove` time.
 
-**Before running `zenit remove`.** Confirm that all injections are locatable so removal proceeds cleanly. Use `--fix` if the project has been formatted recently to re-sync fingerprints.
+**Before running `zenit remove`.** Confirm that all injections are locatable
+so removal proceeds cleanly. Use `--fix` if the project has been formatted
+recently to re-sync fingerprints.
 
-**After running a formatter.** Formatters can change whitespace inside injected blocks enough to fail the exact fingerprint check. `doctor --fix` recalculates the line ranges and fingerprints so `remove` will proceed cleanly.
+**After running a formatter.** Formatters can change whitespace inside injected
+blocks enough to fail the exact fingerprint check. `doctor --fix` recalculates
+the line ranges and fingerprints so `remove` will proceed cleanly.
 
-**When something seems wrong.** If the app behaves unexpectedly after an `add`, `doctor` gives you a complete picture of the project's managed state.
+**When something seems wrong.** If the app behaves unexpectedly after an `add`,
+`doctor` gives you a complete picture of the project's managed state.
 
 ---
 
 ## Using `doctor` in CI
 
-`doctor` exits with code `1` on any error, making it suitable as a CI gate. Example GitHub Actions step:
+`doctor` exits with code `1` on any error, making it suitable as a CI gate.
+Example GitHub Actions step:
 
 ```yaml
-name: Verify Zenit project integrity
-run: zenit doctor
+- name: Verify Zenit project integrity
+  run: zenit doctor
 ```
 
-Add this after your test step to catch cases where a generated file was accidentally edited and committed with a stale or missing injection.
+Add this after your test step to catch cases where a generated file was
+accidentally edited and committed with a stale or missing injection.
