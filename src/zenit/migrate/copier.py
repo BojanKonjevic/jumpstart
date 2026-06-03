@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import contextlib
+import datetime
 import fnmatch
 import json
+import re
 import secrets
 import string
 import sys
@@ -101,6 +103,39 @@ def _to_nice_json(value: object, indent: int = 2) -> str:
     return json.dumps(value, indent=indent, ensure_ascii=False)
 
 
+def _slugify(value: str, sep: str = "-") -> str:
+    """Convert a string to a slug, joined by *sep*."""
+    value = value.lower().strip()
+    value = re.sub(r"[^\w\s" + re.escape(sep) + "]", "", value)
+    value = re.sub(r"[\s" + re.escape(sep) + r"]+", sep, value)
+    return value.strip(sep)
+
+
+def _strftime(value: object, fmt: str | None = None) -> str:
+    """Format a datetime/date via strftime, or treat *value* as the format string.
+
+    Copier convention: ``{{ '%Y' | strftime }}`` uses *value* as the format
+    string and ``now`` as the date.  ``{{ now | strftime('%Y') }}`` uses
+    *value* as the date and *fmt* as the format.
+    """
+    if isinstance(value, str) and fmt is None:
+        return datetime.datetime.now().strftime(value)
+    if isinstance(value, (datetime.datetime, datetime.date)):
+        return value.strftime(fmt) if fmt else str(value)
+    return str(value)
+
+
+def _commit_hash_url(value: str, repo_url: str) -> str:
+    """Format a commit hash as a URL."""
+    commit = str(value)[:40] if value else "HEAD"
+    return f"{repo_url.rstrip('/')}/commit/{commit}"
+
+
+def _to_json(value: object, indent: int | None = None) -> str:
+    """Serialize to JSON."""
+    return json.dumps(value, indent=indent, ensure_ascii=False, default=str)
+
+
 # ── Copier Jinja2 namespace extension ─────────────────────────────────────────
 
 
@@ -137,6 +172,34 @@ class CopierNamespaceExtension(jinja2.ext.Extension):
     @staticmethod
     def _render_namespace(name: str, caller: Callable[[], str]) -> str:
         return caller()
+
+
+class CopierTimeExtension(jinja2.ext.Extension):
+    """Stub for ``jinja2_time.TimeExtension`` — handles ``{% now %}`` tag."""
+
+    tags = {"now"}
+
+    def parse(self, parser: jinja2.parser.Parser) -> jinja2.nodes.Node:
+        next(parser.stream)
+        args: list[jinja2.nodes.Expr] = []
+        while parser.stream.current.type != "block_end":
+            if parser.stream.current.test("comma"):
+                next(parser.stream)
+                continue
+            args.append(parser.parse_expression())
+        return jinja2.nodes.Output(
+            [
+                self.call_method("_render_now", args),
+            ]
+        )
+
+    @staticmethod
+    def _render_now(tz: str = "utc", fmt: str = "%Y-%m-%d %H:%M:%S") -> str:
+        if tz.lower() in ("utc", "gmt"):
+            now = datetime.datetime.now(datetime.UTC)
+        else:
+            now = datetime.datetime.now()
+        return now.strftime(fmt)
 
 
 # ── Safe stubs for security-sensitive Jinja2 features ─────────────────────────
@@ -185,6 +248,36 @@ COPIER_ENV.add_extension(CopierNamespaceExtension)
 COPIER_ENV.filters["shell"] = _safe_shell_filter
 COPIER_ENV.globals["make_secret"] = _make_secret
 
+# Copier internal globals — stubs to prevent crashes in templates that reference them
+COPIER_ENV.globals["_copier_conf"] = {
+    "src_path": "/stub",
+    "dst_path": "/stub",
+    "answers_path": ".copier-answers.yml",
+    "vcs_ref": "HEAD",
+    "exclude": [],
+    "skip_if_exists": [],
+    "tasks": [],
+    "templates_suffix": None,
+    "jinja_extensions": [],
+    "envops": {},
+    "subdirectory": None,
+}
+COPIER_ENV.globals["_copier_answers"] = {
+    "_src_path": "/stub",
+    "_dst_path": "/stub",
+}
+COPIER_ENV.globals["_folder_name"] = "project"
+COPIER_ENV.globals["_destination_path"] = "/stub/project"
+COPIER_ENV.globals["now"] = datetime.datetime.now
+
+# Stub filters for third-party extensions
+COPIER_ENV.filters["slugify"] = _slugify
+COPIER_ENV.filters["strftime"] = _strftime
+COPIER_ENV.filters["commit_hash_url"] = _commit_hash_url
+COPIER_ENV.filters["to_json"] = _to_json
+
+COPIER_ENV.add_extension(CopierTimeExtension)
+
 
 def build_extended_env(
     config: CopierConfig,
@@ -224,6 +317,21 @@ def build_extended_env(
     env.add_extension(CopierNamespaceExtension)
     env.filters["shell"] = _safe_shell_filter
     env.globals["make_secret"] = _make_secret
+
+    # Copier internal globals (same as COPIER_ENV)
+    env.globals["_copier_conf"] = COPIER_ENV.globals["_copier_conf"]
+    env.globals["_copier_answers"] = COPIER_ENV.globals["_copier_answers"]
+    env.globals["_folder_name"] = "project"
+    env.globals["_destination_path"] = "/stub/project"
+    env.globals["now"] = datetime.datetime.now
+
+    # Stub filters (same as COPIER_ENV)
+    env.filters["slugify"] = _slugify
+    env.filters["strftime"] = _strftime
+    env.filters["commit_hash_url"] = _commit_hash_url
+    env.filters["to_json"] = _to_json
+
+    env.add_extension(CopierTimeExtension)
 
     if content_dir is not None:
         search_paths = [str(content_dir.resolve())]
@@ -271,8 +379,6 @@ def _infer_question_type(raw: dict[str, Any]) -> QuestionType:
         return QuestionType.MULTISELECT
     type_str = raw.get("type", "str")
     choices = raw.get("choices")
-    if choices:
-        return QuestionType.CHOICE
     match type_str:
         case "secret":
             return QuestionType.SECRET
@@ -285,6 +391,8 @@ def _infer_question_type(raw: dict[str, Any]) -> QuestionType:
         case "float":
             return QuestionType.FLOAT
         case _:
+            if choices:
+                return QuestionType.CHOICE
             return QuestionType.STR
 
 

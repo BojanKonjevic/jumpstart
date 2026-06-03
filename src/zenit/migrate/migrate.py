@@ -449,6 +449,12 @@ def _resolve_answers_noninteractive(
                 f"Pass it with -D {q.name}=<value>"
             )
 
+    # Inject any overrides that weren't consumed (non-question variables
+    # like copyright_holder, domain_spec, etc.).
+    for key, value in overrides.items():
+        if key not in answers.render_vars:
+            answers.render_vars[key] = value
+
     return answers
 
 
@@ -576,12 +582,15 @@ def _render_file_content(
 
     last_rendered: str | None = None
     last_env: jinja2.Environment = COPIER_ENV
+    first_error: Exception | None = None
     for _pass_name, env in passes:
         last_env = env
         try:
             rendered = env.from_string(content).render(**render_vars)
             last_rendered = rendered
-        except Exception:
+        except Exception as e:
+            if first_error is None:
+                first_error = e
             continue
 
         if "{{" not in rendered and "{%" not in rendered:
@@ -595,6 +604,10 @@ def _render_file_content(
         return last_rendered, diagnostic
 
     diagnostic = _diagnose_failed_render(content, question_names, last_env)
+    if first_error is not None:
+        msg = str(first_error)
+        truncated = msg[:200] + "..." if len(msg) > 200 else msg
+        diagnostic = f"rendering error: {truncated}"
     return None, diagnostic
 
 
@@ -602,7 +615,11 @@ def _scan_for_unresolved_markers(
     project_dir: Path,
     rendered_file_paths: set[str],
 ) -> list[str]:
-    """Scan only rendered files for unresolved Copier Jinja2 markers."""
+    """Scan only rendered files for unresolved Copier Jinja2 markers.
+
+    Strips GitHub Actions ``${{ }}`` expressions before checking to
+    avoid false positives.
+    """
     flagged: list[str] = []
     for rel_path in rendered_file_paths:
         full = project_dir / rel_path
@@ -612,7 +629,8 @@ def _scan_for_unresolved_markers(
             content = full.read_text(encoding="utf-8")
         except UnicodeDecodeError:
             continue
-        if "{{" in content or "{%" in content or "{#" in content:
+        no_gha = re.sub(r"\$\{\{.*?\}\}", "", content)
+        if "{{" in no_gha or "{%" in no_gha or "{#" in no_gha:
             flagged.append(rel_path)
     return flagged
 
@@ -1392,10 +1410,10 @@ def run_migration(
         if data is not None:
             overrides.update(data)
         answers = _resolve_answers_noninteractive(config, overrides)
-        # When --name is given but the template has no project_name question,
-        # inject it so _pick_project_name uses it as the directory name.
-        if name is not None and "project_name" not in answers.render_vars:
-            answers.render_vars["project_name"] = name
+        # When --name or -D project_name= is given but the template has no
+        # project_name question, inject it so _pick_project_name uses it.
+        if "project_name" not in answers.render_vars and "project_name" in overrides:
+            answers.render_vars["project_name"] = overrides["project_name"]
         overridden_names: set[str] = set(overrides.keys())
     else:
         step("Prompting for template answers")
