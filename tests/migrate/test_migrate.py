@@ -8,6 +8,15 @@ import yaml
 
 from zenit.core.lockfile import read_lockfile
 from zenit.core.manifest import read_manifest
+from zenit.migrate import MigrationAnswers, run_migration
+from zenit.migrate.answers import (
+    _mask_secrets,
+    _prompt_questions,
+    _regex_search_func,
+    _resolve_answers_noninteractive,
+    _stabilise_render_vars,
+    _validate_answer,
+)
 from zenit.migrate.copier import (
     CopierConfig,
     CopierQuestion,
@@ -15,16 +24,24 @@ from zenit.migrate.copier import (
     QuestionType,
     parse_copier_yml,
 )
-from zenit.migrate.migrate import (
-    MigrationAnswers,
-    _inventory_compose,
-    _inventory_deps,
-    _inventory_env,
-    _normalise_source,
-    _prompt_questions,
-    _resolve_answers_noninteractive,
-    _stabilise_render_vars,
-    run_migration,
+from zenit.migrate.fetch import _normalise_source
+from zenit.migrate.files import (
+    _apply_safe_task_file_ops,
+    _apply_skip_if_exists,
+)
+from zenit.migrate.inventory import _inventory_compose, _inventory_deps, _inventory_env
+from zenit.migrate.render import (
+    _diagnose_failed_render,
+    _render_file_content,
+    _scan_for_unresolved_markers,
+)
+from zenit.migrate.tasks import (
+    TaskResult,
+    _execute_task,
+    _execute_tasks,
+    _task_command,
+    _task_enabled,
+    _write_task_stub,
 )
 from zenit.schema.exceptions import ZenitError
 
@@ -327,7 +344,7 @@ def test_stabilise_circular_dependency_warns(
 
     warnings: list[str] = []
     monkeypatch.setattr(
-        "zenit.migrate.migrate.warn",
+        "zenit.migrate.answers.warn",
         lambda msg: warnings.append(msg),
     )
 
@@ -763,12 +780,11 @@ def test_apply_skip_if_exists_file_exists_pattern_matches(
     """File exists and pattern matches → skipped with warning."""
     warnings: list[str] = []
     monkeypatch.setattr(
-        "zenit.migrate.migrate.warn",
+        "zenit.migrate.files.warn",
         lambda msg: warnings.append(msg),
     )
     (tmp_path / "CHANGELOG.md").write_text("existing")
 
-    from zenit.migrate.migrate import _apply_skip_if_exists
     from zenit.schema.models import FileContribution
 
     contributions = [
@@ -788,10 +804,9 @@ def test_apply_skip_if_exists_file_absent(
     """File absent even though pattern matches → written normally, no warning."""
     warnings: list[str] = []
     monkeypatch.setattr(
-        "zenit.migrate.migrate.warn",
+        "zenit.migrate.files.warn",
         lambda msg: warnings.append(msg),
     )
-    from zenit.migrate.migrate import _apply_skip_if_exists
     from zenit.schema.models import FileContribution
 
     contributions = [FileContribution(dest="NEW_FILE.md")]
@@ -807,12 +822,11 @@ def test_apply_skip_if_exists_pattern_no_match(
     """File exists but pattern doesn't match → written normally."""
     warnings: list[str] = []
     monkeypatch.setattr(
-        "zenit.migrate.migrate.warn",
+        "zenit.migrate.files.warn",
         lambda msg: warnings.append(msg),
     )
     (tmp_path / "CHANGELOG.md").write_text("existing")
 
-    from zenit.migrate.migrate import _apply_skip_if_exists
     from zenit.schema.models import FileContribution
 
     contributions = [FileContribution(dest="CHANGELOG.md")]
@@ -828,14 +842,13 @@ def test_apply_skip_if_exists_glob_pattern(
     """Glob pattern matches existing file → skipped."""
     warnings: list[str] = []
     monkeypatch.setattr(
-        "zenit.migrate.migrate.warn",
+        "zenit.migrate.files.warn",
         lambda msg: warnings.append(msg),
     )
     sub = tmp_path / "odoo" / "custom" / "dependencies"
     sub.mkdir(parents=True)
     (sub / "external.txt").write_text("existing")
 
-    from zenit.migrate.migrate import _apply_skip_if_exists
     from zenit.schema.models import FileContribution
 
     contributions = [FileContribution(dest="odoo/custom/dependencies/external.txt")]
@@ -850,7 +863,6 @@ def test_apply_skip_if_exists_no_patterns(
     tmp_path: Path,
 ) -> None:
     """No skip_if_exists patterns → all files written normally."""
-    from zenit.migrate.migrate import _apply_skip_if_exists
     from zenit.schema.models import FileContribution
 
     contributions = [
@@ -867,12 +879,11 @@ def test_apply_skip_if_exists_renders_jinja_dest(
     """Jinja in destination path is rendered before skip check."""
     warnings: list[str] = []
     monkeypatch.setattr(
-        "zenit.migrate.migrate.warn",
+        "zenit.migrate.files.warn",
         lambda msg: warnings.append(msg),
     )
     (tmp_path / "myproj.conf").write_text("existing")
 
-    from zenit.migrate.migrate import _apply_skip_if_exists
     from zenit.schema.models import FileContribution
 
     contributions = [FileContribution(dest="{{ name }}.conf")]
@@ -1035,7 +1046,6 @@ def test_run_migration_skips_copier_internal_answers_file(
 
 def test_mask_secrets_replaces_value() -> None:
     """_mask_secrets replaces secret values with ******."""
-    from zenit.migrate.migrate import _mask_secrets
 
     result = _mask_secrets(
         "api_key=sk-1234, other=foo",
@@ -1049,7 +1059,6 @@ def test_mask_secrets_replaces_value() -> None:
 
 def test_mask_secrets_multiple() -> None:
     """Multiple secret values are all masked."""
-    from zenit.migrate.migrate import _mask_secrets
 
     result = _mask_secrets(
         "a=secret1, b=secret2",
@@ -1063,7 +1072,6 @@ def test_mask_secrets_multiple() -> None:
 
 def test_mask_secrets_no_match() -> None:
     """Text with no secret values is returned unchanged."""
-    from zenit.migrate.migrate import _mask_secrets
 
     result = _mask_secrets(
         "hello world",
@@ -1075,7 +1083,6 @@ def test_mask_secrets_no_match() -> None:
 
 def test_mask_secrets_empty_value() -> None:
     """Empty string value is not masked."""
-    from zenit.migrate.migrate import _mask_secrets
 
     result = _mask_secrets(
         "pw=",
@@ -1087,7 +1094,6 @@ def test_mask_secrets_empty_value() -> None:
 
 def test_mask_secrets_non_string_value() -> None:
     """Non-string value in render_vars is skipped."""
-    from zenit.migrate.migrate import _mask_secrets
 
     result = _mask_secrets(
         "port=5432",
@@ -1102,7 +1108,6 @@ def test_resolve_secret_noninteractive() -> None:
     config = CopierConfig(
         questions=[CopierQuestion(name="api_key", type=QuestionType.SECRET)],
     )
-    from zenit.migrate.migrate import _resolve_answers_noninteractive
 
     answers = _resolve_answers_noninteractive(config, {"api_key": "sk-abc"})
     assert answers.render_vars["api_key"] == "sk-abc"
@@ -1119,7 +1124,6 @@ def test_resolve_yaml_noninteractive() -> None:
             )
         ],
     )
-    from zenit.migrate.migrate import _resolve_answers_noninteractive
 
     answers = _resolve_answers_noninteractive(config, {})
     assert isinstance(answers.render_vars["config"], dict)
@@ -1135,7 +1139,6 @@ def test_resolve_secret_default_coerces_as_string() -> None:
             ),
         ],
     )
-    from zenit.migrate.migrate import _resolve_answers_noninteractive
 
     answers = _resolve_answers_noninteractive(config, {})
     assert answers.render_vars["api_key"] == "default_key"
@@ -1146,7 +1149,6 @@ def test_resolve_secret_default_coerces_as_string() -> None:
 
 def test_scan_unresolved_markers_flags_rendered_file(tmp_path: Path) -> None:
     """File with unresolved var is flagged."""
-    from zenit.migrate.migrate import _scan_for_unresolved_markers
 
     d = tmp_path / "proj"
     d.mkdir()
@@ -1157,7 +1159,6 @@ def test_scan_unresolved_markers_flags_rendered_file(tmp_path: Path) -> None:
 
 def test_scan_unresolved_markers_skips_static_copy(tmp_path: Path) -> None:
     """Static-copied GHA file is not scanned, so not flagged."""
-    from zenit.migrate.migrate import _scan_for_unresolved_markers
 
     d = tmp_path / "proj"
     d.mkdir()
@@ -1168,7 +1169,6 @@ def test_scan_unresolved_markers_skips_static_copy(tmp_path: Path) -> None:
 
 def test_scan_unresolved_markers_rendered_and_resolved(tmp_path: Path) -> None:
     """Rendered file with all vars resolved is not flagged."""
-    from zenit.migrate.migrate import _scan_for_unresolved_markers
 
     d = tmp_path / "proj"
     d.mkdir()
@@ -1179,7 +1179,6 @@ def test_scan_unresolved_markers_rendered_and_resolved(tmp_path: Path) -> None:
 
 def test_scan_unresolved_markers_block_tag(tmp_path: Path) -> None:
     """Unresolved block tag is flagged."""
-    from zenit.migrate.migrate import _scan_for_unresolved_markers
 
     d = tmp_path / "proj"
     d.mkdir()
@@ -1207,11 +1206,9 @@ def test_run_migration_tracks_rendered_files(
 
     warnings: list[str] = []
     monkeypatch.setattr(
-        "zenit.migrate.migrate.warn",
+        "zenit.migrate.api.warn",
         lambda msg: warnings.append(msg),
     )
-
-    from zenit.migrate.migrate import run_migration
 
     run_migration(str(template_dir), name="myproj")
 
@@ -1242,11 +1239,9 @@ def test_run_migration_warns_unresolved_markers(
 
     warnings: list[str] = []
     monkeypatch.setattr(
-        "zenit.migrate.migrate.warn",
+        "zenit.migrate.api.warn",
         lambda msg: warnings.append(msg),
     )
-
-    from zenit.migrate.migrate import run_migration
 
     run_migration(str(template_dir), name="myproj")
 
@@ -1261,7 +1256,6 @@ def test_run_migration_warns_unresolved_markers(
 
 def test_validate_answer_passes(monkeypatch: pytest.MonkeyPatch) -> None:
     """Validator expression that evaluates to truthy passes."""
-    from zenit.migrate.migrate import _validate_answer
 
     result = _validate_answer(
         CopierQuestion(
@@ -1275,7 +1269,6 @@ def test_validate_answer_passes(monkeypatch: pytest.MonkeyPatch) -> None:
 
 def test_validate_answer_fails(monkeypatch: pytest.MonkeyPatch) -> None:
     """Validator expression that evaluates to falsy fails."""
-    from zenit.migrate.migrate import _validate_answer
 
     result = _validate_answer(
         CopierQuestion(
@@ -1290,7 +1283,6 @@ def test_validate_answer_fails(monkeypatch: pytest.MonkeyPatch) -> None:
 
 def test_validate_answer_no_validator() -> None:
     """Question with no validator always passes."""
-    from zenit.migrate.migrate import _validate_answer
 
     result = _validate_answer(
         CopierQuestion(name="x", type=QuestionType.STR),
@@ -1302,7 +1294,6 @@ def test_validate_answer_no_validator() -> None:
 
 def test_regex_search_func() -> None:
     """regex_search helper works as a Jinja2-compatible validator."""
-    from zenit.migrate.migrate import _regex_search_func
 
     assert _regex_search_func(r"^[a-z]+$", "hello") is True
     assert _regex_search_func(r"^[a-z]+$", "HELLO") is False
@@ -1316,7 +1307,6 @@ def test_required_no_default_raises() -> None:
             CopierQuestion(name="api_key", type=QuestionType.STR, required=True),
         ],
     )
-    from zenit.migrate.migrate import _resolve_answers_noninteractive
 
     with pytest.raises(ZenitError, match="required"):
         _resolve_answers_noninteractive(config, {})
@@ -1329,7 +1319,6 @@ def test_required_with_override() -> None:
             CopierQuestion(name="api_key", type=QuestionType.STR, required=True),
         ],
     )
-    from zenit.migrate.migrate import _resolve_answers_noninteractive
 
     answers = _resolve_answers_noninteractive(config, {"api_key": "sk-abc"})
     assert answers.render_vars["api_key"] == "sk-abc"
@@ -1342,7 +1331,6 @@ def test_required_false_allows_empty_default() -> None:
             CopierQuestion(name="opt", type=QuestionType.STR, required=False),
         ],
     )
-    from zenit.migrate.migrate import _resolve_answers_noninteractive
 
     answers = _resolve_answers_noninteractive(config, {})
     assert answers.render_vars["opt"] == ""
@@ -1372,7 +1360,6 @@ def test_parse_required_and_validator(tmp_path: Path) -> None:
 
 def test_validate_answer_uses_regex_search() -> None:
     """regex_search function is available to validator expressions."""
-    from zenit.migrate.migrate import _validate_answer
 
     # Validator uses regex_search — should fail for non-matching value
     result = _validate_answer(
@@ -1392,7 +1379,6 @@ def test_validate_answer_uses_regex_search() -> None:
 
 def test_render_file_content_standard() -> None:
     """Simple {{ var }} template renders cleanly."""
-    from zenit.migrate.migrate import _render_file_content
 
     content, diagnostic = _render_file_content(
         "Hello {{ name }}",
@@ -1407,7 +1393,6 @@ def test_render_file_content_standard() -> None:
 def test_render_file_content_namespace() -> None:
     """{% namespace %} block renders cleanly."""
     from zenit.migrate.copier import COPIER_ENV
-    from zenit.migrate.migrate import _render_file_content
 
     content, diagnostic = _render_file_content(
         "{% namespace x %}hello{% endnamespace %}",
@@ -1423,7 +1408,6 @@ def test_render_file_content_namespace() -> None:
 def test_render_file_content_unknown_tag() -> None:
     """File with unknown Jinja2 tag gets a diagnostic."""
     from zenit.migrate.copier import COPIER_ENV
-    from zenit.migrate.migrate import _render_file_content
 
     content, diagnostic = _render_file_content(
         "{% unknown_tag %}",
@@ -1439,7 +1423,6 @@ def test_render_file_content_unknown_tag() -> None:
 def test_render_file_content_parsing_error() -> None:
     """Malformed template fails and gives diagnostic."""
     from zenit.migrate.copier import COPIER_ENV
-    from zenit.migrate.migrate import _render_file_content
 
     content, diagnostic = _render_file_content(
         "{% if missing %}",
@@ -1454,7 +1437,6 @@ def test_render_file_content_parsing_error() -> None:
 def test_diagnose_failed_render_unknown_var() -> None:
     """Diagnostic lists unknown variables."""
     from zenit.migrate.copier import COPIER_ENV
-    from zenit.migrate.migrate import _diagnose_failed_render
 
     diagnostic = _diagnose_failed_render(
         "Hello {{ unknown_var }}",
@@ -1468,7 +1450,6 @@ def test_diagnose_failed_render_unknown_var() -> None:
 def test_diagnose_failed_render_unknown_tag() -> None:
     """Diagnostic lists unknown tags."""
     from zenit.migrate.copier import COPIER_ENV
-    from zenit.migrate.migrate import _diagnose_failed_render
 
     diagnostic = _diagnose_failed_render(
         "{% custom_tag %}",
@@ -1482,7 +1463,6 @@ def test_diagnose_failed_render_unknown_tag() -> None:
 def test_diagnose_failed_render_parse_error() -> None:
     """Diagnostic shows parse error for malformed template."""
     from zenit.migrate.copier import COPIER_ENV
-    from zenit.migrate.migrate import _diagnose_failed_render
 
     diagnostic = _diagnose_failed_render(
         "{% if missing %}",
@@ -1497,7 +1477,6 @@ def test_diagnose_failed_render_parse_error() -> None:
 
 def test_task_command_string() -> None:
     """String task returns the string as command."""
-    from zenit.migrate.migrate import _task_command
 
     result = _task_command("echo hello")
     assert result == "echo hello"
@@ -1505,7 +1484,6 @@ def test_task_command_string() -> None:
 
 def test_task_command_dict() -> None:
     """Dict task returns the 'command' field."""
-    from zenit.migrate.migrate import _task_command
 
     result = _task_command({"command": "echo hello", "when": "True"})
     assert result == "echo hello"
@@ -1513,7 +1491,6 @@ def test_task_command_dict() -> None:
 
 def test_task_command_dict_no_command() -> None:
     """Dict task without 'command' returns None."""
-    from zenit.migrate.migrate import _task_command
 
     result = _task_command({"when": "True"})
     assert result is None
@@ -1521,14 +1498,12 @@ def test_task_command_dict_no_command() -> None:
 
 def test_task_enabled_string() -> None:
     """String task is always enabled."""
-    from zenit.migrate.migrate import _task_enabled
 
     assert _task_enabled("echo hi", {}) is True
 
 
 def test_task_enabled_when_true() -> None:
     """Task with true when condition is enabled."""
-    from zenit.migrate.migrate import _task_enabled
 
     t = {"command": "echo hi", "when": "{{ use_it }}"}
     assert _task_enabled(t, {"use_it": "True"}) is True
@@ -1536,7 +1511,6 @@ def test_task_enabled_when_true() -> None:
 
 def test_task_enabled_when_false() -> None:
     """Task with false when condition is disabled."""
-    from zenit.migrate.migrate import _task_enabled
 
     t = {"command": "echo hi", "when": "{{ use_it }}"}
     assert _task_enabled(t, {"use_it": "false"}) is False
@@ -1544,10 +1518,9 @@ def test_task_enabled_when_false() -> None:
 
 def test_execute_task_simple(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     """Simple echo task succeeds."""
-    from zenit.migrate.migrate import _execute_task
 
     monkeypatch.setattr(
-        "zenit.migrate.migrate.subprocess.run",
+        "zenit.migrate.tasks.subprocess.run",
         lambda *a, **kw: type(
             "Proc",
             (),
@@ -1565,10 +1538,9 @@ def test_execute_task_simple(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) ->
 
 def test_execute_task_fails(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     """Task with non-zero exit returns failed result."""
-    from zenit.migrate.migrate import _execute_task
 
     monkeypatch.setattr(
-        "zenit.migrate.migrate.subprocess.run",
+        "zenit.migrate.tasks.subprocess.run",
         lambda *a, **kw: type(
             "Proc",
             (),
@@ -1589,7 +1561,6 @@ def test_execute_task_skipped_by_when(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     """Task with when=False is skipped (returns None)."""
-    from zenit.migrate.migrate import _execute_task
 
     result = _execute_task(
         {"command": "echo hi", "when": "{{ use_it }}"},
@@ -1603,11 +1574,10 @@ def test_execute_tasks_returns_failed_only(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     """_execute_tasks returns only failed/timed-out tasks."""
-    from zenit.migrate.migrate import _execute_tasks
 
     return_codes: list[int] = [0, 1]
     monkeypatch.setattr(
-        "zenit.migrate.migrate.subprocess.run",
+        "zenit.migrate.tasks.subprocess.run",
         lambda *a, **kw: type(
             "Proc",
             (),
@@ -1629,7 +1599,6 @@ def test_execute_tasks_returns_failed_only(
 
 def test_write_task_stub_skipped_no_failed(tmp_path: Path) -> None:
     """No stub written when no tasks failed."""
-    from zenit.migrate.migrate import _write_task_stub
 
     _write_task_stub(tmp_path, [])
     assert not (tmp_path / ".zenit-tasks.md").exists()
@@ -1637,7 +1606,6 @@ def test_write_task_stub_skipped_no_failed(tmp_path: Path) -> None:
 
 def test_write_task_stub_writes_failed(tmp_path: Path) -> None:
     """Stub written with failed task details."""
-    from zenit.migrate.migrate import TaskResult, _write_task_stub
 
     _write_task_stub(
         tmp_path,
@@ -1653,7 +1621,6 @@ def test_write_task_stub_writes_failed(tmp_path: Path) -> None:
 
 def test_apply_safe_mkdir_p(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     """mkdir -p task creates directory safely."""
-    from zenit.migrate.migrate import _apply_safe_task_file_ops
 
     results, pending = _apply_safe_task_file_ops([], ["mkdir -p dir/sub"], {}, tmp_path)
     assert (tmp_path / "dir" / "sub").exists()

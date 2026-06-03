@@ -1,30 +1,19 @@
-"""Copier template parser, question classifier, and delimiter translator."""
+"""Copier template parser, question classifier, and file classifier."""
 
 from __future__ import annotations
 
 import contextlib
-import datetime
 import fnmatch
-import json
-import re
-import secrets
-import string
-import sys
-from collections.abc import Callable
 from dataclasses import dataclass, field
 from enum import Enum
-from io import StringIO
 from pathlib import Path
 from typing import Any
 
 import jinja2
-import jinja2.ext
 import jinja2.meta
-import jinja2.nodes
-import jinja2.parser
 from ruamel.yaml import YAML
 
-from zenit.cli.ui import warn
+from .env import COPIER_ENV, build_extended_env
 
 # ── Question types ─────────────────────────────────────────────────────────────
 
@@ -88,281 +77,10 @@ class CopierConfig:
     message_after_copy: str = ""
 
 
-def _to_nice_yaml(value: object, indent: int = 2) -> str:
-    """Serialize a Python object to YAML (``to_nice_yaml`` filter)."""
-    y = YAML()
-    y.default_flow_style = False
-    y.indent(mapping=indent, sequence=indent, offset=indent)
-    buf = StringIO()
-    y.dump(value, buf)
-    return buf.getvalue().rstrip("\n")
-
-
-def _to_nice_json(value: object, indent: int = 2) -> str:
-    """Serialize a Python object to pretty-printed JSON (``to_nice_json`` filter)."""
-    return json.dumps(value, indent=indent, ensure_ascii=False)
-
-
-def _slugify(value: str, sep: str = "-") -> str:
-    """Convert a string to a slug, joined by *sep*."""
-    value = value.lower().strip()
-    value = re.sub(r"[^\w\s" + re.escape(sep) + "]", "", value)
-    value = re.sub(r"[\s" + re.escape(sep) + r"]+", sep, value)
-    return value.strip(sep)
-
-
-def _strftime(value: object, fmt: str | None = None) -> str:
-    """Format a datetime/date via strftime, or treat *value* as the format string.
-
-    Copier convention: ``{{ '%Y' | strftime }}`` uses *value* as the format
-    string and ``now`` as the date.  ``{{ now | strftime('%Y') }}`` uses
-    *value* as the date and *fmt* as the format.
-    """
-    if isinstance(value, str) and fmt is None:
-        return datetime.datetime.now().strftime(value)
-    if isinstance(value, (datetime.datetime, datetime.date)):
-        return value.strftime(fmt) if fmt else str(value)
-    return str(value)
-
-
-def _commit_hash_url(value: str, repo_url: str) -> str:
-    """Format a commit hash as a URL."""
-    commit = str(value)[:40] if value else "HEAD"
-    return f"{repo_url.rstrip('/')}/commit/{commit}"
-
-
-def _to_json(value: object, indent: int | None = None) -> str:
-    """Serialize to JSON."""
-    return json.dumps(value, indent=indent, ensure_ascii=False, default=str)
-
-
-# ── Copier Jinja2 namespace extension ─────────────────────────────────────────
-
-
-class CopierNamespaceExtension(jinja2.ext.Extension):
-    """Handle ``{% namespace name %}``/``{% endnamespace %}`` blocks.
-
-    Copier templates use this extension to group variables under a prefix.
-    The extension was originally provided by ``copier.template`` and is
-    registered here as a standalone Jinja2 extension class.
-    """
-
-    tags = {"namespace", "endnamespace"}
-
-    def parse(self, parser: jinja2.parser.Parser) -> jinja2.nodes.Node:
-        # ``{% endnamespace %}`` — consume the name token, return empty output.
-        if parser.stream.current.value == "endnamespace":
-            next(parser.stream)
-            return jinja2.nodes.Output([])
-        # ``{% namespace name %}`` — consume tag name, then the group name.
-        next(parser.stream)
-        token = parser.stream.expect("name")
-        name = token.value
-        body = parser.parse_statements(
-            ("name:endnamespace",),
-            drop_needle=True,
-        )
-        return jinja2.nodes.CallBlock(
-            self.call_method("_render_namespace", [jinja2.nodes.Const(name)]),
-            [],
-            [],
-            body,
-        )
-
-    @staticmethod
-    def _render_namespace(name: str, caller: Callable[[], str]) -> str:
-        return caller()
-
-
-class CopierTimeExtension(jinja2.ext.Extension):
-    """Stub for ``jinja2_time.TimeExtension`` — handles ``{% now %}`` tag."""
-
-    tags = {"now"}
-
-    def parse(self, parser: jinja2.parser.Parser) -> jinja2.nodes.Node:
-        next(parser.stream)
-        args: list[jinja2.nodes.Expr] = []
-        while parser.stream.current.type != "block_end":
-            if parser.stream.current.test("comma"):
-                next(parser.stream)
-                continue
-            args.append(parser.parse_expression())
-        return jinja2.nodes.Output(
-            [
-                self.call_method("_render_now", args),
-            ]
-        )
-
-    @staticmethod
-    def _render_now(tz: str = "utc", fmt: str = "%Y-%m-%d %H:%M:%S") -> str:
-        if tz.lower() in ("utc", "gmt"):
-            now = datetime.datetime.now(datetime.UTC)
-        else:
-            now = datetime.datetime.now()
-        return now.strftime(fmt)
-
-
-# ── Safe stubs for security-sensitive Jinja2 features ─────────────────────────
-
-
-def _safe_shell_filter(command: str) -> str:
-    """Safe stub for the ``shell()`` Jinja2 filter.
-
-    The real ``shell()`` filter (from ``jinja2_shell_extension``) executes
-    shell commands during rendering — a security concern in migration
-    context.  This stub warns and returns an empty string.
-    """
-    warn(
-        f"shell() filter called with: '{command[:80]}"
-        f"{'...' if len(command) > 80 else ''}'. "
-        f"Shell execution during rendering is not supported. "
-        f"Returning empty string — provide the value with "
-        f"-D <name>=<value>."
-    )
-    return ""
-
-
-def _make_secret(length: int = 32) -> str:
-    """Generate a random alphanumeric string (replaces Copier's ``make_secret()``)."""
-    alphabet = string.ascii_letters + string.digits
-    return "".join(secrets.choice(alphabet) for _ in range(length))
-
-
-# ── Copier delimiters (standard Jinja2) ────────────────────────────────────────
-
-COPIER_ENV = jinja2.Environment(
-    variable_start_string="{{",
-    variable_end_string="}}",
-    block_start_string="{%",
-    block_end_string="%}",
-    comment_start_string="{#",
-    comment_end_string="#}",
-    keep_trailing_newline=True,
-)
-COPIER_ENV.filters["to_nice_yaml"] = _to_nice_yaml
-COPIER_ENV.filters["to_nice_json"] = _to_nice_json
-
-COPIER_ENV.add_extension("jinja2.ext.do")
-COPIER_ENV.add_extension("jinja2.ext.loopcontrols")
-COPIER_ENV.add_extension(CopierNamespaceExtension)
-COPIER_ENV.filters["shell"] = _safe_shell_filter
-COPIER_ENV.globals["make_secret"] = _make_secret
-
-# Copier internal globals — stubs to prevent crashes in templates that reference them
-COPIER_ENV.globals["_copier_conf"] = {
-    "src_path": "/stub",
-    "dst_path": "/stub",
-    "answers_path": ".copier-answers.yml",
-    "vcs_ref": "HEAD",
-    "exclude": [],
-    "skip_if_exists": [],
-    "tasks": [],
-    "templates_suffix": None,
-    "jinja_extensions": [],
-    "envops": {},
-    "subdirectory": None,
-}
-COPIER_ENV.globals["_copier_answers"] = {
-    "_src_path": "/stub",
-    "_dst_path": "/stub",
-}
-COPIER_ENV.globals["_folder_name"] = "project"
-COPIER_ENV.globals["_destination_path"] = "/stub/project"
-COPIER_ENV.globals["now"] = datetime.datetime.now
-
-# Stub filters for third-party extensions
-COPIER_ENV.filters["slugify"] = _slugify
-COPIER_ENV.filters["strftime"] = _strftime
-COPIER_ENV.filters["commit_hash_url"] = _commit_hash_url
-COPIER_ENV.filters["to_json"] = _to_json
-
-COPIER_ENV.add_extension(CopierTimeExtension)
-
-
-def build_extended_env(
-    config: CopierConfig,
-    template_dir: Path | None = None,
-    content_dir: Path | None = None,
-) -> jinja2.Environment:
-    """Build a Jinja2 environment that includes envops and custom extensions.
-
-    Applies ``_envops`` parameters (custom Jinja2 delimiters, whitespace
-    control, etc.) when specified in the template config, and tries to
-    import each extension in ``config.jinja_extensions``.
-
-    For local extension modules (e.g. ``extensions/slugify.py:SlugifyExtension``),
-    *template_dir* is added to ``sys.path`` during import.
-
-    When *content_dir* is provided, a ``FileSystemLoader`` pointing to it is
-    attached so that ``{% import %}`` and ``{% extends %}`` resolve correctly.
-    """
-    env_kw: dict[str, Any] = {
-        "variable_start_string": "{{",
-        "variable_end_string": "}}",
-        "block_start_string": "{%",
-        "block_end_string": "%}",
-        "comment_start_string": "{#",
-        "comment_end_string": "#}",
-        "keep_trailing_newline": True,
-    }
-    env_kw.update(config.envops)
-
-    env = jinja2.Environment(**env_kw)
-    env.filters["to_nice_yaml"] = _to_nice_yaml
-    env.filters["to_nice_json"] = _to_nice_json
-
-    # Standard extensions (Phase 2, Step 2)
-    env.add_extension("jinja2.ext.do")
-    env.add_extension("jinja2.ext.loopcontrols")
-    env.add_extension(CopierNamespaceExtension)
-    env.filters["shell"] = _safe_shell_filter
-    env.globals["make_secret"] = _make_secret
-
-    # Copier internal globals (same as COPIER_ENV)
-    env.globals["_copier_conf"] = COPIER_ENV.globals["_copier_conf"]
-    env.globals["_copier_answers"] = COPIER_ENV.globals["_copier_answers"]
-    env.globals["_folder_name"] = "project"
-    env.globals["_destination_path"] = "/stub/project"
-    env.globals["now"] = datetime.datetime.now
-
-    # Stub filters (same as COPIER_ENV)
-    env.filters["slugify"] = _slugify
-    env.filters["strftime"] = _strftime
-    env.filters["commit_hash_url"] = _commit_hash_url
-    env.filters["to_json"] = _to_json
-
-    env.add_extension(CopierTimeExtension)
-
-    if content_dir is not None:
-        search_paths = [str(content_dir.resolve())]
-        if template_dir is not None:
-            search_paths.append(str(template_dir.resolve()))
-        env.loader = jinja2.FileSystemLoader(search_paths)
-
-    if config.jinja_extensions and template_dir is not None:
-        template_dir_str = str(template_dir.resolve())
-        if template_dir_str not in sys.path:
-            sys.path.insert(0, template_dir_str)
-
-    for ext_path in config.jinja_extensions:
-        try:
-            env.add_extension(ext_path)
-        except Exception as e:
-            warn(
-                f"Failed to load Jinja2 extension '{ext_path}': {e}. "
-                f"Files requiring this extension may render incompletely. "
-                f"Install the extension package and re-run, or provide "
-                f"values with -D <name>=<value>."
-            )
-
-    return env
-
-
 # ── Parser ─────────────────────────────────────────────────────────────────────
 
 
 def _coerce_yaml_value(value: object) -> object:
-    """Parse a YAML string into a Python object."""
     if not isinstance(value, str):
         return value
     if not value.strip():
@@ -397,7 +115,6 @@ def _infer_question_type(raw: dict[str, Any]) -> QuestionType:
 
 
 def _build_copier_yaml(template_root: Path) -> YAML:
-    """Build a YAML instance with ``!include`` support for multi-file configs."""
     yaml = YAML()
 
     def include_constructor(loader: Any, node: Any) -> Any:
@@ -414,7 +131,6 @@ def _build_copier_yaml(template_root: Path) -> YAML:
 
 
 def parse_copier_yml(path: Path) -> CopierConfig:
-    """Parse a ``copier.yml`` file into a ``CopierConfig``."""
     if not path.exists():
         raise FileNotFoundError(f"copier.yml not found at '{path}'")
 
@@ -433,7 +149,6 @@ def parse_copier_yml(path: Path) -> CopierConfig:
 
     config = CopierConfig()
 
-    # Extract special underscore-prefixed keys
     config.subdirectory = data.pop("_subdirectory", None)
     config.exclude = list(data.pop("_exclude", []) or [])
     config.skip_if_exists = list(data.pop("_skip_if_exists", []) or [])
@@ -455,7 +170,6 @@ def parse_copier_yml(path: Path) -> CopierConfig:
     if isinstance(raw_envops, dict):
         config.envops = raw_envops
 
-    # Remove remaining Copier metadata keys that aren't questions
     for key in list(data):
         if key.startswith("_"):
             data.pop(key)
@@ -522,15 +236,10 @@ def parse_copier_yml(path: Path) -> CopierConfig:
     return config
 
 
-# ── Question classifier ────────────────────────────────────────────────────────
+# ── Question classifier ────────────────────────────────────────────────────
 
 
 def _get_undeclared_variables(content: str) -> set[str]:
-    """Extract undeclared variable names referenced in a Jinja2 template string.
-
-    Uses ``jinja2.meta.find_undeclared_variables`` which returns all variable
-    names that are referenced but not defined locally in the template.
-    """
     try:
         ast = COPIER_ENV.parse(content)
     except Exception:
@@ -544,11 +253,6 @@ def _get_undeclared_variables(content: str) -> set[str]:
 def classify_questions(
     config: CopierConfig, template_dir: Path
 ) -> dict[str, QuestionClass]:
-    """Classify each Copier question into a zenit question class.
-
-    Uses the template directory to scan files for variable references
-    to determine gating patterns.
-    """
     classes: dict[str, QuestionClass] = {}
 
     question_names: set[str] = {q.name for q in config.questions}
@@ -605,11 +309,10 @@ def classify_questions(
     return classes
 
 
-# ── File classifier ────────────────────────────────────────────────────────────
+# ── File classifier ────────────────────────────────────────────────────────
 
 
 def _has_jinja_expressions(content: str) -> bool:
-    """Check if a string contains Jinja2 expressions using Copier's delimiters."""
     if not content.strip():
         return False
     return "{{" in content or "{%" in content or "{#" in content
@@ -618,11 +321,6 @@ def _has_jinja_expressions(content: str) -> bool:
 def _excluded_by_pattern(
     file_path: Path, content_dir: Path | None, patterns: list[str]
 ) -> bool:
-    """Check if *file_path* matches any exclude pattern.
-
-    Copier's ``_exclude`` patterns match against paths relative to the
-    content directory (or the template root when there is no subdirectory).
-    """
     if not patterns:
         return False
     rel_str: str | None = None
@@ -640,7 +338,6 @@ def _excluded_by_pattern(
 def _try_parse_with_env(
     content: str, env: jinja2.Environment, question_names: set[str]
 ) -> FileJinjaClass:
-    """Try to parse *content* with *env* and classify based on undeclared variables."""
     try:
         ast = env.parse(content)
     except Exception:
@@ -660,22 +357,6 @@ def classify_file(
     content_dir: Path | None = None,
     template_dir: Path | None = None,
 ) -> FileJinjaClass:
-    """Classify a single file as JINJA2, STATIC, or UNTRANSLATABLE.
-
-    1. If the file matches an exclude pattern, skip (STATIC). Patterns are
-       matched against the path relative to *content_dir* when available,
-       falling back to the full path and then the filename. This matches
-       Copier's behavior where ``_exclude`` patterns are relative-path based.
-    2. If ``_templates_suffix`` is set, only files ending with that suffix
-       are candidates for Jinja2 template classification.  All other files
-       are STATIC.
-    3. If the file has a .jinja, .j2, or .jinja2 extension, treat as JINJA2.
-    4. If ``jinja_extensions`` is non-empty and the file requires custom
-       extensions to parse/render, mark as UNTRANSLATABLE.
-    5. Otherwise, attempt to parse with Jinja2. If parsing succeeds and the AST
-       contains expressions referencing known questions, treat as JINJA2.
-       Otherwise STATIC.
-    """
     if _excluded_by_pattern(file_path, content_dir, config.exclude):
         return FileJinjaClass.EXCLUDED
 
@@ -688,7 +369,6 @@ def classify_file(
 
     suffix = config.templates_suffix
     if suffix is not None:
-        # Custom _templates_suffix — only files with this suffix are templates
         name = file_path.name
         if name.endswith(suffix):
             try:

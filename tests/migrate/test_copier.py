@@ -7,18 +7,20 @@ import pytest
 import yaml
 
 from zenit.migrate.copier import (
-    COPIER_ENV,
     CopierConfig,
     FileJinjaClass,
     QuestionClass,
     QuestionType,
     _coerce_yaml_value,
-    _make_secret,
-    _safe_shell_filter,
-    build_extended_env,
     classify_file,
     classify_questions,
     parse_copier_yml,
+)
+from zenit.migrate.env import (
+    COPIER_ENV,
+    _make_secret,
+    _safe_shell_filter,
+    build_extended_env,
 )
 
 # ── parse_copier_yml ───────────────────────────────────────────────────────────
@@ -101,8 +103,6 @@ def test_parse_default_handling(tmp_path: Path) -> None:
 
 def test_parse_tasks_with_bool_converts_to_string(tmp_path: Path) -> None:
     """YAML ``false`` / ``true`` in _tasks is parsed as bool and converted to string."""
-    from zenit.migrate.migrate import parse_copier_yml
-
     (tmp_path / "copier.yml").write_text(
         "project_name:\n  type: str\n_tasks:\n  - echo hello\n  - false\n  - true\n",
         encoding="utf-8",
@@ -376,7 +376,7 @@ def test_unknown_extension_emits_warning(monkeypatch: pytest.MonkeyPatch) -> Non
     )
     warnings: list[str] = []
     monkeypatch.setattr(
-        "zenit.migrate.copier.warn",
+        "zenit.migrate.env.warn",
         lambda msg: warnings.append(msg),
     )
     build_extended_env(config)
@@ -390,7 +390,7 @@ def test_shell_filter_emits_warning_and_returns_empty(
     """shell() filter emits WARN and returns empty string."""
     warnings: list[str] = []
     monkeypatch.setattr(
-        "zenit.migrate.copier.warn",
+        "zenit.migrate.env.warn",
         lambda msg: warnings.append(msg),
     )
     result = _safe_shell_filter("echo hi")

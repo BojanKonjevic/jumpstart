@@ -507,13 +507,15 @@ def cmd_migrate(
     In non-interactive mode (\fB--name\fR or \fB--data\fR) every question
     takes its default value; use \fB--data\fR to override specific ones.
     """
-    from zenit.migrate.migrate import run_migration
-
-    overrides = _parse_data_flags(data) if data else None
+    data_dict = _parse_data_flags(data or [])
+    from zenit.migrate import run_migration
 
     try:
         result = run_migration(
-            source, name=name, data=overrides, task_timeout=task_timeout
+            source,
+            name=name,
+            data=data_dict,
+            task_timeout=task_timeout,
         )
         _print_migration_result(result)
     except Exception as exc:
@@ -525,7 +527,7 @@ def cmd_migrate(
 
 def _print_migration_result(result: object) -> None:
     """Print migration result — imported lazily to avoid circular imports."""
-    from zenit.migrate.migrate import MigrationResult, _print_migration_report
+    from zenit.migrate import MigrationResult, _print_migration_report
 
     if isinstance(result, MigrationResult):
         _print_migration_report(result)

@@ -14,18 +14,18 @@ from rich.console import Console
 from rich.prompt import Confirm, FloatPrompt, IntPrompt, Prompt
 
 from zenit.cli.ui import DIM, RESET, YELLOW
+from zenit.migrate.answers import (
+    MigrationAnswers,
+    _coerce_question_value,
+    _validate_answer,
+)
 from zenit.migrate.copier import (
     CopierConfig,
     QuestionClass,
     QuestionType,
     _coerce_yaml_value,
 )
-from zenit.migrate.migrate import (
-    MigrationAnswers,
-    _coerce_question_value,
-    _render_copier_default,
-    _validate_answer,
-)
+from zenit.migrate.env import _render_copier_default
 
 _CONSOLE = Console()
 _FILE_CONSOLES: dict[Path, Console] = {}
