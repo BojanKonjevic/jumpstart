@@ -818,7 +818,7 @@ nav {
   background: var(--bg-c);
   border-left: 1px solid var(--bdl);
   display: flex; flex-direction: column;
-  overflow: hidden;
+  overflow-y: auto;
   height: 100%;
 }
 
@@ -859,116 +859,61 @@ nav {
 .btn:hover { color: var(--t1); border-color: var(--t4); }
 .btn.copied { color: var(--green); border-color: rgba(122,170,114,.3); }
 
-/* Stack section */
-.stack-summary {
-  padding: .45rem 1rem .5rem;
-  border-bottom: 1px solid var(--bdl);
-  flex-shrink: 0;
-  min-height: 0;
-  overflow-y: auto;
-  max-height: 80px;
-}
-.stack-pills { display: flex; flex-wrap: wrap; gap: .25rem; }
-.stack-pill {
-  display: flex; align-items: center; gap: .28rem;
-  font-family: var(--mono); font-size: .63rem;
-  padding: .16rem .4rem .16rem .3rem;
-  background: var(--amber-m); border: 1px solid rgba(200,146,46,.25);
-  border-radius: 3px; color: var(--amber);
-}
-.stack-pill.is-auto {
-  background: rgba(200,146,46,.05); border-color: rgba(200,146,46,.12);
-  color: rgba(200,146,46,.5);
-}
-.pill-dot { width: 3px; height: 3px; border-radius: 50%; flex-shrink: 0; }
-.pill-rm { background: none; border: none; color: rgba(200,146,46,.35); cursor: pointer; font-size: .75rem; line-height: 1; padding: 0; transition: color .12s; }
-.pill-rm:hover { color: var(--red); }
 .clear-btn { background: none; border: none; color: var(--t5); font-family: var(--mono); font-size: .58rem; cursor: pointer; transition: color .15s; }
 .clear-btn:hover { color: var(--red); }
-.stack-empty-note {
-  font-family: var(--mono); font-size: .62rem; color: var(--t5);
-  font-style: italic;
-}
 
 /* ── DEPENDENCY TREE ── */
 .deptree-block {
-  flex: 1; display: flex; flex-direction: column; min-height: 0;
-  padding: .75rem 1rem .9rem;
+  padding: 0 1rem .85rem;
 }
 .deptree-canvas {
-  flex: 1; min-height: 0; position: relative;
   background: var(--frame-bg); border: 1px solid var(--bdl);
   border-radius: 4px; overflow: hidden;
 }
-.deptree-scroll {
-  position: absolute; inset: 0;
-  overflow-y: auto;
-  padding: .55rem .7rem .65rem;
-  display: flex; flex-direction: column;
-}
-.deptree-empty {
-  position: absolute; inset: 0;
-  display: flex; flex-direction: column; align-items: center; justify-content: center;
-  gap: .4rem; pointer-events: none;
-}
-.deptree-empty p { font-family: var(--mono); font-size: .6rem; color: var(--t5); text-align: center; }
-.dt-row {
+.dt-tpl {
   display: flex; align-items: center; gap: .35rem;
-  font-family: var(--mono); font-size: .68rem;
-  padding: .14rem 0;
-  line-height: 1.4;
+  padding: .4rem .7rem 0;
+  font-family: var(--mono); font-size: .65rem;
+  color: var(--t2);
+}
+.dt-tpl-dot {
+  width: 5px; height: 5px; border-radius: 50%;
+  background: var(--amber);
   flex-shrink: 0;
 }
-.dt-indent {
-  display: inline-flex; flex-shrink: 0;
-  align-items: center; gap: 0;
-}
-.dt-connector {
-  flex-shrink: 0;
-  color: var(--t4);
-  font-size: .55rem;
-  width: .9rem;
-  text-align: center;
-  user-select: none;
-}
-.dt-dot {
-  width: 6px; height: 6px; border-radius: 50%;
-  flex-shrink: 0;
-  margin-right: .05rem;
-}
-.dt-dot.sel { background: var(--amber); box-shadow: 0 0 4px rgba(200,146,46,.35); }
-.dt-dot.auto { background: rgba(200,146,46,.3); }
-.dt-name {
-  color: var(--t1);
+.dt-tpl-name {
   font-weight: 500;
 }
-.dt-name.auto { color: var(--t2); }
-.dt-tag {
-  font-size: .48rem; text-transform: uppercase; letter-spacing: .06em;
-  padding: .03rem .28rem; border-radius: 2px;
-  flex-shrink: 0; font-weight: 500;
+.dt-divider {
+  height: 1px; background: var(--bdl);
+  margin: .3rem .7rem;
 }
-.dt-tag.sel {
-  color: var(--amber);
-  background: rgba(200,146,46,.08);
-  border: 1px solid rgba(200,146,46,.12);
+.deptree-inner {
+  padding: 0 .7rem .55rem;
+  display: flex; flex-direction: column;
+  gap: .04rem;
 }
-.dt-tag.auto {
-  color: rgba(200,146,46,.45);
-  background: rgba(200,146,46,.03);
-  border: 1px solid rgba(200,146,46,.06);
+.dt-empty {
+  font-family: var(--mono); font-size: .6rem;
+  color: var(--t5); font-style: italic;
+  padding: .1rem 0;
 }
-.dt-tag.conflict {
-  color: var(--red);
-  background: var(--red-m);
-  border: 1px solid rgba(184,120,120,.15);
+.dt-row {
+  display: flex; align-items: center; gap: .15rem;
+  font-family: var(--mono); font-size: .68rem;
+  line-height: 1.7;
 }
-.dt-see-above {
-  color: var(--t4);
-  font-style: normal;
-  font-size: .55rem;
-  margin-left: .1rem;
+.dt-indent {
+  display: inline-flex; flex-shrink: 0; width: 1.1rem;
 }
+.dt-connector {
+  flex-shrink: 0; color: var(--t5);
+  font-size: .5rem; width: .8rem; text-align: center;
+  user-select: none;
+}
+.dt-name { font-weight: 500; }
+.dt-name.sel { color: var(--amber); }
+.dt-name.auto { color: var(--t4); }
 
 /* Resize handle */
 .resize-handle {
@@ -1240,19 +1185,17 @@ nav {
       </div>
     </div>
 
-    <!-- Compact addon pills summary -->
-    <div class="stack-summary" id="stackSummary">
-      <div id="stackItems"><span class="stack-empty-note">no addons selected</span></div>
-    </div>
-
-    <!-- Dependency tree takes all remaining space -->
+    <!-- Dependency tree -->
     <div class="deptree-block">
-      <div class="block-label" style="margin-bottom:0">dependency tree</div>
+      <div class="block-label" style="margin-bottom:.35rem">dependency tree</div>
       <div class="deptree-canvas">
-        <div class="deptree-scroll" id="depTreeScroll"></div>
-        <div class="deptree-empty" id="depTreeEmpty">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#4a4440" stroke-width="1.2"><path d="M4 4h16v16H4z"/><line x1="8" y1="9" x2="16" y2="9"/><line x1="8" y1="13" x2="14" y2="13"/><line x1="8" y1="17" x2="12" y2="17"/></svg>
-          <p>select addons to see<br>their dependency tree</p>
+        <div class="dt-tpl" id="depTreeTpl">
+          <span class="dt-tpl-dot"></span>
+          <span class="dt-tpl-name"></span>
+        </div>
+        <div class="dt-divider"></div>
+        <div class="deptree-inner" id="depTreeInner">
+          <div class="dt-empty">no addons selected</div>
         </div>
       </div>
     </div>
@@ -1724,20 +1667,6 @@ function updatePanel() {
   document.getElementById('cmdAddonsStr').textContent = addonsStr;
 
   document.getElementById('clearBtn').style.display = selected.size>0 ? '' : 'none';
-
-  const stackEl = document.getElementById('stackItems');
-  if (!all.length) {
-    stackEl.innerHTML = `<span class="stack-empty-note">no addons selected</span>`;
-    return;
-  }
-  stackEl.innerHTML = `<div class="stack-pills">${all.map(({id,auto})=>{
-    const a = ADDONS.find(x=>x.id===id);
-    return `<div class="stack-pill${auto?' is-auto':''}">
-      <div class="pill-dot" style="background:${a?a.col:'#6e6458'}"></div>
-      ${id}
-      ${auto ? '' : `<button class="pill-rm" onclick="event.stopPropagation();toggle('${id}')">×</button>`}
-    </div>`;
-  }).join('')}</div>`;
 }
 
 function copyCmd() {
@@ -1752,93 +1681,47 @@ function copyCmd() {
 // ── DEPENDENCY TREE ────────────────────────────────────────────────────────────────
 
 function renderDepTree() {
-  const hasSelection = selected.size > 0;
-  const empty = document.getElementById('depTreeEmpty');
-  const scroll = document.getElementById('depTreeScroll');
-  empty.style.display = hasSelection ? 'none' : 'flex';
+  const tpl = TEMPLATES.find(t => t.id === currentTpl);
+  const tplEl = document.getElementById('depTreeTpl');
+  tplEl.querySelector('.dt-tpl-name').textContent = tpl ? tpl.id : '—';
 
-  if (!hasSelection) { scroll.innerHTML = ''; return; }
+  const inner = document.getElementById('depTreeInner');
+
+  if (selected.size === 0) {
+    inner.innerHTML = '<div class="dt-empty">no addons selected</div>';
+    return;
+  }
 
   const seen = new Set();
   const allIds = new Set([...selected, ...autoDeps]);
 
-  function collectLines(addonId, depth, lines) {
+  function collect(id, depth, lines) {
     if (depth > 8) return;
-    const addon = ADDONS.find(x => x.id === addonId);
-    if (!addon) return;
-
-    (addon.requires || []).forEach(reqId => {
-      if (!allIds.has(reqId)) return;
-
-      if (seen.has(reqId)) {
-        lines.push({ id: reqId, depth, isSelected: selected.has(reqId), ref: true });
-        return;
-      }
-
+    const a = ADDONS.find(x => x.id === id);
+    if (!a) return;
+    (a.requires || []).forEach(reqId => {
+      if (!allIds.has(reqId) || seen.has(reqId)) return;
       seen.add(reqId);
       lines.push({ id: reqId, depth, isSelected: selected.has(reqId) });
-      collectLines(reqId, depth + 1, lines);
+      collect(reqId, depth + 1, lines);
     });
   }
 
   const lines = [];
-
   selected.forEach(id => {
     if (seen.has(id)) return;
     seen.add(id);
     lines.push({ id, depth: 0, isSelected: true });
-    collectLines(id, 1, lines);
+    collect(id, 1, lines);
   });
 
-  scroll.innerHTML = buildTreeHTML(lines);
-}
-
-function buildTreeHTML(lines) {
-  let html = '';
-  for (let i = 0; i < lines.length; i++) {
-    const l = lines[i];
-    const conflicts = findConflictsForTree(l.id);
-    const dotClass = l.isSelected ? 'sel' : 'auto';
-    const nameClass = l.isSelected ? 'dt-name' : 'dt-name auto';
-    const tagClass = l.isSelected ? 'sel' : 'auto';
-    const tagText = l.isSelected ? 'sel' : 'auto';
-
-    let indentHtml = '';
-    for (let d = 0; d < l.depth; d++) {
-      indentHtml += '<span class="dt-indent" style="width:1.2rem;flex-shrink:0"></span>';
-    }
-
-    if (l.ref) {
-      html += `<div class="dt-row">
-        ${indentHtml}
-        <span class="dt-connector">└</span>
-        <span class="dt-dot ${dotClass}"></span>
-        <span class="dt-name ${nameClass}">${l.id}</span>
-        <span class="dt-tag ${tagClass}">${tagText}</span>
-        <span class="dt-see-above">↻ above</span>
-      </div>`;
-    } else {
-      const conflictTags = conflicts.length
-        ? `<span class="dt-tag conflict">⚠ ${conflicts.join(', ')}</span>`
-        : '';
-      html += `<div class="dt-row">
-        ${indentHtml}
-        <span class="dt-connector">${l.depth > 0 ? '└' : ''}</span>
-        <span class="dt-dot ${dotClass}"></span>
-        <span class="dt-name ${nameClass}">${l.id}</span>
-        <span class="dt-tag ${tagClass}">${tagText}</span>
-        ${conflictTags}
-      </div>`;
-    }
-  }
-  return html;
-}
-
-function findConflictsForTree(id) {
-  const a = ADDONS.find(x => x.id === id);
-  if (!a || !a.conflicts) return [];
-  const allIds = new Set([...selected, ...autoDeps]);
-  return a.conflicts.filter(c => allIds.has(c));
+  inner.innerHTML = lines.map(l => {
+    let indent = '';
+    for (let d = 0; d < l.depth; d++) indent += '<span class="dt-indent"></span>';
+    const cl = l.isSelected ? 'sel' : 'auto';
+    const conn = l.depth > 0 ? '<span class="dt-connector">└</span>' : '';
+    return `<div class="dt-row">${indent}${conn}<span class="dt-name ${cl}">${l.id}</span></div>`;
+  }).join('');
 }
 
 // ── ASSEMBLY VISUALIZER ───────────────────────────────────────────────────────
