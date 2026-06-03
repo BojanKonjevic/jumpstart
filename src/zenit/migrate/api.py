@@ -7,6 +7,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from zenit.cli.ui import BOLD, CYAN, DIM, RESET, YELLOW, step, success, warn
+from zenit.core.git import init as git_init
 from zenit.core.lockfile import write_zenit_toml
 from zenit.core.manifest import (
     add_compose_service,
@@ -293,6 +294,9 @@ def run_migration(
         pending_tasks, project_dir, answers.render_vars, task_timeout
     )
     _write_task_stub(project_dir, failed_tasks)
+
+    step("Initialising git repository")
+    git_init(project_dir)
 
     result = MigrationResult(
         project_dir=project_dir,

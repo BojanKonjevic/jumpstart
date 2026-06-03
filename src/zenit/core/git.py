@@ -5,7 +5,13 @@ from zenit.cli.ui import spinner, warn
 
 
 def init(project_dir: Path) -> None:
-    """Initialise a git repository (best-effort — failure is not fatal)."""
+    """Initialise a git repository (best-effort — failure is not fatal).
+
+    If the project already has commits (e.g. from Copier ``_tasks`` that
+    ran ``git init && git commit`` before zenit's pipeline finished) the
+    existing commit is amended to include any new files and its message
+    is normalised to ``"Initial commit"``.
+    """
     try:
         with spinner("Initialising git repository"):
 
@@ -25,7 +31,14 @@ def init(project_dir: Path) -> None:
                 run("git", "config", "user.name", "zenit")
 
             run("git", "add", ".")
-            run("git", "commit", "-m", "Initial commit")
+
+            try:
+                run("git", "rev-parse", "HEAD")
+                run(
+                    "git", "commit", "--amend", "--reset-author", "-m", "Initial commit"
+                )
+            except subprocess.CalledProcessError:
+                run("git", "commit", "-m", "Initial commit")
     except Exception as exc:
         warn(f"Git initialisation skipped ({exc}). Project files are still valid.")
         warn("Run 'git init && git add . && git commit' manually when ready.")
