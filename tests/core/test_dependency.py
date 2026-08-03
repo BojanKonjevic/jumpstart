@@ -1,4 +1,4 @@
-"""Tests for DependencyGraph — the central dependency management module."""
+"""Tests for DependencyGraph - the central dependency management module."""
 
 from __future__ import annotations
 

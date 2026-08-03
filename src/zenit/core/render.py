@@ -76,7 +76,7 @@ def build_render_vars(
     specific addons.
 
     ``deps`` and ``dev_deps`` let template files use ``(( deps ))`` and
-    ``(( dev_deps ))`` in their content — e.g. to list dependencies in a
+    ``(( dev_deps ))`` in their content - e.g. to list dependencies in a
     README or generate an ``__init__.py`` that re-exports them.
 
     ``python_version`` should be ``"major.minor"`` (e.g. ``"3.14"``).

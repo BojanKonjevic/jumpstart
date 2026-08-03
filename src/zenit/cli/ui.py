@@ -21,7 +21,7 @@ if sys.platform == "win32":
         # Flags: ENABLE_PROCESSED_OUTPUT | ENABLE_WRAP_AT_EOL_OUTPUT |
         #        ENABLE_VIRTUAL_TERMINAL_PROCESSING
         kernel32.SetConsoleMode(kernel32.GetStdHandle(-11), 7)
-    except Exception:  # noqa: BLE001 — non-fatal; colours just won't render
+    except Exception:  # noqa: BLE001 - non-fatal; colours just won't render
         pass
 
 BOLD = "\033[1m"
@@ -154,7 +154,7 @@ def confirm(ctx: Context) -> bool:
 
     if not sys.stdin.isatty():
         warn(
-            "Non-interactive mode — proceeding automatically. Pass --dry-run to preview first."
+            "Non-interactive mode - proceeding automatically. Pass --dry-run to preview first."
         )
     return True
 

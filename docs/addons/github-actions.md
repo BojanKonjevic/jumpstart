@@ -29,28 +29,28 @@ The workflow runs on push to `main` and on pull requests targeting `main`.
 
 ### Job steps
 
-1. **Checkout** — `actions/checkout@v4`
-2. **Install uv** — `astral-sh/setup-uv@v4` with caching
-3. **Set up Python** — `uv python install 3.14`
-4. **Install dependencies** — `uv sync --all-extras`
-5. **Run migrations** (fastapi + postgres only) — `uv run alembic upgrade head`
-6. **Lint** — `uv run ruff check .`
-7. **Format check** — `uv run ruff format --check .`
-8. **Type check** — `uv run mypy src/`
-9. **Test** — `uv run pytest -v`
+1. **Checkout** - `actions/checkout@v4`
+2. **Install uv** - `astral-sh/setup-uv@v4` with caching
+3. **Set up Python** - `uv python install 3.14`
+4. **Install dependencies** - `uv sync --all-extras`
+5. **Run migrations** (fastapi + postgres only) - `uv run alembic upgrade head`
+6. **Lint** - `uv run ruff check .`
+7. **Format check** - `uv run ruff format --check .`
+8. **Type check** - `uv run mypy src/`
+9. **Test** - `uv run pytest -v`
 
 ### Service containers
 
 The workflow automatically provisions service containers based on installed addons:
 
-**PostgreSQL** (fastapi template) — `postgres:16`, port 5432, health checks configured.
+**PostgreSQL** (fastapi template) - `postgres:16`, port 5432, health checks configured.
 
-**Redis** (if `redis` addon installed) — `redis:7-alpine`, port 6379, health checks configured.
+**Redis** (if `redis` addon installed) - `redis:7-alpine`, port 6379, health checks configured.
 
 ### Environment variables in CI
 
-- `DATABASE_URL` — points to the PostgreSQL service container
-- `REDIS_URL` — points to the Redis service container
+- `DATABASE_URL` - points to the PostgreSQL service container
+- `REDIS_URL` - points to the Redis service container
 
 ---
 

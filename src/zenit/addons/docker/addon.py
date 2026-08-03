@@ -51,7 +51,7 @@ def health_check(project_dir: Path, lockfile: ZenitLockfile) -> list[HealthIssue
 
 def post_apply(ctx: Context, fs: FileSystem) -> None:  # noqa: ARG001
     # Compose merge is fully handled by _refresh_compose in add.py.
-    # Docker post_apply is intentionally a no-op for compose — the
+    # Docker post_apply is intentionally a no-op for compose - the
     # reconciliation is done once after the full add pipeline completes.
     return
 
@@ -59,13 +59,13 @@ def post_apply(ctx: Context, fs: FileSystem) -> None:  # noqa: ARG001
 def can_apply(project_dir: Path, lockfile: ZenitLockfile) -> str | None:
     if not (project_dir / "src").is_dir():
         return (
-            "No src/ directory found — docker addon expects a src layout.\n"
+            "No src/ directory found - docker addon expects a src layout.\n"
             "    Ensure your package lives under src/<pkg_name>/."
         )
 
     if not (project_dir / "pyproject.toml").exists():
         return (
-            "No pyproject.toml found — docker addon requires one to exist.\n"
+            "No pyproject.toml found - docker addon requires one to exist.\n"
             "    The generated Dockerfile copies pyproject.toml during the build."
         )
 

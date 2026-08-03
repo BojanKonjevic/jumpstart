@@ -1,4 +1,4 @@
-"""Tests for zenit.remove — addon removal from existing projects."""
+"""Tests for zenit.remove - addon removal from existing projects."""
 
 from __future__ import annotations
 
@@ -651,7 +651,7 @@ class TestRemoveAddonIntegration:
         assert "sentry_environment" not in settings
 
     def test_remove_docker_from_fastapi_succeeds(self, tmp_path, monkeypatch):
-        """Docker is no longer required by fastapi — removing it should succeed."""
+        """Docker is no longer required by fastapi - removing it should succeed."""
         project_dir = _scaffold(tmp_path, "myapi", "fastapi", ["docker", "sentry"])
         monkeypatch.chdir(project_dir)
 
@@ -704,7 +704,7 @@ class TestRemoveAddonIntegration:
             remove_addon("sqlalchemy", project_dir=project_dir)
 
         # The template's conftest.py contains [% if "sqlalchemy" in addons %]
-        # — restoration is skipped to avoid content drift, so the file is gone.
+        # - restoration is skipped to avoid content drift, so the file is gone.
         assert not conftest.exists(), (
             "Template conftest with addons-conditional Jinja2 must not be restored"
         )

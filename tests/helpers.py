@@ -1,4 +1,4 @@
-"""Shared test helpers — extracted from conftest to avoid module name shadowing.
+"""Shared test helpers - extracted from conftest to avoid module name shadowing.
 
 Pytest's conftest.py files are loaded as bare ``conftest`` modules during
 collection.  When a subdirectory (e.g. ``tests/handlers/``) is prepended to
@@ -7,7 +7,7 @@ collection.  When a subdirectory (e.g. ``tests/handlers/``) is prepended to
 one, causing ``ImportError``.
 
 By placing shared helpers in a conventionally-named module we side-step the
-collision entirely — no subdirectory will ever have a ``helpers.py``.
+collision entirely - no subdirectory will ever have a ``helpers.py``.
 """
 
 from __future__ import annotations
@@ -65,7 +65,7 @@ def write_test_manifest(
     addons: list[str],
     render_vars: dict[str, object],
 ) -> None:
-    """Write manifest entries for all *addons* — mirrors real ``zenit add`` flow.
+    """Write manifest entries for all *addons* - mirrors real ``zenit add`` flow.
 
     Call this after ``generate_all()`` in test ``_scaffold`` helpers so that
     ``remove_addon`` can read manifest entries instead of relying on

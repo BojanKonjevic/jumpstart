@@ -93,7 +93,7 @@ def validate_addon_deps(
     conflicts_map = {m.id: m.conflicts_with for m in available}
     templates_map = {m.id: m.templates for m in available}
 
-    # Template-compatibility check (before dep check — better error messages).
+    # Template-compatibility check (before dep check - better error messages).
     for addon in addons:
         allowed_templates = templates_map.get(addon, [])
         if allowed_templates and template and template not in allowed_templates:

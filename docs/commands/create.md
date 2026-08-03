@@ -15,7 +15,7 @@ In order:
 1. Creates a new directory with the given name in the current working directory.
 2. Prompts for a template and addons (if not already provided via config defaults).
 3. Renders and writes all template files, applying the Jinja2 context.
-4. Applies each selected addon in order — files, injections, dependencies, compose services, env vars, recipes.
+4. Applies each selected addon in order - files, injections, dependencies, compose services, env vars, recipes.
 5. Writes `pyproject.toml` and `justfile`.
 6. Runs `git init` and makes an initial commit.
 7. Writes `.zenit.toml`.
@@ -193,7 +193,7 @@ Scaffold interactively:
 zenit create my-api
 ```
 
-Scaffold with config defaults pre-selected (still interactive — confirm or change before proceeding):
+Scaffold with config defaults pre-selected (still interactive - confirm or change before proceeding):
 
 ```bash
 # with default_template = "fastapi" and default_addons = ["docker"] in config

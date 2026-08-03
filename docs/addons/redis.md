@@ -72,13 +72,13 @@ redis_url: str = "redis://localhost:6379/0"
 
 ### Dependencies
 
-- `redis>=5` — Redis Python client
-- `hiredis` — C parser for performance
-- `python-dotenv` — `.env` file loading
+- `redis>=5` - Redis Python client
+- `hiredis` - C parser for performance
+- `python-dotenv` - `.env` file loading
 
 ### Dev dependencies
 
-- `fakeredis` — In-memory Redis for testing
+- `fakeredis` - In-memory Redis for testing
 
 ### Just recipes
 

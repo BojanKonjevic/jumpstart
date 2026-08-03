@@ -2,7 +2,7 @@
 
 Paths in templates and addons use ``{{pkg_name}}`` (Jinja2-style double-braces)
 as the sole supported placeholder.  This is **intentionally** a plain string
-substitution, NOT Jinja2 rendering — because zenit's custom Jinja2 delimiters
+substitution, NOT Jinja2 rendering - because zenit's custom Jinja2 delimiters
 are ``(( … ))`` and ``[% … %]`` (see :func:`zenit.core.render.make_env`),
 so ``{{anything}}`` passes through templates as literal text.
 
@@ -51,7 +51,7 @@ def _validate_no_path_traversal(dest: str, project_dir: Path) -> None:
         raise ZenitError(
             f"Path traversal detected: '{dest}' resolves to '{resolved_dest}', "
             f"which is outside the project directory '{resolved_project}'. "
-            f"This is a security issue in the template or addon — please report it."
+            f"This is a security issue in the template or addon - please report it."
         ) from None
 
 
@@ -77,7 +77,7 @@ def resolve_dest_placeholder(text: str, pkg_name: str) -> str:
     This is the only supported placeholder syntax for dest-like path strings
     (``FileContribution.dest``, ``Contributions.dirs``, ``InjectionPoint.file``,
     ``ComposeService.command``, etc.).  It is resolved by plain string
-    replacement — NOT through Jinja2.
+    replacement - NOT through Jinja2.
 
     Raises
     ------

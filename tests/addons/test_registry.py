@@ -1,4 +1,4 @@
-"""Tests for addon registry — metadata (TOML) and lazy exec."""
+"""Tests for addon registry - metadata (TOML) and lazy exec."""
 
 from __future__ import annotations
 
@@ -10,7 +10,7 @@ import pytest
 from zenit.addons._registry import get_addon, list_addons
 from zenit.schema.exceptions import ZenitError
 
-# ── list_addons() — metadata only, no exec ────────────────────────────────
+# ── list_addons() - metadata only, no exec ────────────────────────────────
 
 
 def test_list_addons_returns_meta(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
@@ -57,7 +57,7 @@ def test_list_addons_all_real_addons_have_toml():
         assert m.description
 
 
-# ── get_addon() — lazy exec ────────────────────────────────────────────────
+# ── get_addon() - lazy exec ────────────────────────────────────────────────
 
 
 def test_get_addon_execs_addon_py(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
@@ -116,7 +116,7 @@ def test_get_addon_filenotfound_for_missing_addon():
         get_addon("nonexistent_addon_id_xyz")
 
 
-# ── get_available_addons — backward compatible ─────────────────────────────
+# ── get_available_addons - backward compatible ─────────────────────────────
 
 
 def test_available_addons_still_load():

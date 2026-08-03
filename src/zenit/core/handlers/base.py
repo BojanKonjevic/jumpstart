@@ -53,11 +53,11 @@ class FileHandler(ABC):
             actual = hashlib.sha256("".join(lines[s : e + 1]).encode()).hexdigest()
             if f"sha256:{actual}" != block.fingerprint:
                 warn(
-                    f"Block content has changed since injection — "
+                    f"Block content has changed since injection - "
                     f"cannot safely remove from '{file}'."
                 )
                 raise ZenitError(
-                    f"Block content has changed since injection — "
+                    f"Block content has changed since injection - "
                     f"cannot safely remove from '{file}'.\n"
                     f"  Expected fingerprint: {block.fingerprint}\n"
                     f"  Actual fingerprint:   sha256:{actual}\n"

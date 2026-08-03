@@ -1,4 +1,4 @@
-"""Tests for zenit.justfile — injecting just recipes into existing justfiles.
+"""Tests for zenit.justfile - injecting just recipes into existing justfiles.
 
 Covers inject_just_recipes, extract_recipe_name, and _extract_recipe_names for all
 relevant cases: adding new recipes, skipping duplicates, preserving formatting,
@@ -124,7 +124,7 @@ def test_extract_recipe_names_set_header():
     assert "set windows-shell" not in names
 
 
-# ── inject_just_recipes — basic behaviour ────────────────────────────────────
+# ── inject_just_recipes - basic behaviour ────────────────────────────────────
 
 
 def _write_justfile(tmp_path: Path, content: str) -> Path:

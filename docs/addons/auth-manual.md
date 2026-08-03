@@ -38,18 +38,18 @@ This addon is **only compatible with the `fastapi` template** because it depends
 ### Database models
 
 The `User` model includes:
-- `id` — UUID primary key
-- `email` — unique, indexed
-- `hashed_password` — bcrypt hash
-- `is_active` — boolean flag
-- `refresh_tokens` — relationship to `RefreshToken` (cascade delete)
+- `id` - UUID primary key
+- `email` - unique, indexed
+- `hashed_password` - bcrypt hash
+- `is_active` - boolean flag
+- `refresh_tokens` - relationship to `RefreshToken` (cascade delete)
 
 The `RefreshToken` model includes:
-- `id` — UUID primary key
-- `token` — unique string, indexed
-- `expires_at` — datetime with timezone
-- `is_revoked` — boolean flag
-- `user_id` — foreign key to `users.id`
+- `id` - UUID primary key
+- `token` - unique string, indexed
+- `expires_at` - datetime with timezone
+- `is_revoked` - boolean flag
+- `user_id` - foreign key to `users.id`
 
 ### Routes
 
@@ -82,19 +82,19 @@ refresh_token_expire_days: int = 30
 
 ### Dependencies
 
-- `bcrypt` — password hashing
-- `pyjwt[cryptography]` — JWT encoding/decoding
-- `email-validator` — email validation
-- `python-multipart` — form data parsing
-- `python-dotenv` — `.env` file loading
+- `bcrypt` - password hashing
+- `pyjwt[cryptography]` - JWT encoding/decoding
+- `email-validator` - email validation
+- `python-multipart` - form data parsing
+- `python-dotenv` - `.env` file loading
 
 ### Requirements
 
-- `sqlalchemy` addon — provides the database layer for user and refresh token models
+- `sqlalchemy` addon - provides the database layer for user and refresh token models
 
 ### Just recipes
 
-- `just gen-secret` — Generate a cryptographically secure secret key
+- `just gen-secret` - Generate a cryptographically secure secret key
 
 ### Router registration
 
@@ -109,8 +109,8 @@ api_router.include_router(auth_router, prefix="/auth", tags=["auth"])
 
 Injects into `tests/conftest.py`:
 
-- `test_user` — creates a verified user in the test database
-- `auth_client` — an `AsyncClient` pre-authenticated as `test_user`
+- `test_user` - creates a verified user in the test database
+- `auth_client` - an `AsyncClient` pre-authenticated as `test_user`
 
 ### Exception classes
 

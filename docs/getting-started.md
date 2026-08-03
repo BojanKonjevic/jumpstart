@@ -7,12 +7,12 @@ Get a project running in under five minutes.
 ## Requirements
 
 - **Python 3.12+**
-- **uv 0.4+** — [install](https://docs.astral.sh/uv/getting-started/installation/)
+- **uv 0.4+** - [install](https://docs.astral.sh/uv/getting-started/installation/)
 - **git**
-- **just** — optional, but generated projects use it heavily
-- **direnv** — optional, auto-activates the virtualenv on `cd`
+- **just** - optional, but generated projects use it heavily
+- **direnv** - optional, auto-activates the virtualenv on `cd`
 
-Docker is optional — add the `docker` addon if you want containers.
+Docker is optional - add the `docker` addon if you want containers.
 
 > [!NOTE]
 > **NixOS:** set `UV_PYTHON_DOWNLOADS=never` before installing. Generated projects detect NixOS automatically and write a `shell.nix` + `.envrc` that activates the system Python via direnv.
@@ -85,30 +85,30 @@ Select **fastapi** as the template, then **docker**, **sqlalchemy**, and **postg
 
 ```
 my-api/
-├── .zenit.toml              # Zenit's manifest — tracks what was generated
+├── .zenit.toml              # Zenit's manifest - tracks what was generated
 ├── pyproject.toml
 ├── justfile                 # task runner recipes (run, test, lint, …)
 ├── .env                     # local env vars (not committed)
 ├── .env.example             # committed template for .env
-├── compose.yml              # Docker Compose — app + postgres
+├── compose.yml              # Docker Compose - app + postgres
 ├── Dockerfile
 ├── alembic.ini              # from sqlalchemy addon
 ├── alembic/                 # from sqlalchemy addon
 │   └── env.py
 ├── my_api/
 │   ├── main.py              # FastAPI app, lifespan, middleware
-│   ├── settings.py          # Pydantic Settings — reads from .env
+│   ├── settings.py          # Pydantic Settings - reads from .env
 │   ├── lifecycle.py         # startup/shutdown hooks
 │   ├── exceptions.py        # global exception handlers
 │   ├── api/
 │   │   ├── router.py
 │   │   └── routes/
-│   │       └── health.py    # GET /health — always present
+│   │       └── health.py    # GET /health - always present
 │   ├── db/                  # from sqlalchemy addon
 │   │   ├── base.py
 │   │   └── session.py
 │   ├── models/
-│   │   └── mixins.py        # TimestampMixin — from sqlalchemy addon
+│   │   └── mixins.py        # TimestampMixin - from sqlalchemy addon
 │   ├── schemas/
 │   │   └── common.py        # PaginationParams, PaginatedResponse[T]
 │   └── scripts/
@@ -118,7 +118,7 @@ my-api/
     └── test_health.py
 ```
 
-`.zenit.toml` is the only file that links this project to Zenit. The rest is plain Python — no Zenit-specific imports, no runtime dependency.
+`.zenit.toml` is the only file that links this project to Zenit. The rest is plain Python - no Zenit-specific imports, no runtime dependency.
 
 > [!NOTE]
 > Zenit's core pipeline is validated by 1200+ tests covering injection, removal, round-trip integrity, and edge cases. What you see in `.zenit.toml` matches what actually happened.
@@ -151,7 +151,7 @@ just check     # mypy strict
 zenit add sentry
 ```
 
-Zenit installs the addon, injects the wiring, updates `pyproject.toml`, and records everything in `.zenit.toml`. Nothing is left in an inconsistent state — if anything fails, the entire operation rolls back.
+Zenit installs the addon, injects the wiring, updates `pyproject.toml`, and records everything in `.zenit.toml`. Nothing is left in an inconsistent state - if anything fails, the entire operation rolls back.
 
 ---
 
@@ -170,6 +170,6 @@ The project continues to work exactly as before.
 
 ## Next steps
 
-- [Architecture Overview](./architecture/index.md) — understand how Zenit works and why it was designed this way
-- [Building an addon](./architecture/addons-and-templates.md) — write your own addon
-- [Commands Reference](./commands/index.md) — every flag and option for all commands
+- [Architecture Overview](./architecture/index.md) - understand how Zenit works and why it was designed this way
+- [Building an addon](./architecture/addons-and-templates.md) - write your own addon
+- [Commands Reference](./commands/index.md) - every flag and option for all commands

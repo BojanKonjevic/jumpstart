@@ -1,4 +1,4 @@
-"""Tests for zenit.lockfile — read/write round-trip."""
+"""Tests for zenit.lockfile - read/write round-trip."""
 
 from pathlib import Path
 

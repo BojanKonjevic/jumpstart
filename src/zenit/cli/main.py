@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""zenit — scaffold Python projects from a template with optional addons."""
+"""zenit - scaffold Python projects from a template with optional addons."""
 
 from __future__ import annotations
 
@@ -19,7 +19,7 @@ from zenit.cli.ui import BOLD, CYAN, DIM, GREEN, RED, RESET
 
 
 def _parse_addon_list(raw: list[str] | None) -> list[str] | None:
-    """Parse addon list from CLI arg — handles repeated ``-a`` and comma-separated values.
+    """Parse addon list from CLI arg - handles repeated ``-a`` and comma-separated values.
 
     Each argument is split by commas, then flattened and stripped.
     Duplicates are removed while preserving insertion order.
@@ -121,7 +121,7 @@ def cmd_list(
         ),
     ] = False,
 ) -> None:
-    """List templates and addons — available, installed, or both."""
+    """List templates and addons - available, installed, or both."""
     if available and installed:
         from zenit.cli.ui import error
 
@@ -260,7 +260,7 @@ def cmd_config() -> None:
     if path.exists():
         print(f"  {GREEN}✓{RESET}  {DIM}file exists{RESET}")
     else:
-        print(f"  {DIM}file does not exist — using built‑in defaults{RESET}")
+        print(f"  {DIM}file does not exist - using built‑in defaults{RESET}")
 
     print()
     template_val = (
@@ -526,7 +526,7 @@ def cmd_migrate(
 
 
 def _print_migration_result(result: object) -> None:
-    """Print migration result — imported lazily to avoid circular imports."""
+    """Print migration result - imported lazily to avoid circular imports."""
     from zenit.migrate import MigrationResult, _print_migration_report
 
     if isinstance(result, MigrationResult):

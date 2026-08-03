@@ -1,4 +1,4 @@
-"""Tests for zenit.render — Jinja2 environment configuration.
+"""Tests for zenit.render - Jinja2 environment configuration.
 
 Includes a regression test for ``line_comment_prefix=None``, which must stay
 set to prevent Jinja2's default ``##`` from silently eating comment lines in
@@ -49,14 +49,14 @@ def test_hash_hash_is_NOT_a_line_comment():
 
     Jinja2's default ``line_comment_prefix`` is ``'##'``.  If it is
     accidentally removed, any Python line starting with ``##`` would be
-    silently stripped from generated files — breaking double-hash comments in
+    silently stripped from generated files - breaking double-hash comments in
     templates like Alembic scripts or docstrings.
     """
     env = make_env()
     template_text = "line1\n## this must survive\nline3\n"
     result = env.from_string(template_text).render()
     assert "## this must survive" in result, (
-        "line_comment_prefix must be None — '##' lines are being stripped. "
+        "line_comment_prefix must be None - '##' lines are being stripped. "
         "Check that make_env() sets line_comment_prefix=None."
     )
 

@@ -1,4 +1,4 @@
-"""Tests for zenit.generate — recipe rendering and deduplication."""
+"""Tests for zenit.generate - recipe rendering and deduplication."""
 
 from pathlib import Path
 from unittest.mock import MagicMock
@@ -123,7 +123,7 @@ def test_generate_all_includes_addon_recipes(tmp_path):
 def test_generate_all_deduplicates_by_recipe_name(tmp_path):
     ctx = _make_ctx(tmp_path)
     fs = _make_fs()
-    # Both template and addon define "run" — the addon's version should be dropped.
+    # Both template and addon define "run" - the addon's version should be dropped.
     contributions = _make_contributions(
         ["# start server\nrun:\n    uvicorn myproject.main:app"]
     )

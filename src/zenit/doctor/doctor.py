@@ -1,4 +1,4 @@
-"""zenit doctor — inspect a project's health against zenit's expectations."""
+"""zenit doctor - inspect a project's health against zenit's expectations."""
 
 from __future__ import annotations
 
@@ -231,7 +231,7 @@ def _check_manifest_env(
         env_path = project_dir / file_name
         if not env_path.exists():
             result.warn(
-                f"'{file_name}' is missing — cannot verify env integrity.",
+                f"'{file_name}' is missing - cannot verify env integrity.",
                 hint=f"Restore '{file_name}' or run 'zenit add' for the relevant addon.",
             )
             continue
@@ -329,7 +329,7 @@ def _check_manifest_deps(
     pyproject_path = project_dir / PYPROJECT_FILE
     if not pyproject_path.exists():
         result.error(
-            "pyproject.toml is missing — cannot verify manifest dependencies.",
+            "pyproject.toml is missing - cannot verify manifest dependencies.",
             hint="Restore pyproject.toml.",
         )
         return result
@@ -389,7 +389,7 @@ def _check_manifest_recipes(
     justfile_path = project_dir / JUSTFILE_NAME
     if not justfile_path.exists():
         result.warn(
-            "justfile is missing — cannot verify just-recipe integrity.",
+            "justfile is missing - cannot verify just-recipe integrity.",
             hint="Restore the justfile.",
         )
         return result
@@ -546,7 +546,7 @@ def _check_python_integrity(
                 actual_str = f"{actual[0]}-{actual[1]}"
                 result.warn(
                     f"Block '{block.point}' for '{block.addon}' in '{block.file}' "
-                    f"has drifted — recorded at lines {block.lines}, "
+                    f"has drifted - recorded at lines {block.lines}, "
                     f"actually at lines {actual_str}.",
                     hint="Run 'zenit doctor --fix' to update the manifest's line tracking.",
                 )
@@ -556,7 +556,7 @@ def _check_python_integrity(
                     f"has been modified (fingerprint mismatch at lines {block.lines}).",
                     hint=(
                         f"Run 'zenit doctor --fix' to re-sync line tracking. "
-                        f"If it persists, the block content was changed — "
+                        f"If it persists, the block content was changed - "
                         f"run 'zenit remove {block.addon}' and 'zenit add {block.addon}' "
                         f"to re-inject, or restore the original block."
                     ),
@@ -571,7 +571,7 @@ def _fix_python_blocks(project_dir: Path, manifest: Manifest) -> int:
     For each ``ManifestBlock``, re-runs the stored locator to find where the
     block actually is in the current file, then updates ``block.lines`` and
     recomputes ``fingerprint`` / ``fingerprint_normalised`` from the actual
-    content at that location.  Only modifies zenit tracking data — never
+    content at that location.  Only modifies zenit tracking data - never
     touches user code.
 
     Returns the number of blocks whose tracking data was updated.
@@ -712,7 +712,7 @@ def _check_copier_unmanaged_content(
     result = HealthResult("Unmanaged content")
 
     if lockfile.template_source != "copier":
-        result.ok("Project uses a native template — no unmanaged content expected.")
+        result.ok("Project uses a native template - no unmanaged content expected.")
         return result
 
     if manifest is None:
@@ -763,7 +763,7 @@ def _check_copier_unmanaged_content(
         hint = (
             f"Run: zenit add {' | zenit add '.join(suggestions)}"
             if suggestions
-            else "No matching native addon found — content must be managed manually."
+            else "No matching native addon found - content must be managed manually."
         )
         result.warn(
             f"{len(entries)} unmanaged {entry_type}: {display}",
@@ -1056,7 +1056,7 @@ def _check_compose(
 
     compose_path = project_dir / COMPOSE_FILE
     if not compose_path.exists():
-        result.ok("No compose.yml — skipping compose check.")
+        result.ok("No compose.yml - skipping compose check.")
         return result
 
     try:

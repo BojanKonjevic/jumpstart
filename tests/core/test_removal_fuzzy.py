@@ -1,4 +1,4 @@
-"""Integration tests — fuzzy removal threshold, warning emission, Stage B silence.
+"""Integration tests - fuzzy removal threshold, warning emission, Stage B silence.
 
 Tests the 4-stage removal cascade in python_handler.remove() under realistic
 conditions: libcst round-trips (Stage B), mild edits (Stage C success + warn),
@@ -71,7 +71,7 @@ class Settings(BaseSettings):
 """
 
 
-# ── Stage B — libcst round-trip: silent success ───────────────────────────────
+# ── Stage B - libcst round-trip: silent success ───────────────────────────────
 
 
 def test_fuzzy_removal_after_cst_roundtrip(
@@ -93,13 +93,13 @@ def test_fuzzy_removal_after_cst_roundtrip(
 
     captured = capsys.readouterr()
     assert captured.err == "", (
-        "Stage B removal must be silent — no warning expected after a "
+        "Stage B removal must be silent - no warning expected after a "
         f"libcst round-trip, got: {captured.err!r}"
     )
     assert "redis_url" not in f.read_text(encoding="utf-8")
 
 
-# ── Stage C — mild edit: success with warning ─────────────────────────────────
+# ── Stage C - mild edit: success with warning ─────────────────────────────────
 
 
 def test_fuzzy_removal_mild_edit_warns(
@@ -112,7 +112,7 @@ def test_fuzzy_removal_mild_edit_warns(
 
     block = _inject(f, '    redis_url: str = "redis://localhost"\n')
 
-    # Mild edit: rename the attribute — similarity stays ≥ 0.85.
+    # Mild edit: rename the attribute - similarity stays ≥ 0.85.
     text = f.read_text(encoding="utf-8")
     f.write_text(
         text.replace(
@@ -154,7 +154,7 @@ def test_fuzzy_removal_warning_message_format(
     assert f.name in warning, (
         f"Warning must contain the file name {f.name!r}, got: {warning!r}"
     )
-    # Similarity is printed as e.g. "85%" or "0.85" — match either form.
+    # Similarity is printed as e.g. "85%" or "0.85" - match either form.
     has_percent = "%" in warning
     has_ratio = any(
         part.replace(".", "", 1).isdigit()
@@ -171,7 +171,7 @@ def test_fuzzy_removal_warning_message_format(
     ), f"Warning must contain a line range (e.g. '6-6'), got: {warning!r}"
 
 
-# ── Stage C — heavy edit: failure → RemovalError ──────────────────────────────
+# ── Stage C - heavy edit: failure → RemovalError ──────────────────────────────
 
 
 def test_fuzzy_removal_heavy_edit_raises(tmp_path: Path) -> None:
@@ -181,7 +181,7 @@ def test_fuzzy_removal_heavy_edit_raises(tmp_path: Path) -> None:
     the file path, the expected line range, and manual resolution instructions.
 
     Stage C computes norm_ref from the *current* file at the clamped recorded
-    position, so content edits alone cannot push below the threshold — when
+    position, so content edits alone cannot push below the threshold - when
     s == ref_start the candidate equals norm_ref and similarity is always 100%.
     The only reliable path to Stage D is an empty scan window, which requires
     len(lines) < rec_start - FUZZY_WINDOW_LINES (== 20).  We achieve this by
@@ -265,7 +265,7 @@ def test_fuzzy_removal_correct_block_selected(
     )
     assert block_celery.addon == "celery"
 
-    # Mildly edit both so Stage A and B both fail — forcing Stage C.
+    # Mildly edit both so Stage A and B both fail - forcing Stage C.
     text = f.read_text(encoding="utf-8")
     text = text.replace(
         '    redis_url: str = "redis://localhost"',

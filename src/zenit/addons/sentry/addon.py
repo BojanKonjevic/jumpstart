@@ -73,7 +73,7 @@ def can_apply(project_dir: Path, lockfile: ZenitLockfile) -> str | None:
         target = project_dir / "src" / pkg_name / "lifecycle.py"
         if not target.exists():
             return (
-                "lifecycle.py not found — has it been moved or deleted?\n"
+                "lifecycle.py not found - has it been moved or deleted?\n"
                 "    zenit needs to inject init_sentry() into the lifespan function.\n"
                 "    Restore lifecycle.py or add the call manually."
             )
@@ -87,7 +87,7 @@ def can_apply(project_dir: Path, lockfile: ZenitLockfile) -> str | None:
         target = project_dir / "src" / pkg_name / "main.py"
         if not target.exists():
             return (
-                "main.py not found — has it been moved or deleted?\n"
+                "main.py not found - has it been moved or deleted?\n"
                 "    zenit needs to inject init_sentry() into the main() function.\n"
                 "    Restore main.py or add the call manually."
             )

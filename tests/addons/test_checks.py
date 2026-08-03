@@ -1,4 +1,4 @@
-"""Tests for zenit.checks — precondition checking for zenit add."""
+"""Tests for zenit.checks - precondition checking for zenit add."""
 
 from pathlib import Path
 

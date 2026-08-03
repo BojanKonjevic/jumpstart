@@ -1,4 +1,4 @@
-"""Tests for zenit.config — user config loading."""
+"""Tests for zenit.config - user config loading."""
 
 import sys
 from pathlib import Path

@@ -1,4 +1,4 @@
-"""Integration tests — every scaffolded item is tracked in the manifest.
+"""Integration tests - every scaffolded item is tracked in the manifest.
 
 Verifies that after a full scaffold run:
   - Template-owned entries carry source='template', addon=''.

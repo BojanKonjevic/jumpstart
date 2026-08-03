@@ -1,4 +1,4 @@
-"""Interactive prompt — arrow keys and space to select, enter to confirm.
+"""Interactive prompt - arrow keys and space to select, enter to confirm.
 
 Works on Unix (termios) and Windows (msvcrt).  Falls back to numbered input
 when stdin is not a tty (CI / piped input).

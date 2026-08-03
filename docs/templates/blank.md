@@ -1,12 +1,12 @@
 # blank
 
-The `blank` template produces a minimal Python package — a working entry point, a passing test, and a full set of dev tooling. It has no framework, no database, and no service dependencies. Everything Zenit adds is removable.
+The `blank` template produces a minimal Python package - a working entry point, a passing test, and a full set of dev tooling. It has no framework, no database, and no service dependencies. Everything Zenit adds is removable.
 
 ---
 
 ## When to use it
 
-Choose `blank` when you are building a CLI tool, a script, a library, or any project that does not need a web framework. If you later decide you need FastAPI, re-scaffold with the `fastapi` template — `blank` is not upgradeable in place.
+Choose `blank` when you are building a CLI tool, a script, a library, or any project that does not need a web framework. If you later decide you need FastAPI, re-scaffold with the `fastapi` template - `blank` is not upgradeable in place.
 
 ---
 
@@ -14,15 +14,15 @@ Choose `blank` when you are building a CLI tool, a script, a library, or any pro
 
 ```
 my-project/
-├── .zenit.toml                  # Zenit's manifest — tracks what was generated
+├── .zenit.toml                  # Zenit's manifest - tracks what was generated
 ├── pyproject.toml               # Project metadata and dependencies
 ├── justfile                     # Task runner recipes
 ├── .env                         # Local environment variables (not committed)
-├── .envrc                       # direnv hook — auto-activates the virtualenv on cd
+├── .envrc                       # direnv hook - auto-activates the virtualenv on cd
 ├── .gitignore
 ├── .gitattributes
 ├── .pre-commit-config.yaml      # Ruff lint, ruff format, mypy on every commit
-├── shell.nix                    # NixOS only — provides libstdc++
+├── shell.nix                    # NixOS only - provides libstdc++
 ├── my_project/
 │   ├── __init__.py              # Package version string
 │   ├── __main__.py              # Allows python -m my_project
@@ -62,10 +62,10 @@ The `blank` template is intentionally minimal. It exposes two injection points:
 | Point | File | Locator | What goes here |
 |---|---|---|---|
 | `settings_fields` | `src/{{pkg_name}}/settings.py` | `after_last_class_attribute` (`Settings`) | Pydantic settings fields |
-| `main_startup` | `src/{{pkg_name}}/main.py` | `before_return_in_function` (`main`) | Startup calls — e.g. `init_sentry()` |
+| `main_startup` | `src/{{pkg_name}}/main.py` | `before_return_in_function` (`main`) | Startup calls - e.g. `init_sentry()` |
 | `env_vars` | `.env` | `at_file_end` | Key=value pairs appended to the env file |
 
-If you need richer hooks (lifespan, router registration, test fixtures), use the `fastapi` template — it exposes ten distinct injection points. If you want a new hook added to `blank`, open an issue or see [Contributing](../contributing.md).
+If you need richer hooks (lifespan, router registration, test fixtures), use the `fastapi` template - it exposes ten distinct injection points. If you want a new hook added to `blank`, open an issue or see [Contributing](../contributing.md).
 
 ---
 

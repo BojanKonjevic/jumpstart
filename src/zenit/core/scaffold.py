@@ -1,4 +1,4 @@
-"""Project scaffold pipeline — called by the CLI layer."""
+"""Project scaffold pipeline - called by the CLI layer."""
 
 from __future__ import annotations
 
@@ -65,7 +65,7 @@ def validate_addons_exist(addons: list[str]) -> None:
         if addon not in available_ids:
             error(f"Unknown addon '{addon}'.")
             valid = "\n    ".join(
-                f"• {m.id}  — {m.description}" for m in available_meta
+                f"• {m.id}  - {m.description}" for m in available_meta
             )
             print(f"\n  Available addons:\n    {valid}\n")
             raise typer.Exit(1)
@@ -89,7 +89,7 @@ def scaffold_project(
     template: str | None = None,
     addons: list[str] | None = None,
 ) -> None:
-    """Core scaffold pipeline — called by the main CLI command."""
+    """Core scaffold pipeline - called by the main CLI command."""
 
     zenit_root = get_zenit_root()
     pkg_name = normalise_pkg_name(name)
@@ -200,11 +200,11 @@ def scaffold_project(
 
     if sys.platform == "win32":
         print()
-        info("Your environment is managed by uv — no activation needed.")
+        info("Your environment is managed by uv - no activation needed.")
         info("Every 'just' command runs through 'uv run' and syncs automatically.")
     elif not shutil.which("direnv"):
         print()
-        info("direnv not detected — run 'uv sync' once to set up your environment,")
+        info("direnv not detected - run 'uv sync' once to set up your environment,")
         info("or install direnv and run 'direnv allow' for auto-activation on cd.")
 
     if "github-actions" in adns:
@@ -226,7 +226,7 @@ def _stamp_template_manifest(
     template-owned env vars, compose services/volumes, dependencies, and
     just recipes with the correct ownership metadata.
 
-    The ``add_*`` helpers are idempotent — calling them on already-recorded
+    The ``add_*`` helpers are idempotent - calling them on already-recorded
     entries is safe.
     """
     manifest = read_manifest(project_dir)

@@ -28,7 +28,7 @@ Choose `sentry` when you want:
 
 The generated `sentry.py`:
 
-- Reads `SENTRY_DSN` from environment — no-ops when empty (safe for local dev)
+- Reads `SENTRY_DSN` from environment - no-ops when empty (safe for local dev)
 - For `fastapi` projects: includes `FastApiIntegration` and `SqlalchemyIntegration`
 - For `blank` projects: basic Sentry SDK init
 
@@ -48,8 +48,8 @@ sentry_environment: str = "development"
 
 ### Dependencies
 
-- `sentry-sdk[fastapi]` — Sentry SDK with FastAPI integration
-- `python-dotenv` — `.env` file loading
+- `sentry-sdk[fastapi]` - Sentry SDK with FastAPI integration
+- `python-dotenv` - `.env` file loading
 
 ### Just recipes
 

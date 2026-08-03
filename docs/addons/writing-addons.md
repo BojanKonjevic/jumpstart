@@ -1,6 +1,6 @@
 # Writing an addon
 
-This walkthrough builds a `hello` addon from scratch — a file, an injection, a preflight check, and a health check. By the end you'll have a working addon installable with `zenit add hello`.
+This walkthrough builds a `hello` addon from scratch - a file, an injection, a preflight check, and a health check. By the end you'll have a working addon installable with `zenit add hello`.
 
 For the full `AddonConfig` API reference, see [Addons & Templates](../architecture/addons-and-templates.md).
 
@@ -35,7 +35,7 @@ config = AddonConfig(
 )
 ```
 
-That's a complete addon — no files, no dependencies, just one injection.
+That's a complete addon - no files, no dependencies, just one injection.
 
 ---
 

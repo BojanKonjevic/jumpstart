@@ -59,7 +59,7 @@ def test_apply_skips_existing_top_level_key(tmp_path: Path) -> None:
     original = '[project]\nname = "myapp"\n'
     f.write_text(original, encoding="utf-8")
 
-    # "project" key already exists — no write must occur
+    # "project" key already exists - no write must occur
     _handler().apply(f, '[project]\nname = "other"\n', "", {})
 
     assert f.read_text() == original

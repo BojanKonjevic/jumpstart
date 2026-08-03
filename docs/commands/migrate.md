@@ -20,7 +20,7 @@ After migration, `zenit doctor` reports which content is presence-tracked
 
 ## Arguments
 
-**`<source>`** — The Copier template source. One of:
+**`<source>`** - The Copier template source. One of:
 
 | Format | Example |
 |---|---|
@@ -36,17 +36,17 @@ after migration. Local paths are used directly.
 
 ## Options
 
-**`--name`, `-n`** — Project name. When provided, all questions are answered with
+**`--name`, `-n`** - Project name. When provided, all questions are answered with
 their defaults (or overridden via `--data`). The project directory is created in
 the current directory with this name.
 
-**`--data`, `-D`** — Override a template question value. Repeatable:
+**`--data`, `-D`** - Override a template question value. Repeatable:
 
 ```
 zenit migrate gh:user/template -D use_redis=yes -D project_name=myapp
 ```
 
-**`--task-timeout`** — Per-task timeout in seconds for Copier `_tasks` execution.
+**`--task-timeout`** - Per-task timeout in seconds for Copier `_tasks` execution.
 Default is 300.
 
 ---

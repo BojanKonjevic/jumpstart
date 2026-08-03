@@ -1,4 +1,4 @@
-"""Tests for zenit.assembler — collecting and merging contributions."""
+"""Tests for zenit.assembler - collecting and merging contributions."""
 
 from zenit.core.collect import collect_all
 from zenit.schema.models import (
@@ -153,7 +153,7 @@ def test_collect_all_dedup_addon_overrides_template(tmp_path):
     source_file.write_text("print('goodbye')", encoding="utf-8")
     template_fc = FileContribution(dest="x.py", content="print('hello')")
     addon_fc = FileContribution(dest="x.py", source=str(source_file))
-    # Should not raise — addon overrides template for same dest
+    # Should not raise - addon overrides template for same dest
     collect_all(
         _template(files=[template_fc]),
         [_addon(id="myaddon", files=[addon_fc])],

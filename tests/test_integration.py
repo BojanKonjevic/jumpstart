@@ -1,4 +1,4 @@
-"""Integration tests — scaffold real projects into tmp_path and verify the results."""
+"""Integration tests - scaffold real projects into tmp_path and verify the results."""
 
 
 # ── blank template ────────────────────────────────────────────────────────────
@@ -179,13 +179,13 @@ class TestFastapiTemplate:
         assert "class Settings" in settings
 
     def test_settings_py_no_database_url(self, tmp_path, scaffold_project):
-        """Plain fastapi skeleton has no database_url — it comes from postgres addon."""
+        """Plain fastapi skeleton has no database_url - it comes from postgres addon."""
         project_dir = scaffold_project("myapi", "fastapi", ["docker"])
         settings = (project_dir / "src" / "myapi" / "settings.py").read_text()
         assert "database_url" not in settings
 
     def test_lifecycle_py_no_engine_dispose(self, tmp_path, scaffold_project):
-        """Plain fastapi skeleton has no engine.dispose() — it comes from sqlalchemy addon."""
+        """Plain fastapi skeleton has no engine.dispose() - it comes from sqlalchemy addon."""
         project_dir = scaffold_project("myapi", "fastapi", ["docker"])
         lifecycle = (project_dir / "src" / "myapi" / "lifecycle.py").read_text()
         assert "engine.dispose" not in lifecycle

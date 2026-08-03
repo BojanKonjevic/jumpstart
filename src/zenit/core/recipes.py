@@ -12,7 +12,7 @@ class RecipeCollection:
     """Holds template and addon just_recipes separately.
 
     ``template`` recipes always win when an addon recipe shares the same name
-    during deduplication.  Operates on raw (unrendered) recipes — recipe
+    during deduplication.  Operates on raw (unrendered) recipes - recipe
     names are determined by text before ``:``, which Jinja2 rendering
     cannot change.
     """

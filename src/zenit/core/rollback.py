@@ -20,13 +20,13 @@ def scaffold_or_rollback(project_dir: Path) -> Generator[None]:
         yield
     except KeyboardInterrupt:
         _cleanup(project_dir)
-        warn("Interrupted — removed partial directory.")
+        warn("Interrupted - removed partial directory.")
         raise
     except (Exception, SystemExit) as exc:
         _cleanup(project_dir)
         if not isinstance(exc, SystemExit):
             error(f"Scaffold failed: {exc}")
-        warn("Rolled back — no directory was left behind.")
+        warn("Rolled back - no directory was left behind.")
         raise SystemExit(1) from exc
 
 
@@ -80,7 +80,7 @@ def addon_or_rollback(project_dir: Path, addon_id: str) -> Generator[None]:
     Uses ``shutil.copytree`` to snapshot the project directory into a temp
     directory.  Generated/cache directories (``.venv``, ``.git``,
     ``__pycache__``, etc.) are excluded from the snapshot via ignore
-    patterns since addons never modify them — this eliminates the dominant
+    patterns since addons never modify them - this eliminates the dominant
     performance bottleneck (copying a virtualenv can take seconds).
 
     On rollback, files are merged back from the snapshot (overwriting
@@ -91,12 +91,12 @@ def addon_or_rollback(project_dir: Path, addon_id: str) -> Generator[None]:
         try:
             yield
         except KeyboardInterrupt:
-            warn(f"Interrupted — rolled back addon '{addon_id}'.")
+            warn(f"Interrupted - rolled back addon '{addon_id}'.")
             raise
         except (Exception, SystemExit) as exc:
             if not isinstance(exc, SystemExit):
                 error(f"Addon '{addon_id}' failed: {exc}")
-            warn("Rolled back — no changes were made.")
+            warn("Rolled back - no changes were made.")
             raise SystemExit(1) from exc
 
 
@@ -113,12 +113,12 @@ def batch_snapshot(project_dir: Path, label: str = "operation") -> Generator[Non
         try:
             yield
         except KeyboardInterrupt:
-            warn(f"Interrupted — rolled back batch '{label}'.")
+            warn(f"Interrupted - rolled back batch '{label}'.")
             raise
         except (Exception, SystemExit) as exc:
             if not isinstance(exc, SystemExit):
                 error(f"Batch '{label}' failed: {exc}")
-            warn("Rolled back — no changes were made.")
+            warn("Rolled back - no changes were made.")
             raise SystemExit(1) from exc
 
 

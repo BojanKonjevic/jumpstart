@@ -54,12 +54,12 @@ Both services:
 
 ### Dependencies
 
-- `celery[redis]>=5` — Celery with Redis support
-- `flower` — Web-based monitoring and administration
+- `celery[redis]>=5` - Celery with Redis support
+- `flower` - Web-based monitoring and administration
 
 ### Dev dependencies
 
-- `pytest-celery` — Testing utilities for Celery tasks
+- `pytest-celery` - Testing utilities for Celery tasks
 
 ### Just recipes
 

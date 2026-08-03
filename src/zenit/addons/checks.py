@@ -17,7 +17,7 @@ Example in an addon.py
         ...
         if (project_dir / "src").exists():
             return None
-        return "No src/ directory found — this addon expects a src layout."
+        return "No src/ directory found - this addon expects a src layout."
 
     def can_remove(project_dir: Path, lockfile: ZenitLockfile) -> str | None:
         if some_other_addon_depends_on_this(lockfile):
@@ -54,7 +54,7 @@ def _read_lockfile_and_validate(
         )
     if not lockfile.template:
         raise ZenitError(
-            ".zenit.toml exists but has no template field — it may be corrupt."
+            ".zenit.toml exists but has no template field - it may be corrupt."
         )
     addon_ids = _known_addon_ids()
     if addon_id not in addon_ids:
@@ -101,7 +101,7 @@ def check_can_add(
     Returns the parsed lockfile on success (callers need it to know the
     template and currently installed addons).
 
-    Raises ZenitError with a clear message on any failure — the caller
+    Raises ZenitError with a clear message on any failure - the caller
     just needs to print it and exit.
     """
     lockfile = _read_lockfile_and_validate(project_dir, addon_id, "add")
@@ -182,7 +182,7 @@ def check_can_remove(
     if all_dependents:
         dep_str = ", ".join(sorted(all_dependents))
         raise ZenitError(
-            f"Cannot remove '{addon_id}' — it is required by: {dep_str}. "
+            f"Cannot remove '{addon_id}' - it is required by: {dep_str}. "
             f"Remove {dep_str} first."
         )
 
@@ -197,7 +197,7 @@ def check_can_remove(
                     f"and cannot be removed."
                 )
         except FileNotFoundError:
-            pass  # Template not found locally — skip this check
+            pass  # Template not found locally - skip this check
 
     # ── addon's own can_remove check ──────────────────────────────────────────
     cfg = get_addon(addon_id)

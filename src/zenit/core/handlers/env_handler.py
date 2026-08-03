@@ -7,7 +7,7 @@ from zenit.core.handlers.base import FileHandler, _ensure_trailing_newline
 
 
 class EnvHandler(FileHandler):
-    """Handles .env and .env.example files — line-based key=value."""
+    """Handles .env and .env.example files - line-based key=value."""
 
     def can_handle(self, path: Path) -> bool:
         return path.name.startswith(".env")

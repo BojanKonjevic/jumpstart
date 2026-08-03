@@ -1,4 +1,4 @@
-"""Addon registry — lazy-loading metadata (TOML) and on‑demand full config (exec)."""
+"""Addon registry - lazy-loading metadata (TOML) and on‑demand full config (exec)."""
 
 from __future__ import annotations
 

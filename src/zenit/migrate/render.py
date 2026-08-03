@@ -74,7 +74,7 @@ def _diagnose_failed_render(
         issues.append(f"unknown tags: {', '.join(sorted(unknown_tags))}")
 
     if not issues:
-        issues.append("complex Jinja2 pattern — not fully supported")
+        issues.append("complex Jinja2 pattern - not fully supported")
 
     return "; ".join(issues)
 

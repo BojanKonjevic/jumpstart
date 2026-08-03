@@ -1,4 +1,4 @@
-"""Functional integration tests — scaffolded projects must be runnable.
+"""Functional integration tests - scaffolded projects must be runnable.
 
 These tests scaffold real projects and then execute commands inside them,
 verifying that the generated output is not just syntactically present but
@@ -95,7 +95,7 @@ class TestBlankFunctional:
         )
 
     def test_hyphenated_name_pytest_passes(self, tmp_path, scaffold_project):
-        """Hyphenated project names convert to underscore pkg — tests must still work."""
+        """Hyphenated project names convert to underscore pkg - tests must still work."""
         project_dir = scaffold_project("my-cool-app", "blank", [])
         _uv("sync", "--quiet", "--frozen", cwd=project_dir)
         result = _uv("run", "pytest", "-v", cwd=project_dir)
@@ -162,7 +162,7 @@ class TestBlankDockerFunctional:
 class TestRenderedContentCorrectness:
     """Verify that Jinja2 variables are fully resolved in generated files.
 
-    These don't require uv/pytest to be installed — they just inspect content.
+    These don't require uv/pytest to be installed - they just inspect content.
     """
 
     def test_no_unrendered_jinja_in_blank_main(self, tmp_path, scaffold_project):
@@ -284,7 +284,7 @@ class TestMypyFunctional:
         )
 
 
-# ── plan §7.1 — toolchain validation and doctor integration ───────────────────
+# ── plan §7.1 - toolchain validation and doctor integration ───────────────────
 
 
 @pytest.mark.slow
@@ -310,7 +310,7 @@ class TestPlanToolchain:
         return self._run("uv", *args, cwd=cwd)
 
     def _assert_toolchain(self, project_dir: Path, *, run_pytest: bool = True) -> None:
-        """Run mypy, ruff check, ruff format --check — all must exit 0.
+        """Run mypy, ruff check, ruff format --check - all must exit 0.
 
         pytest is skipped for fastapi projects by default because the generated
         test suite requires a live PostgreSQL instance which is not available in
@@ -319,7 +319,7 @@ class TestPlanToolchain:
 
         ruff format is run (not just --check) before the check pass.  The
         scaffolder's injection system produces syntactically correct Python but
-        does not guarantee byte-for-byte ruff-style output — that is ruff's job.
+        does not guarantee byte-for-byte ruff-style output - that is ruff's job.
         The meaningful invariants tested here are type correctness (mypy) and
         lint cleanliness (ruff check).  ruff format --check after ruff format
         confirms idempotence: a second format pass changes nothing.

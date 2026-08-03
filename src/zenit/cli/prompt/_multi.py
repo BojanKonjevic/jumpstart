@@ -176,7 +176,7 @@ def prompt_addons(
     always_locked: set[int] = set()
 
     # Addons that declare a templates allowlist which doesn't include the
-    # currently selected template — they cannot be used at all this run.
+    # currently selected template - they cannot be used at all this run.
     incompatible: set[int] = set()
     for i, cfg in enumerate(available):
         if cfg.templates and template not in cfg.templates:
@@ -427,7 +427,7 @@ def _fallback_multi(
             f" {DIM}(required){RESET}" if addon_id in always_locked_names else ""
         )
         incompat_mark = (
-            f" {DIM}(fastapi only — not available){RESET}" if is_incompatible else ""
+            f" {DIM}(fastapi only - not available){RESET}" if is_incompatible else ""
         )
         default_mark = (
             f" {DIM}(default){RESET}"
@@ -471,7 +471,7 @@ def _fallback_multi(
                 break
             idx = int(token) - 1
             if idx < 0 or idx >= len(items):
-                warn(f"{token} is out of range — pick between 1 and {len(items)}.")
+                warn(f"{token} is out of range - pick between 1 and {len(items)}.")
                 valid = False
                 break
             addon_id = items[idx][0]
@@ -498,7 +498,7 @@ def prompt_multi_addon(
     """Multi-select TUI for add/remove context.
 
     Returns the list of selected addon IDs.  Unlike ``prompt_addons`` this
-    has no template concept — it simply shows items and lets the user pick
+    has no template concept - it simply shows items and lets the user pick
     any number of available ones.
     """
     if requires_map is None:
@@ -557,7 +557,7 @@ def _fallback_multi_addon(
             if token.isdigit():
                 idx = int(token) - 1
                 if idx < 0 or idx >= len(items):
-                    warn(f"{token} is out of range — pick between 1 and {len(items)}.")
+                    warn(f"{token} is out of range - pick between 1 and {len(items)}.")
                     valid = False
                     break
                 addon_id = items[idx][0]

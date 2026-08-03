@@ -1,4 +1,4 @@
-"""Tests for zenit.deps — dependency injection into pyproject.toml.
+"""Tests for zenit.deps - dependency injection into pyproject.toml.
 
 Covers inject_deps and the _dep_package_name helper for all relevant cases:
 adding new deps, skipping existing ones, handling both [dependency-groups]
@@ -51,7 +51,7 @@ def test_dep_package_name_with_tilde_specifier():
 
 
 def test_dep_package_name_empty_string():
-    # degenerate input — should not raise
+    # degenerate input - should not raise
     result = dep_package_name("")
     assert isinstance(result, str)
 
@@ -95,7 +95,7 @@ def _minimal_pyproject(
         return f'[project]\nname = "myapp"\n{dep_block}\n{dev_block}'
 
 
-# ── inject_deps — basic runtime deps ─────────────────────────────────────────
+# ── inject_deps - basic runtime deps ─────────────────────────────────────────
 
 
 def test_inject_deps_adds_new_runtime_dep(tmp_path):
@@ -126,7 +126,7 @@ def test_inject_deps_skips_already_present_runtime_dep(tmp_path):
 
 
 def test_inject_deps_skips_dep_with_different_specifier_same_name(tmp_path):
-    # "redis>=4" already present — "redis>=5" skipped (same pkg name)
+    # "redis>=4" already present - "redis>=5" skipped (same pkg name)
     _write_pyproject(tmp_path, _minimal_pyproject(deps=["python-dotenv", "redis>=4"]))
     added, _ = inject_deps(tmp_path, ["redis>=5"], [])
     assert added == []
@@ -207,7 +207,7 @@ def test_inject_deps_writes_to_table_without_dotenv_seed(tmp_path: Path) -> None
     assert "fakeredis" in text
 
 
-# ── inject_deps — dev deps via [dependency-groups] ───────────────────────────
+# ── inject_deps - dev deps via [dependency-groups] ───────────────────────────
 
 
 def test_inject_dev_deps_creates_dev_key_when_missing(tmp_path: Path) -> None:
@@ -244,7 +244,7 @@ def test_inject_dev_deps_case_insensitive_name_matching(tmp_path):
     assert added_dev == []
 
 
-# ── inject_deps — dev deps via [project.optional-dependencies] ───────────────
+# ── inject_deps - dev deps via [project.optional-dependencies] ───────────────
 
 
 def test_inject_dev_deps_adds_to_optional_dependencies(tmp_path):
@@ -267,7 +267,7 @@ def test_inject_dev_deps_skips_existing_in_optional_dependencies(tmp_path):
 
 
 def test_inject_dev_deps_no_dev_group_present_still_works(tmp_path):
-    # No dev group at all — dev deps silently skipped, runtime deps still added
+    # No dev group at all - dev deps silently skipped, runtime deps still added
     _write_pyproject(
         tmp_path,
         '[project]\nname = "myapp"\ndependencies = [\n  "python-dotenv",\n]\n',
@@ -277,7 +277,7 @@ def test_inject_dev_deps_no_dev_group_present_still_works(tmp_path):
     assert added_dev == []
 
 
-# ── inject_deps — combined runtime + dev ─────────────────────────────────────
+# ── inject_deps - combined runtime + dev ─────────────────────────────────────
 
 
 def test_inject_deps_adds_both_runtime_and_dev(tmp_path):
@@ -304,7 +304,7 @@ def test_inject_deps_partial_skip_partial_add(tmp_path):
     assert "mypy" in added_dev
 
 
-# ── inject_deps — file not found ─────────────────────────────────────────────
+# ── inject_deps - file not found ─────────────────────────────────────────────
 
 
 def test_inject_deps_raises_when_pyproject_missing(tmp_path):
@@ -312,7 +312,7 @@ def test_inject_deps_raises_when_pyproject_missing(tmp_path):
         inject_deps(tmp_path, ["redis"], [])
 
 
-# ── inject_deps — round-trip correctness ─────────────────────────────────────
+# ── inject_deps - round-trip correctness ─────────────────────────────────────
 
 
 def test_inject_deps_preserves_existing_content(tmp_path):
@@ -371,7 +371,7 @@ def test_inject_deps_multiple_calls_accumulate(tmp_path):
     assert "hiredis" in text
 
 
-# ── inject_deps — name normalisation ─────────────────────────────────────────
+# ── inject_deps - name normalisation ─────────────────────────────────────────
 
 
 def test_inject_deps_same_package_not_duplicated(tmp_path):
@@ -383,7 +383,7 @@ def test_inject_deps_same_package_not_duplicated(tmp_path):
 
 
 def test_inject_deps_dep_with_version_not_duplicated_when_bare_present(tmp_path):
-    # "redis" already present bare — "redis>=5" skipped (same pkg name)
+    # "redis" already present bare - "redis>=5" skipped (same pkg name)
     _write_pyproject(tmp_path, _minimal_pyproject(deps=["python-dotenv", "redis"]))
     added, _ = inject_deps(tmp_path, ["redis>=5"], [])
     assert added == []

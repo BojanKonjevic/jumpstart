@@ -1,6 +1,6 @@
 # fastapi
 
-The `fastapi` template produces a production-oriented async FastAPI application. It is the default template for web API projects. Database access (SQLAlchemy, Alembic, asyncpg) and Docker support come from addons — select `sqlalchemy`, `postgres`, and `docker` at creation time to include them.
+The `fastapi` template produces a production-oriented async FastAPI application. It is the default template for web API projects. Database access (SQLAlchemy, Alembic, asyncpg) and Docker support come from addons - select `sqlalchemy`, `postgres`, and `docker` at creation time to include them.
 
 ---
 
@@ -15,7 +15,7 @@ Choose `fastapi` when you are building a web API, microservice, or any project t
 - Optional Docker Compose (add `docker` addon)
 
 > [!NOTE]
-> The `fastapi` template does not require any addon by default. Add the ones you need — `sqlalchemy`, `postgres`, and `docker` are the most common choices.
+> The `fastapi` template does not require any addon by default. Add the ones you need - `sqlalchemy`, `postgres`, and `docker` are the most common choices.
 
 ---
 
@@ -23,7 +23,7 @@ Choose `fastapi` when you are building a web API, microservice, or any project t
 
 ```
 my-project/
-├── .zenit.toml              # Zenit's manifest — tracks what was generated
+├── .zenit.toml              # Zenit's manifest - tracks what was generated
 ├── pyproject.toml           # Project metadata and dependencies
 ├── justfile                 # Task runner recipes
 ├── .env                     # Local environment variables (not committed)
@@ -44,7 +44,7 @@ my-project/
     │   ├── router.py        # Registers all route groups
     │   └── routes/
     │       ├── __init__.py
-    │       └── health.py    # GET /health — always generated
+    │       └── health.py    # GET /health - always generated
     ├── core/
     │   └── __init__.py
     ├── schemas/
@@ -109,8 +109,8 @@ Addons inject into `settings_fields` to add their own configuration fields.
 
 `tests/conftest.py` provides:
 
-- `session` — creates a test database, runs `Base.metadata.create_all`, yields an async session, then drops everything
-- `client` — overrides `get_session` with the test session and yields an `httpx.AsyncClient`
+- `session` - creates a test database, runs `Base.metadata.create_all`, yields an async session, then drops everything
+- `client` - overrides `get_session` with the test session and yields an `httpx.AsyncClient`
 
 Addons inject into `test_imports` and `test_fixtures` to add addon-specific fixtures.
 
@@ -180,4 +180,4 @@ just db-create
 
 This starts the PostgreSQL container, creates the development and test databases, and applies all pending migrations.
 
-Without these addons, the `fastapi` template has no database layer — add them later with `zenit add sqlalchemy postgres`.
+Without these addons, the `fastapi` template has no database layer - add them later with `zenit add sqlalchemy postgres`.

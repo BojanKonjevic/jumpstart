@@ -3,7 +3,7 @@
 Each locator is a **pure function** that receives a ``libcst.Module`` and
 keyword arguments, and returns the integer body-index at which new statements
 should be inserted.  All locators raise ``LocatorError`` with an actionable
-message on failure — never a bare ``IndexError`` or ``AttributeError``.
+message on failure - never a bare ``IndexError`` or ``AttributeError``.
 
 Locator contract
 ----------------
@@ -15,14 +15,14 @@ Locator contract
 
 Registered locators
 -------------------
-before_yield_in_function   — before the ``yield`` in an async generator function
-after_last_class_attribute — after the last non-comment attribute in a class body
-after_last_import          — after the last import statement in the module
-after_statement_matching   — after the first statement matching a regex
-before_return_in_function  — before the first ``return`` in a named function
-at_module_end              — append at end of module body
-at_file_end                — (non-Python files) no-op sentinel; only Python files use locators
-in_function_body           — inside a named function, before/after an anchor statement
+before_yield_in_function   - before the ``yield`` in an async generator function
+after_last_class_attribute - after the last non-comment attribute in a class body
+after_last_import          - after the last import statement in the module
+after_statement_matching   - after the first statement matching a regex
+before_return_in_function  - before the first ``return`` in a named function
+at_module_end              - append at end of module body
+at_file_end                - (non-Python files) no-op sentinel; only Python files use locators
+in_function_body           - inside a named function, before/after an anchor statement
 """
 
 from __future__ import annotations
@@ -172,7 +172,7 @@ def after_last_import(module: cst.Module) -> int:
         if _is_import(stmt):
             last_import_idx = i
     if last_import_idx == -1:
-        # No imports found — insert at the start (after module docstring if any)
+        # No imports found - insert at the start (after module docstring if any)
         if module.body and _is_docstring(module.body[0]):
             return 1
         return 0
@@ -210,7 +210,7 @@ def before_return_in_function(module: cst.Module, *, function: str) -> int:
             for i, stmt in enumerate(body.body):
                 if _contains_return(stmt):
                     return i
-            # No explicit return — insert at end
+            # No explicit return - insert at end
             return len(body.body)
     raise LocatorError(
         f"Could not find function '{function}' in the module.\n"
@@ -226,7 +226,7 @@ def at_module_end(module: cst.Module) -> int:
 
 @locator(LocatorScope.MODULE_BODY)
 def at_file_end(module: cst.Module) -> int:  # noqa: ARG001
-    """Alias for at_module_end — used as the locator name for non-Python append targets.
+    """Alias for at_module_end - used as the locator name for non-Python append targets.
 
     For non-Python handlers (.env, justfile, etc.) the locator is ignored;
     this function exists only so LocatorSpec validation passes.

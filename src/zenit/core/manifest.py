@@ -1,4 +1,4 @@
-"""Zenit manifest — .zenit.toml [manifest] section.
+"""Zenit manifest - .zenit.toml [manifest] section.
 
 The manifest is the single source of truth for everything zenit has injected
 into a project.  It is written at scaffold time and updated by every
@@ -7,7 +7,7 @@ integrity.
 
 Schema version
 --------------
-``MANIFEST_SCHEMA_VERSION = 2`` — bump this constant if the normalisation
+``MANIFEST_SCHEMA_VERSION = 2`` - bump this constant if the normalisation
 algorithm or the manifest structure changes in a breaking way.  ``read()``
 will warn (not error) when the stored version differs from the current one.
 
@@ -434,7 +434,7 @@ def normalised_fingerprint_of(code: str) -> str:
 def _normalise(code: str) -> str:
     """Canonical normalisation for formatter-resilient fingerprinting.
 
-    Definition (frozen — do not change without bumping MANIFEST_SCHEMA_VERSION):
+    Definition (frozen - do not change without bumping MANIFEST_SCHEMA_VERSION):
       1. libcst round-trip  →  canonical serialisation.
       2. Strip trailing whitespace from every line.
       3. Collapse runs of 3+ consecutive newlines to exactly two.

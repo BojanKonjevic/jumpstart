@@ -58,7 +58,7 @@ def test_apply_skips_existing_service_by_first_key(tmp_path: Path) -> None:
 
     _handler().apply(f, "  redis:\n    image: redis:7-alpine\n", "", {})
 
-    # File must be byte-for-byte identical — no write occurred
+    # File must be byte-for-byte identical - no write occurred
     assert f.read_text() == original
 
 

@@ -1,6 +1,6 @@
 """Export addon/template data for the studio page.
 
-Generates ``studio-data.json`` — consumed by ``studio.html``.
+Generates ``studio-data.json`` - consumed by ``studio.html``.
 Runnable via: uv run python scripts/export-configure-data.py
 """
 

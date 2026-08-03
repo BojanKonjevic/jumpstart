@@ -52,7 +52,7 @@ This is the only manual registration step.
 
 ## Step 3: write the template files
 
-**`files/main.py.j2`** — rendered with Jinja2:
+**`files/main.py.j2`** - rendered with Jinja2:
 
 ```python
 import click
@@ -70,7 +70,7 @@ if __name__ == "__main__":
     cli()
 ```
 
-**`files/__main__.py`** — static, copied verbatim:
+**`files/__main__.py`** - static, copied verbatim:
 
 ```python
 from .main import cli
@@ -78,7 +78,7 @@ from .main import cli
 cli()
 ```
 
-**`files/tests/test_cli.py.j2`** — rendered with Jinja2:
+**`files/tests/test_cli.py.j2`** - rendered with Jinja2:
 
 ```python
 from click.testing import CliRunner
@@ -159,7 +159,7 @@ config = TemplateConfig(
 ```
 
 > [!NOTE]
-> The `_common/apply.py` script always runs before your template files. `.gitignore`, `.gitattributes`, `.pre-commit-config.yaml`, `.envrc`, and `shell.nix` are written to every project automatically — you do not need to declare them.
+> The `_common/apply.py` script always runs before your template files. `.gitignore`, `.gitattributes`, `.pre-commit-config.yaml`, `.envrc`, and `shell.nix` are written to every project automatically - you do not need to declare them.
 
 ---
 
@@ -213,7 +213,7 @@ zenit remove hello-cmd
 
 ## Step 7: force an addon with `requires_addons`
 
-If your template needs an addon at scaffold time — for example, forcing `github-actions` for all CLI projects — list it in `requires_addons`:
+If your template needs an addon at scaffold time - for example, forcing `github-actions` for all CLI projects - list it in `requires_addons`:
 
 ```python
 config = TemplateConfig(
@@ -231,7 +231,7 @@ Addons in `requires_addons` appear with a lock indicator in the TUI and cannot b
 
 | | Addon | Template |
 |---|---|---|
-| Discovery | Automatic — scans `addons/` | Requires entry in `_render.py` |
+| Discovery | Automatic - scans `addons/` | Requires entry in `_render.py` |
 | Lifecycle | Add / remove after creation | Selected once at `zenit create` |
 | Injection points | Consumes them | Declares them |
 | Forced dependencies | `requires: list[str]` | `requires_addons: list[str]` |

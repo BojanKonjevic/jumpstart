@@ -1,4 +1,4 @@
-"""FileSystem protocol and implementations — replaces Context inheritance for dry-run."""
+"""FileSystem protocol and implementations - replaces Context inheritance for dry-run."""
 
 from __future__ import annotations
 
@@ -36,7 +36,7 @@ class FileSystem(Protocol):
 
 
 class RealFileSystem:
-    """Real filesystem implementation — performs actual I/O."""
+    """Real filesystem implementation - performs actual I/O."""
 
     def __init__(self, project_dir: Path) -> None:
         self._project_dir = project_dir
@@ -72,7 +72,7 @@ class RealFileSystem:
 
 
 class RecordingFileSystem:
-    """Recording implementation — captures operations without touching disk."""
+    """Recording implementation - captures operations without touching disk."""
 
     def __init__(self, project_dir: Path) -> None:
         self._project_dir = project_dir

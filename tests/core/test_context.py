@@ -1,4 +1,4 @@
-"""Tests for zenit.context — Context and its filesystem abstraction.
+"""Tests for zenit.context - Context and its filesystem abstraction.
 
 Covers the real Context (which performs I/O) and the dry-run mode via
 RecordingFileSystem (which records operations without touching disk).
@@ -97,7 +97,7 @@ def test_has_returns_false_when_addons_empty(tmp_path):
     assert ctx.has("docker") is False
 
 
-# ── RealFileSystem — I/O tests ────────────────────────────────────────────────
+# ── RealFileSystem - I/O tests ────────────────────────────────────────────────
 
 
 def test_write_file_creates_file(tmp_path):
@@ -219,7 +219,7 @@ def test_execute_command_no_raise_when_check_false(tmp_path):
     RealFileSystem(ctx.project_dir).execute_command(["false"], check=False)
 
 
-# ── RecordingFileSystem — no I/O ──────────────────────────────────────────────
+# ── RecordingFileSystem - no I/O ──────────────────────────────────────────────
 
 
 def test_dry_write_file_does_not_create_file(tmp_path):
@@ -253,7 +253,7 @@ def test_dry_execute_command_does_nothing(tmp_path):
     fs.execute_command(["false"], check=True)
 
 
-# ── RecordingFileSystem — recording ───────────────────────────────────────────
+# ── RecordingFileSystem - recording ───────────────────────────────────────────
 
 
 def test_dry_write_file_recorded_as_create(tmp_path):

@@ -141,7 +141,7 @@ class TestRedisCanApply:
         assert "REDIS_URL" in result
 
     def test_redis_passes_when_redis_import_in_non_integration_file(self, tmp_path):
-        """General source scan was removed for perf — redis only checks targeted paths."""
+        """General source scan was removed for perf - redis only checks targeted paths."""
         project_dir = _project_dir(tmp_path, "myapp")
         src = project_dir / "src" / "myapp"
         src.mkdir(parents=True)
@@ -280,7 +280,7 @@ class TestCeleryCanApply:
         assert "celery" in result.lower()
 
     def test_celery_passes_when_celery_import_in_non_targeted_file(self, tmp_path):
-        """General source scan was removed for perf — celery only checks targeted paths."""
+        """General source scan was removed for perf - celery only checks targeted paths."""
         project_dir = _project_dir(tmp_path, "myapp")
         src = project_dir / "src" / "myapp"
         src.mkdir(parents=True)

@@ -62,7 +62,7 @@ def apply_contributions(
 
     Template-owned entries (env vars, compose services/volumes, deps, recipes)
     are recorded separately by ``_stamp_template_manifest`` in scaffold.py and
-    are NOT recorded here — ``contributions`` may contain template items merged
+    are NOT recorded here - ``contributions`` may contain template items merged
     in from ``collect_all``, but ownership of those belongs to the template, not
     to any addon.
     """
@@ -105,7 +105,7 @@ def apply_contributions(
                 raise ZenitError(
                     f"Internal error: the source path for '{fc.dest}' is relative ('{fc.source}'). "
                     f"FileContribution.source must be an absolute path. "
-                    f"This is a bug in the template or addon — please report it."
+                    f"This is a bug in the template or addon - please report it."
                 )
             if fc.template:
                 loader_dir = src_path.parent
@@ -150,7 +150,7 @@ def apply_contributions(
         if not file_path.exists():
             _warn(
                 f"Injection point '{inj.point}' targets "
-                f"non-existent file '{resolved_file}' — skipping."
+                f"non-existent file '{resolved_file}' - skipping."
             )
             continue
 

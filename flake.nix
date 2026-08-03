@@ -1,5 +1,5 @@
 {
-  description = "zenit — Python project scaffolder";
+  description = "zenit - Python project scaffolder";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";

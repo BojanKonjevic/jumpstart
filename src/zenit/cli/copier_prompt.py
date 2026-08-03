@@ -1,6 +1,6 @@
 """Interactive TUI prompt for Copier template questions.
 
-Uses ``rich.prompt`` for type-appropriate widgets — STR, BOOL, INT, FLOAT,
+Uses ``rich.prompt`` for type-appropriate widgets - STR, BOOL, INT, FLOAT,
 CHOICE, MULTISELECT, SECRET, and YAML.  Designed for the Copier question
 model (ordered heterogeneous types) which differs from the addon
 multi-select model in ``cli/prompt/``.
@@ -181,7 +181,7 @@ def prompt_copier_questions(
                     continue
                 from zenit.cli.ui import warn as _warn
 
-                _warn(f"{err} — using default anyway.")
+                _warn(f"{err} - using default anyway.")
             break
 
     return answers

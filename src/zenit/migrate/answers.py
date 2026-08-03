@@ -214,7 +214,7 @@ def _prompt_questions(
                     answers.explicit_names.discard(q.name)
                     del answers.render_vars[q.name]
                     continue
-                warn(f"{err} — using default anyway.")
+                warn(f"{err} - using default anyway.")
             break
 
     return answers

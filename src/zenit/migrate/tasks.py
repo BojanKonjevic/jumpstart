@@ -103,7 +103,7 @@ def _execute_task(
     executable = _task_first_executable(rendered)
     if executable is not None and shutil.which(executable) is None:
         warn(
-            f"Skipping task: '{rendered!r}' — "
+            f"Skipping task: '{rendered!r}' - "
             f"'{executable}' is not installed. "
             f"Run it manually after installing {executable}."
         )

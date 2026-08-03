@@ -1,4 +1,4 @@
-"""zenit project lockfile — .zenit.toml
+"""zenit project lockfile - .zenit.toml
 
 Written into the project root at scaffold time. Read by `zenit add` to know
 what template and addons are already present, and what version of zenit
@@ -12,7 +12,7 @@ Format
     zenit_version = "1.0.1"
     schema_version = 4
 
-All fields are optional when reading — the lockfile may be absent (project
+All fields are optional when reading - the lockfile may be absent (project
 was not scaffolded by zenit, or was scaffolded before lockfiles existed).
 """
 
@@ -127,7 +127,7 @@ def write_zenit_toml(
 
     When *template* is ``None`` the ``[project]`` section is left unchanged.
     When *manifest* is ``None`` the ``[manifest]`` section is left unchanged.
-    When both are provided both sections are updated in a single write —
+    When both are provided both sections are updated in a single write -
     eliminating the inconsistency window of two sequential writes.
     """
     path = project_dir / LOCKFILE_NAME
@@ -191,7 +191,7 @@ def _upgrade_legacy_lockfile(
 def read_lockfile(project_dir: Path) -> ZenitLockfile | None:
     """Read .zenit.toml from *project_dir*.
 
-    Returns None if the file does not exist or cannot be parsed — callers
+    Returns None if the file does not exist or cannot be parsed - callers
     must handle the absent-lockfile case gracefully.
 
     Legacy lockfiles (v3 and earlier) are auto-upgraded in memory on read.

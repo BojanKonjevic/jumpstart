@@ -32,7 +32,7 @@ def _parse(src: str) -> cst.Module:
 
 
 def _cst_normalised(src: str) -> str:
-    """Return the libcst canonical form of *src* — the same normalisation
+    """Return the libcst canonical form of *src* - the same normalisation
     that fingerprint_normalised applies. Used to generate formatter-resilient
     fixtures without a ruff subprocess dependency."""
     return cst.parse_module(src).code
@@ -44,11 +44,11 @@ def _cst_normalised(src: str) -> str:
 @pytest.mark.parametrize(
     "src, expected",
     [
-        # Minimal: yield is the only statement — insert before index 0.
+        # Minimal: yield is the only statement - insert before index 0.
         ("async def lifespan():\n    yield\n", 0),
-        # Yield after a pass — insert before index 1 (the yield).
+        # Yield after a pass - insert before index 1 (the yield).
         ("async def lifespan():\n    pass\n    yield\n", 1),
-        # Yield after two statements — insert before index 2.
+        # Yield after two statements - insert before index 2.
         ("async def lifespan():\n    x = 1\n    y = 2\n    yield\n", 2),
     ],
 )
@@ -80,13 +80,13 @@ def test_before_yield_no_yield_in_function() -> None:
 @pytest.mark.parametrize(
     "src, expected",
     [
-        # Two annotated attributes — insert after index 1 → index 2.
+        # Two annotated attributes - insert after index 1 → index 2.
         ("class Settings:\n    name: str\n    age: int\n", 2),
-        # Only a pass statement (no attributes) — insert at index 0.
+        # Only a pass statement (no attributes) - insert at index 0.
         ("class Settings:\n    pass\n", 0),
-        # Docstring then one attribute — insert at index 2.
+        # Docstring then one attribute - insert at index 2.
         ('class Settings:\n    """doc"""\n    name: str\n', 2),
-        # Docstring only, no attributes — insert at index 1 (after docstring).
+        # Docstring only, no attributes - insert at index 1 (after docstring).
         ('class Settings:\n    """doc"""\n    pass\n', 1),
         # Assignment-style attribute (not annotated).
         ("class Settings:\n    name = 'default'\n", 1),
@@ -114,13 +114,13 @@ def test_after_last_class_attribute_class_not_found() -> None:
 @pytest.mark.parametrize(
     "src, expected",
     [
-        # Two imports then a class — insert after index 1 → index 2.
+        # Two imports then a class - insert after index 1 → index 2.
         ("import os\nimport sys\nclass X: pass\n", 2),
-        # No imports at all — insert at index 0.
+        # No imports at all - insert at index 0.
         ("class X: pass\n", 0),
-        # Module docstring then one import — insert at index 2.
+        # Module docstring then one import - insert at index 2.
         ('"""module doc"""\nimport os\n', 2),
-        # Module docstring only, no imports — insert at index 1.
+        # Module docstring only, no imports - insert at index 1.
         ('"""module doc"""\nx = 1\n', 1),
         # from-import counts as an import.
         ("from pathlib import Path\nx = 1\n", 1),
@@ -142,9 +142,9 @@ def test_after_last_import_formatter_resilient() -> None:
 @pytest.mark.parametrize(
     "src, pattern, expected",
     [
-        # Pattern matches the first statement — insert after index 0 → index 1.
+        # Pattern matches the first statement - insert after index 0 → index 1.
         ("x = 1\ny = 2\n", "x = 1", 1),
-        # Pattern matches the second statement — insert after index 1 → index 2.
+        # Pattern matches the second statement - insert after index 1 → index 2.
         ("x = 1\ny = 2\nz = 3\n", "y = 2", 2),
         # Pattern is a regex.
         ("import os\nimport sys\n", r"import\s+sys", 2),
@@ -168,11 +168,11 @@ def test_after_statement_matching_pattern_not_found() -> None:
 @pytest.mark.parametrize(
     "src, expected",
     [
-        # Statement then return — insert before return at index 1.
+        # Statement then return - insert before return at index 1.
         ("def f():\n    x = 1\n    return x\n", 1),
-        # No return — insert at end of body (index 1).
+        # No return - insert at end of body (index 1).
         ("def f():\n    pass\n", 1),
-        # Return is the only statement — insert before index 0.
+        # Return is the only statement - insert before index 0.
         ("def f():\n    return None\n", 0),
     ],
 )
@@ -213,9 +213,9 @@ def test_at_module_end_success(src: str, expected: int) -> None:
 @pytest.mark.parametrize(
     "src, anchor, position, expected",
     [
-        # After the anchor — index 1.
+        # After the anchor - index 1.
         ("def f():\n    x = 1\n    y = 2\n", "x = 1", "after", 1),
-        # Before the anchor — index 0.
+        # Before the anchor - index 0.
         ("def f():\n    x = 1\n    y = 2\n", "x = 1", "before", 0),
         # Anchor is the second statement; after → index 2.
         ("def f():\n    x = 1\n    y = 2\n    z = 3\n", "y = 2", "after", 2),

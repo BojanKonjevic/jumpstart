@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 
 class TomlHandler(FileHandler):
-    """Handles .toml files — uses tomlkit for round-trip fidelity."""
+    """Handles .toml files - uses tomlkit for round-trip fidelity."""
 
     def can_handle(self, path: Path) -> bool:
         return path.suffix == ".toml"

@@ -1,4 +1,4 @@
-"""Tests for zenit.dryrun — preview mode that records operations without writing.
+"""Tests for zenit.dryrun - preview mode that records operations without writing.
 
 Verifies that RecordingFileSystem captures all file operations and that run_dry
 produces the expected output without touching the filesystem.
@@ -93,7 +93,7 @@ def test_append_to_file_is_recorded(tmp_path):
     assert any(action == "append" for (action, _, __) in fs.recorded_files)
 
 
-# ── run_dry — no filesystem side-effects ─────────────────────────────────────
+# ── run_dry - no filesystem side-effects ─────────────────────────────────────
 
 
 def test_run_dry_blank_does_not_create_project_dir(tmp_path):
@@ -114,7 +114,7 @@ def test_run_dry_fastapi_does_not_create_project_dir(tmp_path):
     assert not (tmp_path / "myapp").exists()
 
 
-# ── run_dry — output content ──────────────────────────────────────────────────
+# ── run_dry - output content ──────────────────────────────────────────────────
 
 
 def test_run_dry_blank_output_mentions_project_name(tmp_path, capsys):

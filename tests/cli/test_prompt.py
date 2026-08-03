@@ -1,4 +1,4 @@
-"""Tests for zenit.cli.prompt — TUI, fallback, rendering, and key reading.
+"""Tests for zenit.cli.prompt - TUI, fallback, rendering, and key reading.
 
 Covers every module in zenit/cli/prompt/:
 
@@ -81,7 +81,7 @@ class TestTtyAvailable:
 
 @pytest.mark.skipif(sys.platform == "win32", reason="Unix-specific test")
 class TestReadKeyUnix:
-    """read_key() Unix path — replaces sys.modules entries so that the
+    """read_key() Unix path - replaces sys.modules entries so that the
     lazy ``import termios`` / ``import tty`` inside the function body
     resolve to mocks."""
 
@@ -134,7 +134,7 @@ class TestReadKeyUnix:
         self._mock_termios_mod.tcsetattr.assert_called_once()
 
     def test_ctrl_c_returns_raw_byte_on_unix(self) -> None:
-        """On Unix, read_key() returns the raw \\x03 byte — tty.setraw()
+        """On Unix, read_key() returns the raw \\x03 byte - tty.setraw()
         suppresses SIGINT so the caller (run_tui / on_key) must handle it
         explicitly by checking for ``\\x03``."""
         with (
@@ -145,7 +145,7 @@ class TestReadKeyUnix:
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# _render — cursor control / line helpers
+# _render - cursor control / line helpers
 # ═══════════════════════════════════════════════════════════════════════════════
 
 
@@ -180,7 +180,7 @@ class TestReserveLines:
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# _render — render_single
+# _render - render_single
 # ═══════════════════════════════════════════════════════════════════════════════
 
 
@@ -288,7 +288,7 @@ class TestRenderSingle:
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# _render — filter_indices
+# _render - filter_indices
 
 
 class TestFilterIndices:
@@ -318,7 +318,7 @@ class TestFilterIndices:
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# _render — run_tui
+# _render - run_tui
 # ═══════════════════════════════════════════════════════════════════════════════
 
 
@@ -387,12 +387,12 @@ class TestRunTui:
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# _render — run_fallback
+# _render - run_fallback
 # ═══════════════════════════════════════════════════════════════════════════════
 
 
 class TestRunFallback:
-    """run_fallback() — numbered-list non-TTY picker."""
+    """run_fallback() - numbered-list non-TTY picker."""
 
     ITEMS: list[tuple[str, str]] = [("a", "Item A"), ("b", "Item B")]
 
@@ -437,7 +437,7 @@ class TestRunFallback:
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# _single — fallback_template  (existing tests preserved)
+# _single - fallback_template  (existing tests preserved)
 # ═══════════════════════════════════════════════════════════════════════════════
 
 
@@ -495,12 +495,12 @@ def test_fallback_template_keyboard_interrupt_raises_system_exit() -> None:
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# _single — _fallback_single_add
+# _single - _fallback_single_add
 # ═══════════════════════════════════════════════════════════════════════════════
 
 
 class TestFallbackSingleAdd:
-    """_fallback_single_add() — non-TTY single-addon picker."""
+    """_fallback_single_add() - non-TTY single-addon picker."""
 
     ITEMS: list[tuple[str, str, list[str]]] = [
         ("docker", "Docker support", []),
@@ -521,7 +521,7 @@ class TestFallbackSingleAdd:
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# _single — prompt_template TUI path
+# _single - prompt_template TUI path
 # ═══════════════════════════════════════════════════════════════════════════════
 
 
@@ -550,7 +550,7 @@ class TestPromptTemplateTui:
             assert prompt_template() == "fastapi"
 
     def test_j_is_search_char(self) -> None:
-        """j is a search character, not navigation — filtering to nothing,
+        """j is a search character, not navigation - filtering to nothing,
         then escape to clear, enter to confirm default."""
         with (
             patch("zenit.cli.prompt._render.read_key", side_effect=["j", "\x1b", "\r"]),
@@ -559,7 +559,7 @@ class TestPromptTemplateTui:
             assert prompt_template() == "blank"
 
     def test_k_is_search_char(self) -> None:
-        """k is a search character, not navigation — filtering to nothing,
+        """k is a search character, not navigation - filtering to nothing,
         then escape to clear, enter to confirm default."""
         with (
             patch("zenit.cli.prompt._render.read_key", side_effect=["k", "\x1b", "\r"]),
@@ -638,7 +638,7 @@ class TestPromptTemplateTui:
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# _single — prompt_single_addon TUI path
+# _single - prompt_single_addon TUI path
 # ═══════════════════════════════════════════════════════════════════════════════
 
 
@@ -667,7 +667,7 @@ class TestPromptSingleAddonTui:
 
     def test_unavailable_addon_shows_flash_and_stays_in_loop(self) -> None:
         """Pressing enter on an unavailable item emits a flash and stays in
-        the loop — the user must move to an available item to confirm."""
+        the loop - the user must move to an available item to confirm."""
         keys = iter(["\x1b[B", "\x1b[B", "\r", "\x1b[A", "\r"])
         with (
             patch("zenit.cli.prompt._render.read_key", side_effect=keys),
@@ -727,14 +727,14 @@ class TestPromptSingleAddonTui:
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# _multi — _render_multi
+# _multi - _render_multi
 # ═══════════════════════════════════════════════════════════════════════════════
 
 
 class TestRenderMulti:
-    """_render_multi() — multi-select TUI renderer.
+    """_render_multi() - multi-select TUI renderer.
 
-    Assertions use visible characters (›, ●, ○, —) rather than exact
+    Assertions use visible characters (›, ●, ○, -) rather than exact
     ANSI codes so that tests remain robust if colour constants change.
     """
 
@@ -902,12 +902,12 @@ class TestRenderMulti:
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# _multi — _tui_multi state machine
+# _multi - _tui_multi state machine
 # ═══════════════════════════════════════════════════════════════════════════════
 
 
 class TestTuiMulti:
-    """_tui_multi() — full multi-select TUI with keyboard-driven state.
+    """_tui_multi() - full multi-select TUI with keyboard-driven state.
 
     Tests inject keystrokes via patching _render.read_key and verify the
     returned addon list.
@@ -960,7 +960,7 @@ class TestTuiMulti:
         assert "docker" in result
 
     def test_toggling_dep_auto_locks_requirement(self) -> None:
-        """Selecting celery locks redis in place — toggling redis shows
+        """Selecting celery locks redis in place - toggling redis shows
         a flash but doesn't remove it from the result."""
         keys = iter(["\x1b[B", "\x1b[B", " ", "\x1b[A", " ", "\r"])
         with patch("zenit.cli.prompt._render.read_key", side_effect=keys):
@@ -995,7 +995,7 @@ class TestTuiMulti:
 
     def test_default_selected_with_deps(self) -> None:
         """Default_selected must already include transitive deps when
-        passed to _tui_multi — this mirrors what prompt_addons does."""
+        passed to _tui_multi - this mirrors what prompt_addons does."""
         with patch("zenit.cli.prompt._render.read_key", return_value="\r"):
             result = _tui_multi(
                 "test",
@@ -1062,12 +1062,12 @@ class TestTuiMulti:
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# _multi — prompt_addons entry point
+# _multi - prompt_addons entry point
 # ═══════════════════════════════════════════════════════════════════════════════
 
 
 class TestPromptAddons:
-    """prompt_addons() — dispatches to TUI or fallback based on tty."""
+    """prompt_addons() - dispatches to TUI or fallback based on tty."""
 
     def test_empty_available_returns_empty(self) -> None:
         assert prompt_addons([], template="blank") == []
@@ -1124,12 +1124,12 @@ class TestPromptAddons:
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# _multi — prompt_multi_addon
+# _multi - prompt_multi_addon
 # ═══════════════════════════════════════════════════════════════════════════════
 
 
 class TestPromptMultiAddon:
-    """prompt_multi_addon() — multi-select for add/remove context."""
+    """prompt_multi_addon() - multi-select for add/remove context."""
 
     ITEMS: list[tuple[str, str, list[str]]] = [
         ("docker", "Docker support", []),
@@ -1185,12 +1185,12 @@ class TestPromptMultiAddon:
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# _multi — _fallback_multi_addon
+# _multi - _fallback_multi_addon
 # ═══════════════════════════════════════════════════════════════════════════════
 
 
 class TestFallbackMultiAddon:
-    """_fallback_multi_addon() — non-TTY multi-addon picker."""
+    """_fallback_multi_addon() - non-TTY multi-addon picker."""
 
     ITEMS: list[tuple[str, str, list[str]]] = [
         ("docker", "Docker support", []),
@@ -1270,7 +1270,7 @@ class TestFallbackMultiAddon:
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# _multi — _fallback_multi  (existing tests preserved)
+# _multi - _fallback_multi  (existing tests preserved)
 # ═══════════════════════════════════════════════════════════════════════════════
 
 

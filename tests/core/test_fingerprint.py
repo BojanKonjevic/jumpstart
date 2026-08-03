@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from zenit.core.manifest import _normalise, fingerprint
 
-# ── fingerprint() — top-level contract ───────────────────────────────────────
+# ── fingerprint() - top-level contract ───────────────────────────────────────
 
 
 def test_fingerprint_returns_sha256_prefix() -> None:
@@ -53,7 +53,7 @@ def test_normalised_differs_on_semantic_change() -> None:
 def test_invalid_python_falls_back_gracefully() -> None:
     """An indented fragment is not a valid Python module.
 
-    fingerprint() must not raise — it falls back to raw-text hashing
+    fingerprint() must not raise - it falls back to raw-text hashing
     with no libcst round-trip.  The hashes are still valid sha256
     values, but because no canonical round-trip occurred, Stage A/B
     removal will not match and removal falls through to Stage C fuzzy.
@@ -68,7 +68,7 @@ def test_invalid_python_falls_back_gracefully() -> None:
     assert raw != normalised
 
 
-# ── _normalise() — internal contract ─────────────────────────────────────────
+# ── _normalise() - internal contract ─────────────────────────────────────────
 
 
 def test_normalise_collapses_three_plus_blank_lines_to_two() -> None:

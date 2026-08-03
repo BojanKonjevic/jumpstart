@@ -1,4 +1,4 @@
-"""Remove-addon pipeline — undoes a single addon applied to an existing project."""
+"""Remove-addon pipeline - undoes a single addon applied to an existing project."""
 
 from __future__ import annotations
 
@@ -84,7 +84,7 @@ def _check_fuzzy_blocks(
     For each Python block belonging to *addon_id*, reads the current file at
     the recorded line range and compares fingerprints.  Blocks where neither
     the exact fingerprint (Stage A) nor the normalised fingerprint (Stage B)
-    match are returned — these would fall through to Stage C (fuzzy) removal.
+    match are returned - these would fall through to Stage C (fuzzy) removal.
     """
     result: list[tuple[str, str, str]] = []
     for block in manifest.python_blocks:
@@ -167,7 +167,7 @@ def remove_addon(
                 warn("Aborted.")
                 raise typer.Exit(0)
         else:
-            warn("Non-interactive mode — proceeding automatically.")
+            warn("Non-interactive mode - proceeding automatically.")
 
     if sys.stdin.isatty() and not yes:
         try:
@@ -178,7 +178,7 @@ def remove_addon(
             warn("Aborted.")
             raise typer.Exit(0)
     elif not yes:
-        warn("Non-interactive mode — proceeding automatically.")
+        warn("Non-interactive mode - proceeding automatically.")
 
     # ── destructive operations (wrapped in rollback context) ─────────────────
     with addon_or_rollback(project_dir, addon_id):
@@ -196,7 +196,7 @@ def remove_addon(
             remaining_addons,
         )
 
-        # ── injections (physical removal only — manifest written at the end) ────
+        # ── injections (physical removal only - manifest written at the end) ────
         _undo_injections_physical(project_dir, manifest, addon_id)
 
         # ── compose services ────────────────────────────────────────────────────
@@ -342,10 +342,10 @@ def remove_addon(
 
 # ── Removal helpers ───────────────────────────────────────────────────────────
 # Removing a zenit-managed addon involves two categories:
-#   1. Structured-entry removal — compose services/volumes, env vars, deps, and
+#   1. Structured-entry removal - compose services/volumes, env vars, deps, and
 #      just recipes are tracked as manifest entries and removed by dedicated
 #      helpers (_remove_compose_services, _remove_env_vars, etc.).
-#   2. Line-range removal — Python code injections are tracked as ManifestBlock
+#   2. Line-range removal - Python code injections are tracked as ManifestBlock
 #      entries (with line ranges and fingerprints) and removed by
 #      _undo_injections_physical via HandlerDispatcher.
 # This separation keeps each removal path simple and explicit.
@@ -386,7 +386,7 @@ def _remove_files(
         if full.exists():
             if not _file_content_matches_contribution(full, fc):
                 warn(
-                    f"'{dest}' was modified since addon installation — skipping deletion"
+                    f"'{dest}' was modified since addon installation - skipping deletion"
                 )
                 continue
             full.unlink()
@@ -516,7 +516,7 @@ def _undo_injections_physical(
 
     Uses the pre-read *manifest* to find recorded blocks, dispatches each to
     the appropriate handler's remove(), and stops.  It does NOT mutate or
-    write the manifest — that is the caller's responsibility, once all other
+    write the manifest - that is the caller's responsibility, once all other
     physical removals have also succeeded.  This keeps manifest writes atomic
     with respect to the full removal sequence.
 
@@ -540,7 +540,7 @@ def _undo_injections_physical(
         file_path = project_dir / file
         if not file_path.exists():
             print(
-                f"Warning: '{file}' is missing — skipping removal of "
+                f"Warning: '{file}' is missing - skipping removal of "
                 f"'{blocks[0].point}' injection(s) for addon '{addon_id}'. "
                 f"Run 'zenit doctor' to verify project integrity.",
                 file=sys.stderr,
@@ -583,7 +583,7 @@ def _undo_injections_physical(
                     adj.lines = f"{relocated[0]}-{relocated[1]}"
                     dispatcher.remove(file_path, adj)
         else:
-            # No overlap — safe to remove bottom-to-top from recorded lines.
+            # No overlap - safe to remove bottom-to-top from recorded lines.
             for block in blocks:
                 dispatcher.remove(file_path, block)
 
@@ -832,7 +832,7 @@ def _parse_justfile_blocks(lines: list[str]) -> list[_JustBlock]:
             i += 1
 
         elif stripped.startswith("[") and stripped.endswith("]"):
-            # Recipe attribute — accumulate until the next recipe header.
+            # Recipe attribute - accumulate until the next recipe header.
             pending_attrs.append(line)
             i += 1
 

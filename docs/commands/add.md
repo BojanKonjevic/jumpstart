@@ -15,8 +15,8 @@ Must be run from a directory that contains `.zenit.toml`. Zenit walks up the dir
 In order:
 
 1. Loads `.zenit.toml` and validates the project state.
-2. Resolves addon dependencies — if a selected addon requires another that is not installed, it is added to the install list automatically.
-3. Validates compatibility — checks each addon against the current template and against already-installed addons.
+2. Resolves addon dependencies - if a selected addon requires another that is not installed, it is added to the install list automatically.
+3. Validates compatibility - checks each addon against the current template and against already-installed addons.
 4. For each addon in install order: writes files, injects code, updates `pyproject.toml`, updates `compose.yml`, updates `.env.example`, updates `justfile`.
 5. Updates `.zenit.toml` with all new manifest entries.
 
@@ -30,7 +30,7 @@ After a successful `add`, run `uv sync` to install the new packages.
 
 | Argument | Description |
 |---|---|
-| `addon...` | One or more addon names to install. Optional — if omitted, an interactive picker is shown. |
+| `addon...` | One or more addon names to install. Optional - if omitted, an interactive picker is shown. |
 
 ---
 
@@ -122,19 +122,19 @@ $ zenit add redis --dry-run
   ~ append    REDIS_URL, REDIS_POOL_SIZE  →  .env.example
   ~ append    redis-up  →  justfile
 
-Dry run — nothing was written.
+Dry run - nothing was written.
 ```
 
 ---
 
 ## Rollback
 
-If any step fails — a file write error, a failed injection validation, a malformed `pyproject.toml` — Zenit rolls back all changes made during that `add` invocation before reporting the error. The rollback operates at the file level: modified files are restored from backup, and newly created files are deleted:
+If any step fails - a file write error, a failed injection validation, a malformed `pyproject.toml` - Zenit rolls back all changes made during that `add` invocation before reporting the error. The rollback operates at the file level: modified files are restored from backup, and newly created files are deleted:
 
 ```
   ✔ wrote     my_project/redis.py
   ✔ injected  my_project/settings.py  (settings_fields)
-  ✗ injection failed: my_project/lifecycle.py — result is not valid Python
+  ✗ injection failed: my_project/lifecycle.py - result is not valid Python
 
 Rolling back...
   ✔ restored  my_project/redis.py  →  deleted
@@ -143,7 +143,7 @@ Rolling back...
 Error: add failed. No changes were made to the project.
 ```
 
-The rollback is complete — no partial state is left behind. Every file touched during the operation is either reverted to its original content (if it existed before) or deleted (if it was created).
+The rollback is complete - no partial state is left behind. Every file touched during the operation is either reverted to its original content (if it existed before) or deleted (if it was created).
 
 ---
 
@@ -157,7 +157,7 @@ The rollback is complete — no partial state is left behind. Every file touched
 | Unknown addon name | Exits with an error and lists available addons. |
 | File to be created already exists | Exits with an error naming the conflicting file. Nothing is written. |
 | Injection produces invalid Python | Rolls back all changes. Reports the target file and the proposed output. |
-| `uv` not found | Packages are added to `pyproject.toml` but `uv sync` cannot be run. Zenit prints a warning and exits cleanly — the manifest is still updated. |
+| `uv` not found | Packages are added to `pyproject.toml` but `uv sync` cannot be run. Zenit prints a warning and exits cleanly - the manifest is still updated. |
 
 ---
 

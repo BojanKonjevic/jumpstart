@@ -144,7 +144,7 @@ def _build_file_contribution(
             text_content = f.read_text(encoding="utf-8")
             return FileContribution(dest=dest, content=text_content, template=True)
         except Exception:
-            warn(f"Failed to read '{dest}' — copied verbatim.")
+            warn(f"Failed to read '{dest}' - copied verbatim.")
             return FileContribution(dest=dest, source=str(f), template=False)
 
     return FileContribution(dest=dest, source=str(f), template=False)
@@ -209,7 +209,7 @@ def _apply_skip_if_exists(
             str(rendered_dest), patterns
         ):
             warn(
-                f"Skipping '{rendered_dest}' — _skip_if_exists pattern matched "
+                f"Skipping '{rendered_dest}' - _skip_if_exists pattern matched "
                 f"and file already exists."
             )
             continue

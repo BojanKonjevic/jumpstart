@@ -1,4 +1,4 @@
-"""Tests for zenit.add — adding addons to existing projects.
+"""Tests for zenit.add - adding addons to existing projects.
 
 Organised in two sections:
   - Pipeline unit tests: verify that add_addon correctly writes files,
@@ -91,7 +91,7 @@ def _scaffold(tmp_path: Path, name: str, template: str, addons: list[str]) -> Pa
     return project_dir
 
 
-# ── add_addon — migrated-project tests ─────────────────────────────────────────
+# ── add_addon - migrated-project tests ─────────────────────────────────────────
 
 
 def test_add_overwrite_non_tty_errors(
@@ -176,7 +176,7 @@ def test_full_add_on_migrated_lifecycle(
     assert redis_entry is None
 
 
-# ── add_addon — lockfile ──────────────────────────────────────────────────────
+# ── add_addon - lockfile ──────────────────────────────────────────────────────
 
 
 def test_add_updates_lockfile(tmp_path, monkeypatch):
@@ -225,7 +225,7 @@ def test_add_on_migrated_project_preserves_template(tmp_path, monkeypatch):
     assert "docker" in lockfile.addons
 
 
-# ── add_addon — files ─────────────────────────────────────────────────────────
+# ── add_addon - files ─────────────────────────────────────────────────────────
 
 
 def test_add_docker_creates_dockerfile(tmp_path, monkeypatch):
@@ -285,7 +285,7 @@ def test_add_celery_creates_task_files(tmp_path, monkeypatch):
     assert (project_dir / "src" / "myapp" / "tasks" / "example_tasks.py").exists()
 
 
-# ── add_addon — deps ──────────────────────────────────────────────────────────
+# ── add_addon - deps ──────────────────────────────────────────────────────────
 
 
 def test_add_docker_adds_just_recipes(tmp_path, monkeypatch):
@@ -421,7 +421,7 @@ def test_add_redis_then_docker_backfills_recipes(tmp_path, monkeypatch):
     assert "redis-down:" in justfile_after
 
 
-# ── add_addon — env vars ──────────────────────────────────────────────────────
+# ── add_addon - env vars ──────────────────────────────────────────────────────
 
 
 def test_add_redis_adds_env_var(tmp_path, monkeypatch):
@@ -452,7 +452,7 @@ def test_add_env_var_also_in_env_example(tmp_path, monkeypatch):
     assert "REDIS_URL=" in env_example
 
 
-# ── add_addon — injections ────────────────────────────────────────────────────
+# ── add_addon - injections ────────────────────────────────────────────────────
 
 
 def test_add_sentry_blank_injects_init_sentry_into_main(tmp_path, monkeypatch):
@@ -482,7 +482,7 @@ def test_add_redis_fastapi_injects_redis_url_into_settings(tmp_path, monkeypatch
     assert "redis_url" in settings
 
 
-# ── add_addon — compose services ─────────────────────────────────────────────
+# ── add_addon - compose services ─────────────────────────────────────────────
 
 
 def test_add_redis_merges_compose_service(tmp_path, monkeypatch):
@@ -504,7 +504,7 @@ def test_add_celery_merges_compose_services(tmp_path, monkeypatch):
     assert "celery-beat" in data["services"]
 
 
-# ── add_addon — error cases ───────────────────────────────────────────────────
+# ── add_addon - error cases ───────────────────────────────────────────────────
 
 
 def test_add_fails_when_addon_already_installed(tmp_path, monkeypatch):
@@ -872,7 +872,7 @@ def test_add_migrated_tty_respond_y(
 def test_add_migrated_tty_respond_n_skips_file(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Interactive TTY answering 'n' skips the file — addon is added but file absent."""
+    """Interactive TTY answering 'n' skips the file - addon is added but file absent."""
     from unittest.mock import patch
 
     project_dir = _scaffold(tmp_path, "myapp", "blank", [])

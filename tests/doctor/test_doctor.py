@@ -1,4 +1,4 @@
-"""Tests for zenit.doctor — all health check phases."""
+"""Tests for zenit.doctor - all health check phases."""
 
 from __future__ import annotations
 
@@ -1054,7 +1054,7 @@ class TestPrintResults:
         assert print_results([]) is False
 
 
-# ── _check_python_line_presence — fast tier ───────────────────────────────────
+# ── _check_python_line_presence - fast tier ───────────────────────────────────
 
 
 class TestCheckPythonLinePresence:
@@ -1181,7 +1181,7 @@ class TestCheckPythonIntegrity:
         new_lines = lines[: start - 1] + [broken] + lines[end:]
         target.write_text("".join(new_lines), encoding="utf-8")
 
-        # Must not raise — fingerprint falls back to raw text hashing.
+        # Must not raise - fingerprint falls back to raw text hashing.
         # In this case the raw fingerprint won't match either → ERROR is also
         # acceptable, but no unhandled exception.
         try:
@@ -1238,7 +1238,7 @@ class TestFixPythonBlocks:
         assert not result.has_warnings
 
     def test_fix_does_not_touch_user_code(self, tmp_path: Path) -> None:
-        """_fix_python_blocks must only update the manifest — never the file."""
+        """_fix_python_blocks must only update the manifest - never the file."""
         from zenit.core.manifest import read_manifest
 
         project_dir = _scaffold(tmp_path, template="fastapi", addons=["redis"])
@@ -1272,7 +1272,7 @@ class TestDoctorAlwaysRunsIntegrityCheck:
 
     def test_python_line_check_does_not_parse(self, tmp_path: Path) -> None:
         """The fast-tier line-presence check must perform only a file-length
-        comparison — it must not call libcst.parse_module at any point.
+        comparison - it must not call libcst.parse_module at any point.
 
         Verified by patching libcst.parse_module to raise if called, then
         asserting the check still returns a result without error.
@@ -1288,7 +1288,7 @@ class TestDoctorAlwaysRunsIntegrityCheck:
         try:
             import libcst as _cst  # noqa: PLC0415
         except ImportError:
-            return  # libcst not installed at all — nothing to patch
+            return  # libcst not installed at all - nothing to patch
 
         with _mock.patch.object(_cst, "parse_module", side_effect=sentinel):
             result = _check_python_line_presence(project_dir)
@@ -1363,7 +1363,7 @@ class TestCheckTemplateHealth:
 
 
 def test_unmanaged_native_project_ok() -> None:
-    """Native project returns OK — no unmanaged content expected."""
+    """Native project returns OK - no unmanaged content expected."""
     from zenit.doctor.doctor import _check_copier_unmanaged_content
 
     lockfile = ZenitLockfile(

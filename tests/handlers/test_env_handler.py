@@ -55,7 +55,7 @@ def test_apply_skips_existing_keys(tmp_path: Path) -> None:
 
     _handler().apply(f, "REDIS_URL=redis://other\n", "", {})
 
-    # File must be byte-for-byte identical — no write occurred
+    # File must be byte-for-byte identical - no write occurred
     assert f.read_text() == original
 
 
@@ -80,7 +80,7 @@ def test_apply_adds_trailing_newline_before_new_content(tmp_path: Path) -> None:
     _handler().apply(f, "REDIS_URL=redis://localhost\n", "", {})
 
     text = f.read_text()
-    # The two vars must be on separate lines — no concatenation
+    # The two vars must be on separate lines - no concatenation
     assert "localhost\nREDIS_URL" in text or "localhost\nREDIS_URL" in text.replace(
         "\r\n", "\n"
     )
@@ -109,7 +109,7 @@ def test_remove_deletes_lines_by_range(tmp_path: Path) -> None:
 
 def test_remove_missing_file_is_noop(tmp_path: Path) -> None:
     f = tmp_path / ".env"
-    # File does not exist — remove must return without raising
+    # File does not exist - remove must return without raising
     block = _block("1-1", f)
     _handler().remove(f, block)  # must not raise
     assert not f.exists()

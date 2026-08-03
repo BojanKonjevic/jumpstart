@@ -11,5 +11,5 @@ from .celery_app import celery_app
 
 @celery_app.task  # type: ignore[untyped-decorator]
 def add(x: int, y: int) -> int:
-    """Example task — replace or delete."""
+    """Example task - replace or delete."""
     return x + y

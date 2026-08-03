@@ -5,7 +5,7 @@ from zenit.cli.ui import spinner, warn
 
 
 def init(project_dir: Path) -> None:
-    """Initialise a git repository (best-effort — failure is not fatal).
+    """Initialise a git repository (best-effort - failure is not fatal).
 
     If the project already has commits (e.g. from Copier ``_tasks`` that
     ran ``git init && git commit`` before zenit's pipeline finished) the

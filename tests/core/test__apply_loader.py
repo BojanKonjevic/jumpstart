@@ -1,4 +1,4 @@
-"""Tests for zenit.core._apply_loader — loading apply() from a Python file."""
+"""Tests for zenit.core._apply_loader - loading apply() from a Python file."""
 
 from __future__ import annotations
 

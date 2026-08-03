@@ -104,7 +104,7 @@ def collect_all(
             seen[dest] = (label, fc)
             continue
 
-        # One has source, the other has content — resolve and compare actual text.
+        # One has source, the other has content - resolve and compare actual text.
         fc_content = _resolve_content(fc)
         prev_content = _resolve_content(prev_fc)
         if fc_content is None and prev_content is None:

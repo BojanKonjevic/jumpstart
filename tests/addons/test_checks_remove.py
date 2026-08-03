@@ -1,4 +1,4 @@
-"""Tests for :func:`check_can_remove` — precondition checking for zenit remove.
+"""Tests for :func:`check_can_remove` - precondition checking for zenit remove.
 
 Mirrors the structure of test_checks.py.  Every public failure path in
 check_can_remove gets its own test; the happy path verifies the returned
@@ -241,7 +241,7 @@ def test_can_remove_hook_receives_correct_project_dir(tmp_path, monkeypatch):
     assert received == [tmp_path]
 
 
-# ── happy path — return value ─────────────────────────────────────────────────
+# ── happy path - return value ─────────────────────────────────────────────────
 
 
 def test_returns_lockfile_on_success(tmp_path, monkeypatch):

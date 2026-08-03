@@ -1,6 +1,6 @@
 # Configuration
 
-Zenit reads a user-level config file on every run. It sets personal defaults that pre-select options in the interactive prompts — you can still change them before confirming. The file is optional; Zenit works without it.
+Zenit reads a user-level config file on every run. It sets personal defaults that pre-select options in the interactive prompts - you can still change them before confirming. The file is optional; Zenit works without it.
 
 ---
 
@@ -32,7 +32,7 @@ default_template = "fastapi"
 
 ### `default_addons`
 
-Pre-selects addons in `zenit create`. Addons incompatible with the selected template are silently ignored. Addon dependencies are resolved automatically — listing `celery` without `redis` is fine; Zenit selects both.
+Pre-selects addons in `zenit create`. Addons incompatible with the selected template are silently ignored. Addon dependencies are resolved automatically - listing `celery` without `redis` is fine; Zenit selects both.
 
 ```toml
 default_addons = ["docker", "github-actions"]
@@ -60,7 +60,7 @@ Output when the file does not exist:
 
 ```
   Config file:  /home/you/.config/zenit/zenit.toml
-  file does not exist — using built-in defaults
+  file does not exist - using built-in defaults
 
   default_template  =  not set
   default_addons    =  not set
@@ -75,7 +75,7 @@ Output when the file does not exist:
 
 ## How defaults interact with `zenit create`
 
-Defaults pre-select options in the interactive prompts — they do not skip them. You still navigate and confirm before anything is written.
+Defaults pre-select options in the interactive prompts - they do not skip them. You still navigate and confirm before anything is written.
 
 In the template picker, the default template opens with the cursor on it. In the addon picker, pre-selected addons appear with `●`; you can deselect them before confirming.
 

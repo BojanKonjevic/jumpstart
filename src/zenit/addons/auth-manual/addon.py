@@ -122,7 +122,7 @@ async def test_user(session: AsyncSession) -> User:
 
 @pytest.fixture
 async def auth_client(client: AsyncClient, test_user: User) -> AsyncClient:
-    """Authenticated client — logged in as test_user."""
+    """Authenticated client - logged in as test_user."""
     resp = await client.post(
         "/auth/login",
         data={"username": test_user.email, "password": "testpassword123"},

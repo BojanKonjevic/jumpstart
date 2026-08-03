@@ -268,7 +268,7 @@ def run_fallback(
                         if context == "remove"
                         else "missing dependencies"
                     )
-                    warn(f"'{name}' cannot be selected yet — {msg}.")
+                    warn(f"'{name}' cannot be selected yet - {msg}.")
                     break
                 return i
 

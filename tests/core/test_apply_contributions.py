@@ -1,7 +1,7 @@
 """Integration tests for apply_contributions() → manifest recording.
 
 Verifies that apply_contributions() correctly records every category of
-injected item in the manifest — Python blocks with accurate fingerprints,
+injected item in the manifest - Python blocks with accurate fingerprints,
 env entries, compose services/volumes, dependencies, and just recipes.
 
 Tested invariants:

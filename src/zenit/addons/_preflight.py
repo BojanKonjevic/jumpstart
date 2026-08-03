@@ -10,7 +10,7 @@ from zenit.core._filenames import ENV_FILES
 def require_src_layout(project_dir: Path, addon_name: str) -> str | None:
     if not (project_dir / "src").is_dir():
         return (
-            f"No src/ directory found — {addon_name} addon expects a src layout.\n"
+            f"No src/ directory found - {addon_name} addon expects a src layout.\n"
             "    Ensure your package lives under src/<pkg_name>/."
         )
     return None

@@ -11,7 +11,7 @@ from zenit.core.dependency import DependencyGraph
 
 
 class _HasIdAndRequires(Protocol):
-    """Minimal addon shape — both AddonConfig and AddonMeta satisfy this."""
+    """Minimal addon shape - both AddonConfig and AddonMeta satisfy this."""
 
     id: str
     requires: list[str]

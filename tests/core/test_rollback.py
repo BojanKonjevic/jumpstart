@@ -1,4 +1,4 @@
-"""Tests for zenit.rollback — cleanup context managers.
+"""Tests for zenit.rollback - cleanup context managers.
 
 Covers scaffold_or_rollback (removes the whole project dir on failure) and
 addon_or_rollback (removes only files added during the failed addon apply).
@@ -12,7 +12,7 @@ import pytest
 
 from zenit.core.rollback import addon_or_rollback, batch_snapshot, scaffold_or_rollback
 
-# ── scaffold_or_rollback — success ────────────────────────────────────────────
+# ── scaffold_or_rollback - success ────────────────────────────────────────────
 
 
 def test_scaffold_success_leaves_directory(tmp_path):
@@ -34,7 +34,7 @@ def test_scaffold_success_no_cleanup(tmp_path):
     assert sentinel.exists()
 
 
-# ── scaffold_or_rollback — exception ─────────────────────────────────────────
+# ── scaffold_or_rollback - exception ─────────────────────────────────────────
 
 
 def test_scaffold_failure_removes_directory(tmp_path):
@@ -122,7 +122,7 @@ def test_scaffold_cleanup_when_directory_already_gone(tmp_path):
         raise RuntimeError("boom")
 
 
-# ── addon_or_rollback — success ───────────────────────────────────────────────
+# ── addon_or_rollback - success ───────────────────────────────────────────────
 
 
 def test_addon_success_leaves_new_files(tmp_path):
@@ -145,7 +145,7 @@ def test_addon_success_leaves_existing_files(tmp_path):
     assert existing.exists()
 
 
-# ── addon_or_rollback — exception ─────────────────────────────────────────────
+# ── addon_or_rollback - exception ─────────────────────────────────────────────
 
 
 def test_addon_failure_removes_new_files(tmp_path):
@@ -263,7 +263,7 @@ def test_addon_no_new_files_on_failure_leaves_project_intact(tmp_path):
     assert project_dir.exists()
 
 
-# ── addon_or_rollback — content restoration ──────────────────────────────────
+# ── addon_or_rollback - content restoration ──────────────────────────────────
 
 
 def test_addon_failure_restores_modified_existing_file(tmp_path):

@@ -71,7 +71,7 @@ def test_apply_skips_duplicate_recipe_name(tmp_path: Path) -> None:
 
     _handler().apply(f, "docker-up:\n    docker compose up --build\n", "", {})
 
-    # File must be byte-for-byte identical — no write occurred
+    # File must be byte-for-byte identical - no write occurred
     assert f.read_text() == original
 
 

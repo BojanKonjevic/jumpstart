@@ -1,4 +1,4 @@
-"""Tests for zenit.validate — name validation, preflight checks,
+"""Tests for zenit.validate - name validation, preflight checks,
 and addon dependency/template-compatibility validation.
 """
 
@@ -34,7 +34,7 @@ def _make_addon(
     )
 
 
-# ── validate_name — acceptance ────────────────────────────────────────────────
+# ── validate_name - acceptance ────────────────────────────────────────────────
 
 
 def test_validate_name_accepts_simple_name(tmp_path, monkeypatch):
@@ -62,7 +62,7 @@ def test_validate_name_accepts_mixed_case(tmp_path, monkeypatch):
     validate_name("MyProject", "MyProject")
 
 
-# ── validate_name — rejection ─────────────────────────────────────────────────
+# ── validate_name - rejection ─────────────────────────────────────────────────
 
 
 def test_validate_name_rejects_existing_directory(tmp_path, monkeypatch):
@@ -136,7 +136,7 @@ def test_validate_name_rejects_python_keyword_def(tmp_path, monkeypatch):
     _assert_exits(validate_name, "def", "def")
 
 
-# ── validate_addon_deps — acceptance ─────────────────────────────────────────
+# ── validate_addon_deps - acceptance ─────────────────────────────────────────
 
 
 def test_validate_addon_deps_passes_when_all_satisfied():
@@ -177,7 +177,7 @@ def test_validate_addon_deps_passes_addon_with_no_template_restriction_fastapi()
     validate_addon_deps(["docker"], available, template="fastapi")
 
 
-# ── validate_addon_deps — rejection ──────────────────────────────────────────
+# ── validate_addon_deps - rejection ──────────────────────────────────────────
 
 
 def test_validate_addon_deps_fails_when_requirement_missing():
@@ -210,7 +210,7 @@ def test_validate_addon_deps_fails_template_incompatible_wrong_template():
 
 
 def test_validate_addon_deps_template_check_before_dep_check():
-    # auth-manual is fastapi-only AND requires some dep — template error should fire
+    # auth-manual is fastapi-only AND requires some dep - template error should fire
     available = [
         _make_addon("dep"),
         _make_addon("auth-manual", requires=["dep"], templates=["fastapi"]),
@@ -224,11 +224,11 @@ def test_validate_addon_deps_fails_with_multiple_missing_deps():
         _make_addon("b"),
         _make_addon("c", requires=["a", "b"]),
     ]
-    # Only "c" selected — both "a" and "b" are missing
+    # Only "c" selected - both "a" and "b" are missing
     _assert_exits(validate_addon_deps, ["c"], available)
 
 
-# ── check_preflight — tools present ──────────────────────────────────────────
+# ── check_preflight - tools present ──────────────────────────────────────────
 
 
 def test_check_preflight_passes_when_tools_available():

@@ -1,4 +1,4 @@
-"""Main migration pipeline — ``zenit migrate`` entry point."""
+"""Main migration pipeline - ``zenit migrate`` entry point."""
 
 from __future__ import annotations
 
@@ -190,21 +190,21 @@ def run_migration(
         for fc in file_contributions:
             if _uses_copier_internal_path_vars(fc.dest):
                 warn(
-                    f"Skipping '{fc.dest}' — destination depends on Copier-only "
+                    f"Skipping '{fc.dest}' - destination depends on Copier-only "
                     f"variables (prefixed with _copier_)."
                 )
                 continue
             dest_rel = _render_destination_path(fc.dest, answers.render_vars)
             if dest_rel is None:
                 warn(
-                    f"Skipping '{fc.dest}' — rendered destination is empty or unsafe "
+                    f"Skipping '{fc.dest}' - rendered destination is empty or unsafe "
                     f"(likely a conditional path whose condition was false)."
                 )
                 continue
             dest_path = project_dir / dest_rel
             if dest_path.exists() and dest_path.is_dir():
                 warn(
-                    f"Skipping '{fc.dest}' — rendered path '{dest_rel}' already "
+                    f"Skipping '{fc.dest}' - rendered path '{dest_rel}' already "
                     f"exists as a directory."
                 )
                 continue
@@ -214,7 +214,7 @@ def run_migration(
                 if p != project_dir
             ):
                 warn(
-                    f"Skipping '{fc.dest}' — rendered path '{dest_rel}' "
+                    f"Skipping '{fc.dest}' - rendered path '{dest_rel}' "
                     f"collides with an existing file."
                 )
                 continue
@@ -237,7 +237,7 @@ def run_migration(
                     else:
                         dest_path.write_text(fc.content, encoding="utf-8")
                         warn(
-                            f"Failed to render '{dest_rel}' — written verbatim. "
+                            f"Failed to render '{dest_rel}' - written verbatim. "
                             f"Reason: {diagnostic}"
                         )
                 else:
@@ -255,7 +255,7 @@ def run_migration(
     unresolved = _scan_for_unresolved_markers(project_dir, rendered_file_paths)
     for path in unresolved:
         warn(
-            f"Unresolved Copier marker(s) found in '{path}' — "
+            f"Unresolved Copier marker(s) found in '{path}' - "
             f"the template variable may be misspelled or missing."
         )
 

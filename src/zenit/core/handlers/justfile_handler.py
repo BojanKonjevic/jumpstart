@@ -6,7 +6,7 @@ from zenit.core.handlers.base import FileHandler
 
 
 class JustfileHandler(FileHandler):
-    """Handles justfiles — matched by filename, not suffix."""
+    """Handles justfiles - matched by filename, not suffix."""
 
     def can_handle(self, path: Path) -> bool:
         return path.name == "justfile"

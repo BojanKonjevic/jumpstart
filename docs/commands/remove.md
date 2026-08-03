@@ -15,10 +15,10 @@ Must be run from a directory that contains `.zenit.toml`. Zenit walks up the dir
 In order:
 
 1. Loads `.zenit.toml` and validates that each named addon is currently installed.
-2. Checks for dependents — if another installed addon requires the one being removed, Zenit exits with an error before making any changes.
+2. Checks for dependents - if another installed addon requires the one being removed, Zenit exits with an error before making any changes.
 3. Shows a confirmation prompt listing everything that will be removed.
 4. For each addon in reverse installation order: removes justfile recipes, removes env vars from `.env.example`, removes compose services from `compose.yml`, removes dependencies from `pyproject.toml`, excises injected code blocks, deletes created files.
-5. Updates `.zenit.toml` — removes the addon from `[project].addons` and deletes all its manifest entries.
+5. Updates `.zenit.toml` - removes the addon from `[project].addons` and deletes all its manifest entries.
 
 Step 5 is always last. If anything before it fails, all modified files are restored to their state before the command ran.
 
@@ -30,7 +30,7 @@ After a successful `remove`, run `uv sync` to uninstall the removed packages.
 
 | Argument | Description |
 |---|---|---|
-| `addon...` | One or more addon names to remove. Optional — omit to open the interactive picker. |
+| `addon...` | One or more addon names to remove. Optional - omit to open the interactive picker. |
 
 ---
 
@@ -109,7 +109,7 @@ If a file Zenit created has been modified since it was written, `remove` warns b
     Delete anyway? [y/N]
 ```
 
-The prompt is per-file. You can keep a modified file and still remove the rest of the addon — Zenit will skip deletion of that file but will still remove injections, dependencies, env vars, compose services, and justfile recipes associated with the addon.
+The prompt is per-file. You can keep a modified file and still remove the rest of the addon - Zenit will skip deletion of that file but will still remove injections, dependencies, env vars, compose services, and justfile recipes associated with the addon.
 
 ---
 
@@ -124,7 +124,7 @@ If an injected code block has been edited since it was written, `remove` warns b
     Continue? [y/N]
 ```
 
-If the fuzzy match fails entirely — the block has been changed enough that Zenit cannot locate it with confidence — removal exits with an error and manual recovery instructions:
+If the fuzzy match fails entirely - the block has been changed enough that Zenit cannot locate it with confidence - removal exits with an error and manual recovery instructions:
 
 ```
   ✗ Could not locate injection in my_project/lifecycle.py (lifespan_startup).
@@ -140,7 +140,7 @@ If the fuzzy match fails entirely — the block has been changed enough that Zen
 
 ## What "clean" means
 
-After a successful `remove`, the project must be in the exact state it was in before `zenit add` was called for that addon. Zenit verifies this by running the equivalent of `zenit doctor` for the removed addon's entries immediately after removal. If any discrepancy is found, it is reported — Zenit does not silently leave partial state.
+After a successful `remove`, the project must be in the exact state it was in before `zenit add` was called for that addon. Zenit verifies this by running the equivalent of `zenit doctor` for the removed addon's entries immediately after removal. If any discrepancy is found, it is reported - Zenit does not silently leave partial state.
 
 Concretely:
 - No files created by the addon remain on disk.
@@ -155,7 +155,7 @@ Concretely:
 
 ## Dependency removal and `uv sync`
 
-Zenit removes packages from `pyproject.toml` but does not run `uv sync` automatically. This is intentional — running `uv sync` modifies the active virtual environment, which may affect a running dev server or test process. You control when the environment changes.
+Zenit removes packages from `pyproject.toml` but does not run `uv sync` automatically. This is intentional - running `uv sync` modifies the active virtual environment, which may affect a running dev server or test process. You control when the environment changes.
 
 After removing an addon:
 
@@ -167,7 +167,7 @@ uv sync
 
 ## Removing the last addon
 
-Removing all addons leaves the project in the state of the bare template. `.zenit.toml` still exists and still records the template. The project is still Zenit-managed — you can run `zenit add` again at any time.
+Removing all addons leaves the project in the state of the bare template. `.zenit.toml` still exists and still records the template. The project is still Zenit-managed - you can run `zenit add` again at any time.
 
 ---
 

@@ -2,7 +2,7 @@
 
 `.zenit.toml` lives at the root of every Zenit-managed project. It is the complete record of everything Zenit has done: which template was used, which addons are installed, every file created (with a content hash), every code injection (with a fingerprint), and every dependency added.
 
-`zenit add`, `zenit remove`, and `zenit doctor` all require this file. Without it, Zenit cannot manage the project. The project itself is unaffected — it runs identically with or without `.zenit.toml`.
+`zenit add`, `zenit remove`, and `zenit doctor` all require this file. Without it, Zenit cannot manage the project. The project itself is unaffected - it runs identically with or without `.zenit.toml`.
 
 **Commit it. Don't edit it manually.**
 
@@ -56,13 +56,13 @@ addon = "redis"
 
 Written once at scaffold time and updated on every `add` or `remove`.
 
-`template` — the template used to scaffold the project. Never changes after creation.
+`template` - the template used to scaffold the project. Never changes after creation.
 
-`addons` — currently installed addons in installation order.
+`addons` - currently installed addons in installation order.
 
-`zenit_version` — the version of Zenit that last wrote this file.
+`zenit_version` - the version of Zenit that last wrote this file.
 
-`schema_version` — the manifest format version. Used for migrations if the schema changes.
+`schema_version` - the manifest format version. Used for migrations if the schema changes.
 
 ---
 
@@ -70,27 +70,27 @@ Written once at scaffold time and updated on every `add` or `remove`.
 
 One entry per code block injected into a Python file. Contains everything needed to find the block again at removal time.
 
-`addon` — the addon that produced this injection.
+`addon` - the addon that produced this injection.
 
-`point` — the named injection point, e.g. `settings_fields` or `lifespan_startup`.
+`point` - the named injection point, e.g. `settings_fields` or `lifespan_startup`.
 
-`file` — path to the target file, relative to the project root.
+`file` - path to the target file, relative to the project root.
 
-`lines` — the line range where the block was written, e.g. `"14-14"`. Used as a hint for the fingerprint search; not relied upon as a hard position.
+`lines` - the line range where the block was written, e.g. `"14-14"`. Used as a hint for the fingerprint search; not relied upon as a hard position.
 
-`fingerprint` — SHA-256 of the canonical libcst output of the injected block. Used for exact-match removal.
+`fingerprint` - SHA-256 of the canonical libcst output of the injected block. Used for exact-match removal.
 
-`fingerprint_normalised` — SHA-256 after normalising whitespace. Matches when the file has been formatted since injection.
+`fingerprint_normalised` - SHA-256 after normalising whitespace. Matches when the file has been formatted since injection.
 
-`locator.name` and `locator.args` — the locator used to find the insertion point. Re-run at removal time against the current file, so removal works even if the block has moved.
+`locator.name` and `locator.args` - the locator used to find the insertion point. Re-run at removal time against the current file, so removal works even if the block has moved.
 
 ### How fingerprints are used at removal
 
 Zenit tries three strategies in order until one succeeds:
 
-1. **Exact** — SHA-256 matches the recorded `fingerprint`. Clean removal.
-2. **Normalised** — SHA-256 matches `fingerprint_normalised`. Used after a formatter run. Silent.
-3. **Fuzzy** — SequenceMatcher similarity ≥ 85% within a 20-line window. Used when the block was lightly edited. Zenit warns and asks for confirmation.
+1. **Exact** - SHA-256 matches the recorded `fingerprint`. Clean removal.
+2. **Normalised** - SHA-256 matches `fingerprint_normalised`. Used after a formatter run. Silent.
+3. **Fuzzy** - SequenceMatcher similarity ≥ 85% within a 20-line window. Used when the block was lightly edited. Zenit warns and asks for confirmation.
 
 If none succeed, Zenit prints the recorded block and instructs manual removal.
 
@@ -100,11 +100,11 @@ If none succeed, Zenit prints the recorded block and instructs manual removal.
 
 One entry per environment variable added by an addon.
 
-`key` — the variable name, e.g. `REDIS_URL`.
+`key` - the variable name, e.g. `REDIS_URL`.
 
-`source` — one of the `EntrySource` enum values (`"template"` or `"addon"`).
+`source` - one of the `EntrySource` enum values (`"template"` or `"addon"`).
 
-`addon` — the addon that added this variable. Empty string for template-owned
+`addon` - the addon that added this variable. Empty string for template-owned
 entries.
 
 ---
@@ -113,13 +113,13 @@ entries.
 
 One entry per package added to `pyproject.toml`.
 
-`package` — the package name, e.g. `redis`.
+`package` - the package name, e.g. `redis`.
 
-`spec` — the version specifier written to `pyproject.toml`, e.g. `redis>=5`.
+`spec` - the version specifier written to `pyproject.toml`, e.g. `redis>=5`.
 
-`source` — one of the `EntrySource` enum values (`"template"` or `"addon"`).
+`source` - one of the `EntrySource` enum values (`"template"` or `"addon"`).
 
-`dev` — `true` if added to the dev dependency group, `false` for main dependencies.
+`dev` - `true` if added to the dev dependency group, `false` for main dependencies.
 
 ---
 
@@ -142,13 +142,13 @@ One entry per recipe appended to the `justfile`. Has `name`, `source` (one of th
 
 The project continues to work. `main.py` still runs, tests still pass, `uv sync` still works. Zenit has no runtime presence.
 
-What you lose is Zenit's ability to manage the project. `zenit add`, `zenit remove`, and `zenit doctor` all require `.zenit.toml` and will exit with an error. There is no `zenit init` that reconstructs the manifest from an existing project — doing so would require guessing what Zenit wrote versus what you wrote, which is exactly the ambiguity Zenit is designed to avoid.
+What you lose is Zenit's ability to manage the project. `zenit add`, `zenit remove`, and `zenit doctor` all require `.zenit.toml` and will exit with an error. There is no `zenit init` that reconstructs the manifest from an existing project - doing so would require guessing what Zenit wrote versus what you wrote, which is exactly the ambiguity Zenit is designed to avoid.
 
 ---
 
 ## What happens if you edit a Zenit-managed file
 
-`zenit doctor` will flag a content hash mismatch. This is not an error — it's expected that you edit generated files. It is information.
+`zenit doctor` will flag a content hash mismatch. This is not an error - it's expected that you edit generated files. It is information.
 
 `zenit remove` will warn specifically before deleting any file whose hash no longer matches:
 

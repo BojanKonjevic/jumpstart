@@ -28,7 +28,7 @@ src/zenit/
         └── files/
 ```
 
-Addons are discovered automatically — no registration step. Templates require one additional manual step; see [Writing a template](../templates/writing-templates.md).
+Addons are discovered automatically - no registration step. Templates require one additional manual step; see [Writing a template](../templates/writing-templates.md).
 
 ---
 
@@ -108,7 +108,7 @@ class Injection:
     templates: list[str]  # restrict to these templates; empty = all
 ```
 
-The `point` must be one of the injection points declared by the target template. The `content` string is inserted verbatim — include the correct indentation for the target scope.
+The `point` must be one of the injection points declared by the target template. The `content` string is inserted verbatim - include the correct indentation for the target scope.
 
 The `templates` field restricts which templates this injection applies to. When empty (the default), the injection applies to all compatible templates. Set it to `["fastapi"]` to limit the injection to fastapi projects only.
 
@@ -214,7 +214,7 @@ Two implementations:
 
 | Implementation | Behaviour |
 |---|---|
-| `RealFileSystem` | Performs real I/O — writes files, creates directories, runs commands. Used during actual scaffold/add/remove operations. |
+| `RealFileSystem` | Performs real I/O - writes files, creates directories, runs commands. Used during actual scaffold/add/remove operations. |
 | `RecordingFileSystem` | Records every operation in a list without touching disk. Used for `--dry-run` previews. `execute_command` is a no-op. |
 
 ---
@@ -284,7 +284,7 @@ Zenit uses non-standard Jinja2 delimiters to avoid conflicts with Python source 
 [% endif %]
 ```
 
-`dest` paths in `FileContribution` support `{{pkg_name}}` expansion (double braces — resolved before Jinja2 rendering).
+`dest` paths in `FileContribution` support `{{pkg_name}}` expansion (double braces - resolved before Jinja2 rendering).
 
 ---
 
@@ -341,7 +341,7 @@ Called before removal. Return `None` to allow it, or an error string to abort.
 ```python
 def can_remove(project_dir: Path, lockfile: ZenitLockfile) -> str | None:
     if "celery" in lockfile.addons:
-        return "Remove 'celery' first — it depends on this addon."
+        return "Remove 'celery' first - it depends on this addon."
     return None
 ```
 

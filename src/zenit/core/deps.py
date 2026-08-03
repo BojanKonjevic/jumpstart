@@ -1,7 +1,7 @@
 """Dependency injection into an existing pyproject.toml after running zenit add.
 
 Uses tomlkit for round-trip parsing so that the user's formatting, comments,
-and ordering are preserved. Only appends — never removes or reorders existing
+and ordering are preserved. Only appends - never removes or reorders existing
 entries.
 """
 
@@ -68,14 +68,14 @@ def inject_deps(
 ) -> tuple[list[str], list[str]]:
     """Append missing deps into pyproject.toml.
 
-    Returns (added_deps, added_dev_deps) — the deps that were actually written.
+    Returns (added_deps, added_dev_deps) - the deps that were actually written.
     Deps that are already present (by package name, ignoring version specifiers)
     are skipped silently.
     """
     pyproject_path = project_dir / PYPROJECT_FILE
     if not pyproject_path.exists():
         raise FileNotFoundError(
-            "pyproject.toml not found — cannot inject dependencies."
+            "pyproject.toml not found - cannot inject dependencies."
         )
 
     doc = tomlkit.parse(pyproject_path.read_text(encoding="utf-8"))

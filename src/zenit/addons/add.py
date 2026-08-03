@@ -1,4 +1,4 @@
-"""Add‑on pipeline — apply a single addon to an existing project."""
+"""Add‑on pipeline - apply a single addon to an existing project."""
 
 from __future__ import annotations
 
@@ -97,7 +97,7 @@ def _run_add_pipeline(
     """Shared pipeline body for both real and dry-run add operations.
 
     Returns ``(result, manifest)`` where *manifest* is ``None`` during
-    dry runs — the caller is responsible for writing the manifest and
+    dry runs - the caller is responsible for writing the manifest and
     lockfile via ``write_zenit_toml``.
 
     Parameters
@@ -121,7 +121,7 @@ def _run_add_pipeline(
 
     # Docker owns all compose services and volumes. Non-docker addons declare
     # their compose needs in AddonConfig but never directly merge or own
-    # compose entries — that is docker's job via _refresh_compose.
+    # compose entries - that is docker's job via _refresh_compose.
     if addon_cfg.id != "docker":
         contributions.compose_services = []
         contributions.compose_volumes = []
@@ -279,7 +279,7 @@ def _refresh_compose(
 
     atomic_write_text(compose_path, _compose_yaml_dumps(data))
 
-    # 4. Update manifest — record all entries as docker-owned
+    # 4. Update manifest - record all entries as docker-owned
     manifest.compose_services = [
         e for e in manifest.compose_services if e.source != EntrySource.ADDON
     ]
@@ -383,11 +383,11 @@ def _backfill_just_recipes(
     """Re-render just-recipes for earlier addons when the addon set changes.
 
     When Docker is added to a project, addons whose recipes were gated on
-    ``[% if "docker" in addons %]`` need their recipes backfilled — they
+    ``[% if "docker" in addons %]`` need their recipes backfilled - they
     rendered to empty strings (or native branches) during their own add
     pipeline because docker was not present at the time.
 
-    When Docker is removed from a project, the reverse — docker-gated
+    When Docker is removed from a project, the reverse - docker-gated
     recipes are replaced with native alternatives from the ``[% else %]``
     branch, or removed entirely if no native fallback exists.
 
@@ -542,7 +542,7 @@ def add_addon(
             warn("Aborted.")
             raise typer.Exit(0)
     elif not yes:
-        warn("Non‑interactive mode — proceeding automatically.")
+        warn("Non‑interactive mode - proceeding automatically.")
 
     # ── Interactive per-file overwrite confirmation ──────────────────────────
     if (
@@ -569,7 +569,7 @@ def add_addon(
                 warn(f"Overwriting '{f}'")
             else:
                 files_to_skip.add(f)
-                info(f"Skipping '{f}' — addon file not written.")
+                info(f"Skipping '{f}' - addon file not written.")
 
         if files_to_skip:
             addon_cfg = dataclasses.replace(
@@ -669,7 +669,7 @@ def add_addon_interactive(
         raise typer.Exit(1)
 
     if not lockfile.template:
-        error(".zenit.toml exists but has no template field — it may be corrupt.")
+        error(".zenit.toml exists but has no template field - it may be corrupt.")
         raise typer.Exit(1)
 
     available_meta = list_addons()

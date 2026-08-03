@@ -130,7 +130,7 @@ def _safe_shell_filter(command: str) -> str:
         f"shell() filter called with: '{command[:80]}"
         f"{'...' if len(command) > 80 else ''}'. "
         f"Shell execution during rendering is not supported. "
-        f"Returning empty string — provide the value with "
+        f"Returning empty string - provide the value with "
         f"-D <name>=<value>."
     )
     return ""

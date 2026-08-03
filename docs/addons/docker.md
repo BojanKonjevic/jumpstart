@@ -52,7 +52,7 @@ The docker addon adds a single `app` service:
 
 The `app` service mounts `.env` for configuration, uses Docker Compose watch mode to sync `./src`, and runs the appropriate command (`uvicorn` for FastAPI, `python -m` for blank).
 
-Additional services (e.g. `db` for PostgreSQL) come from other addons — the `postgres` addon adds its own service automatically.
+Additional services (e.g. `db` for PostgreSQL) come from other addons - the `postgres` addon adds its own service automatically.
 
 ### Just recipes
 

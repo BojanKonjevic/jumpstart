@@ -4,7 +4,7 @@ Covers:
   - apply(): insertion position, line-range arithmetic, error propagation
   - remove() Stage A: exact fingerprint
   - remove() Stage B: normalised fingerprint (libcst round-trip, no stderr)
-  - remove() Stage C: fuzzy match — success with warning, failure below threshold
+  - remove() Stage C: fuzzy match - success with warning, failure below threshold
   - remove() Stage D: file gone / truncated
   - _collapse_blank_lines(): standalone contract
 """
@@ -185,7 +185,7 @@ def test_apply_adds_trailing_newline_if_missing(tmp_path: Path) -> None:
     cst.parse_module(src)
 
 
-# ── remove() Stage A — exact fingerprint ─────────────────────────────────────
+# ── remove() Stage A - exact fingerprint ─────────────────────────────────────
 
 
 def test_remove_stage_a_exact_match(tmp_path: Path) -> None:
@@ -226,13 +226,13 @@ def test_remove_stage_a_file_is_valid_python_after(tmp_path: Path) -> None:
     cst.parse_module(f.read_text())
 
 
-# ── remove() Stage B — normalised fingerprint ─────────────────────────────────
+# ── remove() Stage B - normalised fingerprint ─────────────────────────────────
 
 
 def test_remove_stage_b_after_cst_roundtrip(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    """Stage B removes silently — no stderr output — after a libcst round-trip."""
+    """Stage B removes silently - no stderr output - after a libcst round-trip."""
     injection = "import redis\n"
     # Write the file with a round-tripped variant of the injection to simulate
     # the exact normalisation used by fingerprint_normalised.
@@ -247,11 +247,11 @@ def test_remove_stage_b_after_cst_roundtrip(
     remove(f, block)
 
     captured = capsys.readouterr()
-    assert captured.err == "", "Stage B must be silent — no stderr"
+    assert captured.err == "", "Stage B must be silent - no stderr"
     assert "import redis" not in f.read_text()
 
 
-# ── remove() Stage C — fuzzy match ────────────────────────────────────────────
+# ── remove() Stage C - fuzzy match ────────────────────────────────────────────
 
 
 def _inject_and_record(tmp_path: Path, injection: str) -> tuple[Path, ManifestBlock]:
@@ -323,7 +323,7 @@ def test_remove_stage_c_below_threshold_raises(tmp_path: Path) -> None:
     injection = '    redis_url: str = "redis://localhost"\n'
     f = tmp_path / "settings.py"
     original = 'class Settings:\n    db_url: str = "postgresql://localhost"\n'
-    # Record a block at line 50 — far beyond the real file length.
+    # Record a block at line 50 - far beyond the real file length.
     # Stage A/B skip (line 50 doesn't exist). Stage C window starts at
     # max(0, 49 - FUZZY_WINDOW_LINES) = 29, which is also beyond the 2-line file.
     # No candidates → Stage D.
@@ -351,7 +351,7 @@ def test_remove_stage_c_below_threshold_raises(tmp_path: Path) -> None:
     assert "Manual steps" in msg
 
 
-# ── remove() Stage D — unrecoverable ──────────────────────────────────────────
+# ── remove() Stage D - unrecoverable ──────────────────────────────────────────
 
 
 def test_remove_stage_d_file_deleted_raises(tmp_path: Path) -> None:
@@ -411,7 +411,7 @@ def test_remove_raises_on_invalid_result_stage_c(tmp_path: Path) -> None:
     assert "invalid Python" in msg
 
 
-# ── remove() Stage C — variable-length fuzzy match ────────────────────────
+# ── remove() Stage C - variable-length fuzzy match ────────────────────────
 
 
 def test_remove_stage_c_locator_mismatch_falls_through_to_c2(
@@ -442,7 +442,7 @@ def test_remove_empty_block_is_noop(tmp_path: Path) -> None:
     f = tmp_path / "mod.py"
     original = "import os\nclass App:\n    pass\n"
     f.write_text(original, encoding="utf-8")
-    # A block whose content is just a newline — degenerate edge case
+    # A block whose content is just a newline - degenerate edge case
     block = _block(f, "1-1", "import os\n")
     remove(f, block)
     assert f.exists()

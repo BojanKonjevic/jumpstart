@@ -30,7 +30,7 @@ This requires `.zenit.toml` in the current directory.
 
 ## `--all`
 
-Show the full addon ecosystem — every addon Zenit knows about, not just the ones installed in the current project. Useful when exploring what addons exist before deciding what to install.
+Show the full addon ecosystem - every addon Zenit knows about, not just the ones installed in the current project. Useful when exploring what addons exist before deciding what to install.
 
 ```
 zenit graph --all
@@ -42,7 +42,7 @@ Does not require `.zenit.toml`.
 
 ## `--reverse`
 
-Show the reverse dependency tree — for each addon, which other addons depend on it.
+Show the reverse dependency tree - for each addon, which other addons depend on it.
 
 ```
 zenit graph --reverse
@@ -113,7 +113,7 @@ zenit graph --json
 }
 ```
 
-The `requires` field lists addons this addon depends on. The `required_by` field lists addons that depend on this one (reverse edges). Only addons visible in the current invocation are included — use `--all` to include every known addon.
+The `requires` field lists addons this addon depends on. The `required_by` field lists addons that depend on this one (reverse edges). Only addons visible in the current invocation are included - use `--all` to include every known addon.
 
 ---
 
@@ -122,5 +122,5 @@ The `requires` field lists addons this addon depends on. The `required_by` field
 | Condition | Behaviour |
 |---|---|
 | No `.zenit.toml` and no `--all` | Error: "No .zenit.toml found. Use --all to see the full ecosystem." |
-| No `.zenit.toml` with `--all` | Works — shows every known addon, none marked installed |
+| No `.zenit.toml` with `--all` | Works - shows every known addon, none marked installed |
 | No addons installed and no `--all` | "No addons to show." |

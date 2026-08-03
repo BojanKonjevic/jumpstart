@@ -1,4 +1,4 @@
-"""Declarative addon/template contribution types — no file I/O here."""
+"""Declarative addon/template contribution types - no file I/O here."""
 
 from __future__ import annotations
 
@@ -39,7 +39,7 @@ class InjectionPoint:
     ``{{pkg_name}}`` which is resolved at apply time.
 
     ``locator`` drives structural injection for Python files.  For non-Python
-    files the locator is unused — handlers locate insertion points by file type
+    files the locator is unused - handlers locate insertion points by file type
     semantics (append for .env, merge for .yml, etc.).
     """
 
@@ -139,7 +139,7 @@ class FileContribution:
 
     ``dest`` may contain ``{{pkg_name}}`` which is resolved at apply time
     by plain string substitution (see :func:`resolve_dest_placeholder`).
-    No other ``{{…}}`` placeholders are allowed in dest paths — use
+    No other ``{{…}}`` placeholders are allowed in dest paths - use
     ``(( var_name ))`` (Jinja2 custom delimiters) in file content instead.
     """
 
@@ -241,7 +241,7 @@ class TemplateConfig:
 
 @dataclass
 class AddonMeta:
-    """Lightweight addon metadata — read from ``addon.toml`` without exec."""
+    """Lightweight addon metadata - read from ``addon.toml`` without exec."""
 
     id: str
     description: str
@@ -252,7 +252,7 @@ class AddonMeta:
 
 @dataclass
 class TemplateMeta:
-    """Lightweight template metadata — read from ``template.toml`` without exec."""
+    """Lightweight template metadata - read from ``template.toml`` without exec."""
 
     id: str
     description: str

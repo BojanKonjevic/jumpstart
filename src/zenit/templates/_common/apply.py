@@ -41,7 +41,7 @@ def apply(ctx: Context, fs: FileSystem) -> None:
         if shutil.which("direnv"):
             fs.execute_command(["direnv", "allow"], check=False)
         else:
-            hint = "direnv not found — .envrc copied but not activated."
+            hint = "direnv not found - .envrc copied but not activated."
             if is_nixos:
                 hint += " You can also run 'nix-shell' to enter the environment."
             warn(hint)

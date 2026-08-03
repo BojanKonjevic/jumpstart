@@ -1,18 +1,18 @@
-"""Unit tests for justfile recipe removal — block parser + end-to-end removal.
+"""Unit tests for justfile recipe removal - block parser + end-to-end removal.
 
 Covers the two-pass block parser (``_parse_justfile_blocks``) and the
 ``_remove_just_recipes`` helper that replaces the old whitespace heuristic.
 
 Test matrix
 -----------
-- Simple recipe with no attributes — baseline
-- Recipe with a ``[private]`` attribute — attribute removed with recipe
-- Recipe with multiple attributes — all removed together
-- Alias to a removed recipe — alias survives (separate block)
-- Two adjacent recipes where the first is removed — second's body intact
-- Recipe with blank lines in the body — body blank lines removed with recipe
-- Module-level ``set`` line — survives regardless
-- Recipe with parameters — ``migrate msg=""`` — handled correctly
+- Simple recipe with no attributes - baseline
+- Recipe with a ``[private]`` attribute - attribute removed with recipe
+- Recipe with multiple attributes - all removed together
+- Alias to a removed recipe - alias survives (separate block)
+- Two adjacent recipes where the first is removed - second's body intact
+- Recipe with blank lines in the body - body blank lines removed with recipe
+- Module-level ``set`` line - survives regardless
+- Recipe with parameters - ``migrate msg=""`` - handled correctly
 """
 
 from __future__ import annotations

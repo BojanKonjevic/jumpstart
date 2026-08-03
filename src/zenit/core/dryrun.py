@@ -1,4 +1,4 @@
-"""Dry-run mode — faithful preview by running the scaffold pipeline with a
+"""Dry-run mode - faithful preview by running the scaffold pipeline with a
 recording context that captures every file operation without touching disk."""
 
 from __future__ import annotations

@@ -289,7 +289,7 @@ def test_stabilise_self_referential() -> None:
 
 
 def test_stabilise_no_jinja_defaults() -> None:
-    """No Jinja2 defaults — no changes to answers."""
+    """No Jinja2 defaults - no changes to answers."""
     config = CopierConfig(
         questions=[
             CopierQuestion(name="name", type=QuestionType.STR, default="myapp"),
@@ -331,7 +331,7 @@ def test_stabilise_circular_dependency_warns(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Circular dependency emits warning after max iterations."""
-    # Each pass appends a character — never converges.
+    # Each pass appends a character - never converges.
     config = CopierConfig(
         questions=[
             CopierQuestion(name="a", type=QuestionType.STR, default="{{ b }}x"),
@@ -372,7 +372,7 @@ def test_stabilise_preserves_user_explicit_values(
     answers.render_vars["a"] = "user_value"  # User explicitly typed this
     answers.render_vars["b"] = "user_b_value"  # User explicitly typed this
 
-    # "a" and "b" are both explicit — neither should be re-resolved
+    # "a" and "b" are both explicit - neither should be re-resolved
     _stabilise_render_vars(config, answers, {"a", "b"})
 
     assert answers.render_vars["b"] == "user_b_value"
@@ -711,7 +711,7 @@ def test_run_migration_derives_package_name_when_project_name_empty(
         encoding="utf-8",
     )
 
-    # All prompts return empty — project_name is empty, so dependent
+    # All prompts return empty - project_name is empty, so dependent
     # defaults (package_name) are also empty at prompt-time.
     monkeypatch.setattr("builtins.input", lambda prompt="": "")
     out_dir = tmp_path / "out"
@@ -1361,7 +1361,7 @@ def test_parse_required_and_validator(tmp_path: Path) -> None:
 def test_validate_answer_uses_regex_search() -> None:
     """regex_search function is available to validator expressions."""
 
-    # Validator uses regex_search — should fail for non-matching value
+    # Validator uses regex_search - should fail for non-matching value
     result = _validate_answer(
         CopierQuestion(
             name="version",

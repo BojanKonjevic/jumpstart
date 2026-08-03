@@ -1,4 +1,4 @@
-"""Tests for zenit.doctor.print_results — terminal output format.
+"""Tests for zenit.doctor.print_results - terminal output format.
 
 test_doctor.py already verifies the return value (True/False) and that
 category names and messages appear in output.  This file focuses on the

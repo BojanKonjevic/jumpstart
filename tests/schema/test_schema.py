@@ -1,4 +1,4 @@
-"""Tests for zenit.schema — dataclass defaults, construction, and field behavior.
+"""Tests for zenit.schema - dataclass defaults, construction, and field behavior.
 
 The schema module is the backbone of the entire contribution pipeline.
 These tests verify that every dataclass initialises correctly, that mutable

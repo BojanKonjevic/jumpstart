@@ -52,7 +52,7 @@ def load_config() -> ZenitConfig:
     """Load and return user config. Returns an empty ZenitConfig on any error.
 
     Failures (file absent, malformed TOML, wrong types) are all silently
-    ignored — the tool must always work without a config file.
+    ignored - the tool must always work without a config file.
     """
     path = config_path()
     if not path.exists():

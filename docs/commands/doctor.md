@@ -13,7 +13,7 @@ with code `0` if everything is consistent, and code `1` if any check fails.
 
 ## What it checks
 
-Checks run in the following order. All checks always run — `doctor` does not
+Checks run in the following order. All checks always run - `doctor` does not
 stop at the first failure.
 
 **1. Metadata**
@@ -30,15 +30,15 @@ For native (zenit) templates, this check passes immediately.
 
 For Copier-migrated projects (`template_source == "copier"`):
 
-- **Error** if `template_has_tasks` is true — pending Copier `_tasks` were not
+- **Error** if `template_has_tasks` is true - pending Copier `_tasks` were not
   executed. Check `.zenit-tasks.md` for the command list.
-- **Warning** with the count of files tracked via `template_file_paths` — these
+- **Warning** with the count of files tracked via `template_file_paths` - these
   files are presence-tracked but not under full lifecycle management.
 
 **3. Manifest schema**
 
 - Verifies `schema_version` matches the current version
-- Detects orphan manifest blocks — entries whose addon is no longer in the
+- Detects orphan manifest blocks - entries whose addon is no longer in the
   lockfile's addon list
 
 **4. Dependencies**
@@ -110,7 +110,7 @@ recorded line range, and recomputes the fingerprint. Reports:
 **15. Unmanaged content (Copier-migrated projects only)**
 
 Scans the manifest for entries still marked `source = "template"` with
-`addon = ""` — env vars, dependencies, compose services, compose volumes, and
+`addon = ""` - env vars, dependencies, compose services, compose volumes, and
 just recipes that the Copier template contributed but no zenit addon has
 adopted. Suggests which native addon could take ownership.
 
@@ -126,7 +126,7 @@ zenit doctor --fix
 
 Re-syncs stale line numbers and fingerprints in the manifest from the current
 file content. After editing files or running formatters, the line ranges
-recorded in `.zenit.toml` may be outdated — `--fix` recalculates them without
+recorded in `.zenit.toml` may be outdated - `--fix` recalculates them without
 changing any source file.
 
 Use `--fix` after editing or reformatting a Zenit-managed file to keep the

@@ -19,7 +19,7 @@ features:
     link: /getting-started
     linkText: Read guide 
   - title: Commands
-    details: Reference for create, add, remove, doctor, and list — with every flag, option, and error condition.
+    details: Reference for create, add, remove, doctor, and list - with every flag, option, and error condition.
     link: /commands/
     linkText: Browse commands 
   - title: Templates

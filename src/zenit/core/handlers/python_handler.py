@@ -42,7 +42,7 @@ def _locate_line(
     """
     from libcst.metadata import MetadataWrapper, PositionProvider
 
-    # Isolate metadata resolution to its own parse — MetadataWrapper uses
+    # Isolate metadata resolution to its own parse - MetadataWrapper uses
     # unsafe_skip_copy=True so that PositionProvider keys match the tree
     # nodes we iterate over below.  Each call re-parses to avoid any risk
     # of cross-contamination from a long-lived wrapper.
@@ -59,7 +59,7 @@ def _locate_line(
                 # decorator and its function/class definition.
                 return positions[body[idx - 1]].end.line
             # idx == 0 → insert before the first element.
-            # For function bodies (before_yield etc.) line 0 is wrong — we
+            # For function bodies (before_yield etc.) line 0 is wrong - we
             # need the global line of the first body statement.
             return positions[body[0]].start.line - 1
         # Past end → insert after the last statement.
@@ -126,7 +126,7 @@ def _normalise_for_fuzzy(source: str) -> str:
     Uses the same normalisation as manifest.fingerprint() so that fuzzy
     scoring is consistent with the stored fingerprint_normalised values.
     Delegates to manifest._normalise via the round-trip already done there.
-    We call _fingerprint on a best-effort basis — if libcst cannot parse
+    We call _fingerprint on a best-effort basis - if libcst cannot parse
     the fragment (e.g. it is not valid Python), fall back to rstrip-only.
     """
     try:
@@ -201,10 +201,10 @@ def remove(
     """Remove a previously injected block from *file*.
 
     Stages:
-        A — exact fingerprint match on recorded lines.
-        B — normalised fingerprint match (formatter-resilient).
-        C — fuzzy match within FUZZY_WINDOW_LINES of recorded position.
-        D — raise RemovalError with actionable instructions.
+        A - exact fingerprint match on recorded lines.
+        B - normalised fingerprint match (formatter-resilient).
+        C - fuzzy match within FUZZY_WINDOW_LINES of recorded position.
+        D - raise RemovalError with actionable instructions.
     """
     source = file.read_text(encoding="utf-8")
     lines = source.splitlines(keepends=True)
@@ -435,13 +435,13 @@ def _assert_valid_python(file: Path, source: str) -> None:
 
     This is a safety net against removal leaving a corrupted file (e.g. when
     fuzzy matching picks the wrong block boundaries).  If this raises, the
-    file is unchanged — no write has occurred.
+    file is unchanged - no write has occurred.
     """
     try:
         cst.parse_module(source)
     except Exception as exc:
         raise RemovalError(
-            f"Removal would leave '{file}' with invalid Python syntax — "
+            f"Removal would leave '{file}' with invalid Python syntax - "
             f"aborted before writing.\n"
             f"  The injected block could not be located precisely enough.\n"
             f"  Manual steps:\n"

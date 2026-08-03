@@ -1,7 +1,7 @@
 """Central dependency graph for addon dependency management.
 
 Provides topological sort, transitive closure, cycle detection,
-and reverse-dependency queries — all in one place instead of
+and reverse-dependency queries - all in one place instead of
 ad-hoc ``requires_map`` dicts rebuilt in 6+ locations.
 """
 
@@ -17,7 +17,7 @@ from zenit.schema.models import AddonConfig, AddonMeta
 class DependencySpec:
     """A single node in the dependency graph.
 
-    ``optional`` indicates a soft dependency — the addon will be
+    ``optional`` indicates a soft dependency - the addon will be
     auto-selected when its consumer is chosen, but won't block removal.
     """
 
@@ -64,7 +64,7 @@ class DependencyGraph:
     def build_from_meta(addons: list[AddonMeta]) -> DependencyGraph:
         """Construct a ``DependencyGraph`` from a list of ``AddonMeta`` objects.
 
-        Same structure as ``build()`` but uses lightweight metadata — no exec
+        Same structure as ``build()`` but uses lightweight metadata - no exec
         of addon.py files required.
         """
         return DependencyGraph._build(
@@ -92,7 +92,7 @@ class DependencyGraph:
     # ── Queries ─────────────────────────────────────────────────────────────
 
     def closure(self, selected: set[str]) -> set[str]:
-        """Transitive closure — all dependencies of *selected*, including themselves.
+        """Transitive closure - all dependencies of *selected*, including themselves.
 
         For any addon in *selected*, every addon it requires (directly or
         transitively) is included in the result.
@@ -157,7 +157,7 @@ class DependencyGraph:
     # ── Ordering ────────────────────────────────────────────────────────────
 
     def tsort(self, selected: set[str]) -> list[str]:
-        """Topological sort — dependencies before consumers (apply order).
+        """Topological sort - dependencies before consumers (apply order).
 
         Only nodes present in *selected* and in the graph are included.
         Nodes not in the graph are silently ignored.
@@ -186,7 +186,7 @@ class DependencyGraph:
         return result
 
     def tsort_reverse(self, selected: set[str]) -> list[str]:
-        """Reverse topological sort — consumers before dependencies (remove order)."""
+        """Reverse topological sort - consumers before dependencies (remove order)."""
         return list(reversed(self.tsort(selected)))
 
     # ── Validation ──────────────────────────────────────────────────────────
