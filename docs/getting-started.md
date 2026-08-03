@@ -44,34 +44,16 @@ zenit --version
 ## Create a project
 
 ```bash
-zenit create my-api
+zenit create my-api --template fastapi -a docker,sqlalchemy,postgres
 ```
 
-Zenit will ask a few questions:
+`--template` selects the template; `-a`/`--addons` selects addons, comma-separated or repeated. The package name is derived automatically from the project name.
 
-```
-Template:
-  ❯ fastapi
-    blank
-
-Addons (space to select, enter to confirm):
-  ❯ ◯ docker
-    ◯ redis
-    ◯ celery
-    ◯ auth-manual
-    ◯ sentry
-    ◯ github-actions
-    ◯ sqlalchemy
-    ◯ postgres
-    ◯ sqlmodel
-
-Project name [my-api]:
-```
-
-Select **fastapi** as the template, then **docker**, **sqlalchemy**, and **postgres** as addons. Arrow keys navigate; space toggles; enter confirms. The package name is derived automatically from the project name. In CI environments without a TTY, Zenit falls back to numbered input automatically.
+Run `zenit list --available` to see every template and addon with a description, or skip the flags and Zenit will ask interactively instead (arrow keys navigate, space toggles, enter confirms; falls back to numbered input without a TTY).
 
 > [!TIP]
 > Set personal defaults in your config file so they appear pre-selected every time:
+>
 > ```toml
 > # ~/.config/zenit/zenit.toml  (Linux / macOS)
 > # %APPDATA%\zenit\zenit.toml  (Windows)
