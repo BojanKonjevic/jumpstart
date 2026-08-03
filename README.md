@@ -21,6 +21,9 @@
   <a href="https://pypi.org/project/zenit/">
     <img src="https://img.shields.io/pypi/pyversions/zenit" alt="Python">
   </a>
+  <a href="https://codecov.io/gh/BojanKonjevic/zenit">
+    <img src="https://img.shields.io/codecov/c/github/BojanKonjevic/zenit" alt="Coverage">
+  </a>
 </p>
 
 ---

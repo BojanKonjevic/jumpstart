@@ -46,7 +46,15 @@ jobs:
         run: uv run mypy src/
 
       - name: Test
-        run: uv run pytest -v ${{ matrix.pytest-addopts }}
+        run: uv run pytest -v --cov=src --cov-report=xml ${{ matrix.pytest-addopts }}
+
+      - name: Upload coverage to Codecov
+        if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.12'
+        uses: codecov/codecov-action@v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          file: coverage.xml
+          fail_ci_if_error: false
 
   studio-data-check:
     runs-on: ubuntu-latest

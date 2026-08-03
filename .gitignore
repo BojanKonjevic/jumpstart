@@ -11,6 +11,7 @@ __pycache__/
 .pytest_cache/
 htmlcov/
 .coverage
+coverage.xml
 .venv/
 
 # Direnv
