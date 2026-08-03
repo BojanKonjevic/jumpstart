@@ -792,7 +792,7 @@ wheels = [
 
 [[package]]
 name = "zenit"
-version = "1.0.9"
+version = "1.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "jinja2" },
