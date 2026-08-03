@@ -31,7 +31,7 @@ The workflow runs on push to `main` and on pull requests targeting `main`.
 
 1. **Checkout** - `actions/checkout@v4`
 2. **Install uv** - `astral-sh/setup-uv@v4` with caching
-3. **Set up Python** - `uv python install 3.14`
+3. **Set up Python** - `uv python install <version>` (the Python version your project was scaffolded with)
 4. **Install dependencies** - `uv sync --all-extras`
 5. **Run migrations** (fastapi + postgres only) - `uv run alembic upgrade head`
 6. **Lint** - `uv run ruff check .`
