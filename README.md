@@ -34,11 +34,11 @@
 
 Create a project non-interactively, then add and remove addons later:
 
-![zenit flags demo](assets/demo-flags.gif)
+![zenit flags demo](https://raw.githubusercontent.com/BojanKonjevic/zenit/main/assets/demo-flags.gif)
 
 The interactive selector - template first, then addons:
 
-![zenit interactive demo](assets/demo-interactive.gif)
+![zenit interactive demo](https://raw.githubusercontent.com/BojanKonjevic/zenit/main/assets/demo-interactive.gif)
 
 ## Quick Start
 
@@ -84,4 +84,3 @@ Explore templates, browse addons, inspect their files and dependencies, and buil
 ## License
 
 [MIT](LICENSE)
-

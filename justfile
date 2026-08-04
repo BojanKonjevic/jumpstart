@@ -20,3 +20,9 @@ publish:
     uv build
     uv publish --token "$UV_PUBLISH_TOKEN"
     uv tool install --reinstall zenit
+    git add -A
+    git commit -m "release: v{{version}}"
+    git tag -a v{{version}} -m "release v{{version}}"
+    git push origin main --tags
+
+version := `uv run python -c "import tomllib; print(tomllib.load(open('pyproject.toml', 'rb'))['project']['version'])"`
