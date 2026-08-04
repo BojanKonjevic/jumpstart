@@ -30,6 +30,16 @@
 
 **Zenit** is a CLI tool that scaffolds Python projects from declarative templates and addons. It generates production-ready code - FastAPI apps, database layers, Docker configs, CI pipelines - then gets out of the way. Everything it adds can be removed cleanly. Delete `.zenit.toml` and the project keeps working exactly the same.
 
+## Demos
+
+Create a project non-interactively, then add and remove addons later:
+
+![zenit flags demo](assets/demo-flags.gif)
+
+The interactive selector - template first, then addons:
+
+![zenit interactive demo](assets/demo-interactive.gif)
+
 ## Quick Start
 
 ```bash

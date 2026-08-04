@@ -35,3 +35,6 @@ node_modules
 #AI
 AGENTS.md
 opencode.json
+
+#MacOS
+.DS_Store
